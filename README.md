@@ -114,6 +114,7 @@ This is a list of all things that Box2D can do that this module doesn't provide 
 - Lots of joints
 - Contact monitoring
 - Sensor fixtures
+- Collision filtering/exclusion
 
 If this list is missing anything important, feel free to submit an issue.
 
