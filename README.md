@@ -22,7 +22,7 @@ Unlike Godot 2D physics, this module does not add a physics server. Instead, eve
 
 All physics happens in the physics step, and there is no issue with modifying physics outside of `_physics_process`.
 
-This is an example of a functional scene:
+To hopefully make usage clear without too many words, this is an example of a functional scene:
 
 ```
 root
@@ -39,7 +39,7 @@ root
         └─ Box2DWeldJoint
 ```
 
-Additionally, while Godot uses distinct nodes for physics object types (RigidBody2D, StaticBody2D, etc.), Box2DPhysicsBody has a `type` property that allows you to pick what kind of body to use.
+While Godot uses distinct nodes for physics object types (RigidBody2D, StaticBody2D, etc.), Box2DPhysicsBody has a `type` property that allows you to pick what kind of body to use.
 
 # Building
 
@@ -55,6 +55,7 @@ To use this module, it helps to already be familiar with compiling the engine on
 cd /your/documents/folder/wherever/
 ```
 For Godot 3.2: `git clone -b 3.2 https://github.com/godotengine/godot.git godot`
+
 For Godot 4.0: `git clone https://github.com/godotengine/godot.git godot`
 
 2. Clone this module
@@ -76,8 +77,8 @@ Box2D provides many features that parallel what is available in Godot, but many 
 | Godot Physics                     | Godot Box2D module                                                                                  |
 |-----------------------------------|-----------------------------------------------------------------------------------------------------|
 | Physics2DServer                   | Physics step is calculated by `Box2DWorld`. Each body, fixture and joint are managed by their node. |
-| Bodies (static, rigid, kinematic) | Box2DPhysicsBody node                                                                               |
-| Joints                            | Offers same constraints + more                                                                           |
+| Bodies (static, rigid, kinematic) | Provided by Box2DPhysicsBody node                                                                               |
+| Joints                            | This module offers same constraints + more                                                                           |
 | Areas                             | Fixtures with `sensor` flag offer a similar function (⚠ unimplemented)                                |
 | Shapes                            | All Godot shapes can be recreated with combinations of fixture shapes (⚠ WIP)                              |
 
