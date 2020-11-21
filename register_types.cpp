@@ -10,7 +10,7 @@
 * @author Brian Semrau
 */
 
-void register_box2d_types() {
+void register_godot_box2d_types() {
 	GLOBAL_DEF("physics/2d/box2d_conversion_factor", 50.0f);
 	ProjectSettings::get_singleton()->set_custom_property_info("physics/2d/box2d_conversion_factor", PropertyInfo(Variant::REAL, "physics/2d/box2d_conversion_factor"));
 
@@ -26,5 +26,5 @@ void register_box2d_types() {
 	// TODO more joints
 }
 
-void unregister_box2d_types() {
+void unregister_godot_box2d_types() {
 }

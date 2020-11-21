@@ -7,7 +7,7 @@ env_box2d = env_modules.Clone()
 
 # Thirdparty source files
 
-thirdparty_dir = "#modules/box2d/thirdparty/box2d/"
+thirdparty_dir = "#modules/godot_box2d/thirdparty/box2d/"
 
 box2d_src = [
     "collision/b2_broad_phase.cpp",
@@ -74,7 +74,7 @@ box2d_include = [
 thirdparty_sources = [thirdparty_dir + "src/" + file for file in box2d_src]
 thirdparty_include = [thirdparty_dir + file for file in box2d_include]
 
-thirdparty_include.append(["#modules/box2d/b2include/"])
+thirdparty_include.append(["#modules/godot_box2d/b2include/"])
 
 # Treat Box2D headers as system headers to avoid raising warnings. Not supported on MSVC.
 # if not env.msvc:
