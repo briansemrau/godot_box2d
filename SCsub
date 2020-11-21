@@ -1,0 +1,95 @@
+#!/usr/bin/env python
+
+Import('env')
+Import('env_modules')
+
+env_box2d = env_modules.Clone()
+
+# Thirdparty source files
+
+thirdparty_dir = "#modules/box2d/thirdparty/box2d/"
+
+box2d_src = [
+    "collision/b2_broad_phase.cpp",
+	"collision/b2_chain_shape.cpp",
+	"collision/b2_circle_shape.cpp",
+	"collision/b2_collide_circle.cpp",
+	"collision/b2_collide_edge.cpp",
+	"collision/b2_collide_polygon.cpp",
+	"collision/b2_collision.cpp",
+	"collision/b2_distance.cpp",
+	"collision/b2_dynamic_tree.cpp",
+	"collision/b2_edge_shape.cpp",
+	"collision/b2_polygon_shape.cpp",
+	"collision/b2_time_of_impact.cpp",
+	"common/b2_block_allocator.cpp",
+	"common/b2_draw.cpp",
+	"common/b2_math.cpp",
+	"common/b2_settings.cpp",
+	"common/b2_stack_allocator.cpp",
+	"common/b2_timer.cpp",
+	"dynamics/b2_body.cpp",
+	"dynamics/b2_chain_circle_contact.cpp",
+	"dynamics/b2_chain_polygon_contact.cpp",
+	"dynamics/b2_circle_contact.cpp",
+	"dynamics/b2_contact.cpp",
+	"dynamics/b2_contact_manager.cpp",
+	"dynamics/b2_contact_solver.cpp",
+	"dynamics/b2_distance_joint.cpp",
+	"dynamics/b2_edge_circle_contact.cpp",
+	"dynamics/b2_edge_polygon_contact.cpp",
+	"dynamics/b2_fixture.cpp",
+	"dynamics/b2_friction_joint.cpp",
+	"dynamics/b2_gear_joint.cpp",
+	"dynamics/b2_island.cpp",
+	"dynamics/b2_joint.cpp",
+	"dynamics/b2_motor_joint.cpp",
+	"dynamics/b2_mouse_joint.cpp",
+	"dynamics/b2_polygon_circle_contact.cpp",
+	"dynamics/b2_polygon_contact.cpp",
+	"dynamics/b2_prismatic_joint.cpp",
+	"dynamics/b2_pulley_joint.cpp",
+	"dynamics/b2_revolute_joint.cpp",
+	"dynamics/b2_weld_joint.cpp",
+	"dynamics/b2_wheel_joint.cpp",
+	"dynamics/b2_world.cpp",
+	"dynamics/b2_world_callbacks.cpp",
+	"rope/b2_rope.cpp",
+]
+
+box2d_include = [
+    "include/",
+    "src/",
+    # "dynamics/b2_chain_circle_contact.h",
+    # "dynamics/b2_chain_polygon_contact.h",
+    # "dynamics/b2_circle_contact.h",
+    # "dynamics/b2_contact_solver.h",
+    # "dynamics/b2_edge_circle_contact.h",
+    # "dynamics/b2_edge_polygon_contact.h",
+    # "dynamics/b2_island.h",
+    # "dynamics/b2_polygon_circle_contact.h",
+    # "dynamics/b2_polygon_contact.h",
+]
+
+thirdparty_sources = [thirdparty_dir + "src/" + file for file in box2d_src]
+thirdparty_include = [thirdparty_dir + file for file in box2d_include]
+
+thirdparty_include.append(["#modules/box2d/b2include/"])
+
+# Treat Box2D headers as system headers to avoid raising warnings. Not supported on MSVC.
+# if not env.msvc:
+    # env_box2d.Append(CPPFLAGS=["-isystem", Dir(thirdparty_dir).path])
+# else:
+env_box2d.Prepend(CPPPATH=thirdparty_include)
+
+env_box2d.Append(CPPDEFINES=["B2_USER_SETTINGS"])
+
+env_thirdparty = env_box2d.Clone()
+env_thirdparty.disable_warnings()
+env_thirdparty.add_source_files(env.modules_sources, thirdparty_sources)
+env_thirdparty.Append(CPPPATH=thirdparty_include)
+
+# Godot source files
+env_box2d.add_source_files(env.modules_sources, "*.cpp")
+
+
