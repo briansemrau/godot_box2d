@@ -33,7 +33,7 @@ public:
 
 private:
 	b2Fixture *fixture;
-	Box2DPhysicsBody *parent;
+	Box2DPhysicsBody *body_node;
 
 	void on_b2Fixture_destroyed(){}; // TODO is there any case when this is needed?
 
@@ -81,9 +81,10 @@ public:
 
 	Box2DFixture() :
 			fixture(NULL),
-			parent(NULL) {
+			body_node(NULL) {
 		fixtureDef.density = 1.0f;
 	};
+	~Box2DFixture();
 };
 
 class Box2DCircleFixture : public Box2DFixture {

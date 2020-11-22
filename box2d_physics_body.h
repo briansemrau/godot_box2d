@@ -33,7 +33,7 @@ private:
 	b2BodyDef bodyDef;
 	b2Body *body = nullptr;
 
-	Box2DWorld *parent;
+	Box2DWorld *world_node;
 
 	Set<IBox2DChildObject *> fixtures;
 	Set<IBox2DChildObject *> joints;

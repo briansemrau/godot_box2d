@@ -40,7 +40,7 @@ private:
 	b2JointDef *jointDef = nullptr;
 	b2Joint *joint = nullptr;
 
-	Box2DWorld *parent;
+	Box2DWorld *world_node;
 
 	NodePath a;
 	NodePath b;

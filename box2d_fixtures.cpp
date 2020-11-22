@@ -6,8 +6,8 @@ bool Box2DFixture::create_b2Fixture() {
 	// TODO should this be abstracted and handled by each fixture node type?
 	//      Probably not, because Polygon/Rect nodes are both e_polygon
 	if (!fixture) {
-		ERR_FAIL_COND_V(!parent, false);
-		ERR_FAIL_COND_V(!parent->body, false);
+		ERR_FAIL_COND_V(!body_node, false);
+		ERR_FAIL_COND_V(!body_node->body, false);
 
 		// Transform shape with local transform
 		b2FixtureDef transformedDef = b2FixtureDef(fixtureDef);
@@ -16,7 +16,7 @@ bool Box2DFixture::create_b2Fixture() {
 				b2CircleShape shp = b2CircleShape(*dynamic_cast<const b2CircleShape *>(fixtureDef.shape));
 				shp.m_p = gd_to_b2(get_transform().xform(b2_to_gd(shp.m_p)));
 				transformedDef.shape = &shp;
-				fixture = parent->body->CreateFixture(&transformedDef); // Write here because shp is in scope
+				fixture = body_node->body->CreateFixture(&transformedDef); // Write here because shp is in scope
 			} break;
 			case b2Shape::Type::e_edge: {
 				b2EdgeShape shp = b2EdgeShape(*dynamic_cast<const b2EdgeShape *>(fixtureDef.shape));
@@ -25,7 +25,7 @@ bool Box2DFixture::create_b2Fixture() {
 				shp.m_vertex2 = gd_to_b2(get_transform().xform(b2_to_gd(shp.m_vertex2)));
 				shp.m_vertex3 = gd_to_b2(get_transform().xform(b2_to_gd(shp.m_vertex3)));
 				transformedDef.shape = &shp;
-				fixture = parent->body->CreateFixture(&transformedDef); // Write here because shp is in scope
+				fixture = body_node->body->CreateFixture(&transformedDef); // Write here because shp is in scope
 			} break;
 			case b2Shape::Type::e_polygon: {
 				b2PolygonShape shp = b2PolygonShape(*dynamic_cast<const b2PolygonShape *>(fixtureDef.shape));
@@ -35,12 +35,12 @@ bool Box2DFixture::create_b2Fixture() {
 				}
 				shp.m_centroid = gd_to_b2(get_transform().xform(b2_to_gd(shp.m_centroid)));
 				transformedDef.shape = &shp;
-				fixture = parent->body->CreateFixture(&transformedDef); // Write here because shp is in scope
+				fixture = body_node->body->CreateFixture(&transformedDef); // Write here because shp is in scope
 			} break;
 			case b2Shape::Type::e_chain: {
 				// TODO
 				ERR_FAIL_V_MSG(false, "Not yet implemented");
-				fixture = parent->body->CreateFixture(&transformedDef); // Write here because shp is in scope
+				fixture = body_node->body->CreateFixture(&transformedDef); // Write here because shp is in scope
 			} break;
 			default: {
 				ERR_FAIL_V(false);
@@ -56,9 +56,9 @@ bool Box2DFixture::create_b2Fixture() {
 
 bool Box2DFixture::destroy_b2Fixture() {
 	if (fixture) {
-		ERR_FAIL_COND_V(!parent, false);
-		if (parent->body) {
-			parent->body->DestroyFixture(fixture);
+		ERR_FAIL_COND_V(!body_node, false);
+		if (body_node->body) {
+			body_node->body->DestroyFixture(fixture);
 			print_line("fixture destroyed");
 		}
 		fixture = NULL;
@@ -69,29 +69,48 @@ bool Box2DFixture::destroy_b2Fixture() {
 
 void Box2DFixture::_notification(int p_what) {
 	switch (p_what) {
-		case NOTIFICATION_PARENTED: {
-			parent = Object::cast_to<Box2DPhysicsBody>(get_parent());
-			if (parent) {
-				parent->fixtures.insert(this);
+		case NOTIFICATION_ENTER_TREE: {
+
+			Box2DPhysicsBody *new_body = Object::cast_to<Box2DPhysicsBody>(get_parent());
+
+			// If new parent, recreate fixture
+			if (body_node != new_body) {
+				// Remove from previous parent
+				if (body_node) {
+					body_node->fixtures.erase(this);
+					destroy_b2Fixture();
+				}
+				
+				body_node = new_body;
+				if (body_node) {
+					body_node->fixtures.insert(this);
+					if (body_node->body) {
+						create_b2Fixture();
+					}
+				}
 			}
+
+		} break;
+		case NOTIFICATION_EXIT_TREE: {
+
+			// Don't destroy fixture. It could be exiting/entering.
+			// Fixture should be destroyed in destructor if node is being freed.
+
 		} break;
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
+
 			update_shape();
-		} break;
-		case NOTIFICATION_UNPARENTED: {
-			destroy_b2Fixture();
-			if (parent) {
-				parent->fixtures.erase(this);
-			}
-			parent = NULL;
+
 		} break;
 		case NOTIFICATION_DRAW: {
+
 			if (!Engine::get_singleton()->is_editor_hint() && !get_tree()->is_debugging_collisions_hint()) {
 				break;
 			}
 
 			Color draw_col = get_tree()->get_debug_collisions_color();
 			debug_draw(get_canvas_item(), draw_col);
+
 		} break;
 	}
 }
@@ -113,11 +132,12 @@ void Box2DFixture::_bind_methods() {
 }
 
 void Box2DFixture::on_parent_created(Node *) {
+	destroy_b2Fixture();
 	create_b2Fixture();
 }
 
 void Box2DFixture::update_shape() {
-	if (parent && parent->body) {
+	if (body_node && body_node->body) {
 		// If shape has changed, the fixture must be completely recreated
 		destroy_b2Fixture();
 		create_b2Fixture();
@@ -161,7 +181,7 @@ Box2DFixture::FixtureType Box2DFixture::get_type() const {
 void Box2DFixture::set_density(real_t p_density) {
 	if (fixture) {
 		fixture->SetDensity(p_density);
-		parent->body->ResetMassData();
+		body_node->body->ResetMassData();
 	}
 	fixtureDef.density = p_density;
 }
@@ -190,6 +210,12 @@ void Box2DFixture::set_restitution(real_t p_restitution) {
 
 real_t Box2DFixture::get_restitution() const {
 	return fixtureDef.restitution;
+}
+
+Box2DFixture::~Box2DFixture() {
+	if (fixture && body_node) {
+		destroy_b2Fixture();
+	}
 }
 
 void Box2DCircleFixture::_bind_methods() {

@@ -2,8 +2,8 @@
 
 #include <core/engine.h>
 
-#include "box2d_joints.h"
 #include "box2d_fixtures.h"
+#include "box2d_joints.h"
 
 #include <string>
 
@@ -81,28 +81,35 @@ void Box2DWorld::SayGoodbye(b2Fixture *fixture) {
 void Box2DWorld::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE: {
-			if (!Engine::get_singleton()->is_editor_hint()) {
-				world = memnew(b2World(gd_to_b2(gravity)));
-				//world_ready = true;
-				auto child = box2d_children.front();
-				while (child) {
-					child->get()->on_parent_created(this);
-					child = child->next();
-				}
-				set_physics_process_internal(true);
 
-				world->SetDestructionListener(this);
+			if (!Engine::get_singleton()->is_editor_hint()) {
+				// Create world
+				if (!world) {
+					world = memnew(b2World(gd_to_b2(gravity)));
+
+					auto child = box2d_children.front();
+					while (child) {
+						child->get()->on_parent_created(this);
+						child = child->next();
+					}
+					set_physics_process_internal(true);
+
+					world->SetDestructionListener(this);
+				}
 			}
+
 		} break;
 		case NOTIFICATION_EXIT_TREE: {
-			if (world) {
-				memdelete(world);
-			}
-			set_physics_process_internal(false);
+
+			// Don't destroy world. It could be exiting/entering.
+			// World should be destroyed in destructor if node is being freed.
+
 		} break;
 		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
+
 			float time = get_physics_process_delta_time();
 			step(time);
+
 		} break;
 	}
 }
@@ -113,7 +120,6 @@ void Box2DWorld::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("query_aabb", "bounds"), &Box2DWorld::query_aabb);
 	ClassDB::bind_method(D_METHOD("intersect_point", "point"), &Box2DWorld::intersect_point);
-
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
 }

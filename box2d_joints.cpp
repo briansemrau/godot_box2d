@@ -55,15 +55,15 @@ void Box2DJoint::update_joint_bodies() {
 }
 
 bool Box2DJoint::create_b2Joint() {
-	if (parent && !joint) {
-		ERR_FAIL_COND_V(!parent->world, false);
+	if (world_node && !joint) {
+		ERR_FAIL_COND_V(!world_node->world, false);
 		ERR_FAIL_COND_V_MSG(!jointDef->bodyA, false, "Tried to create joint with invalid bodyA.");
 		ERR_FAIL_COND_V_MSG(!jointDef->bodyB, false, "Tried to create joint with invalid bodyB.");
 
 		// Allow subtypes to do final initialization before they're created
 		init_b2JointDef();
 
-		joint = parent->world->CreateJoint(jointDef);
+		joint = world_node->world->CreateJoint(jointDef);
 		joint->GetUserData().owner = this;
 
 		print_line("joint created");
@@ -74,10 +74,10 @@ bool Box2DJoint::create_b2Joint() {
 
 bool Box2DJoint::destroy_b2Joint() {
 	if (joint) {
-		ERR_FAIL_COND_V(!parent, false);
-		ERR_FAIL_COND_V(!parent->world, false)
+		ERR_FAIL_COND_V(!world_node, false);
+		ERR_FAIL_COND_V(!world_node->world, false)
 
-		parent->world->DestroyJoint(joint);
+		world_node->world->DestroyJoint(joint);
 		joint = NULL;
 
 		print_line("joint destroyed");
@@ -88,42 +88,43 @@ bool Box2DJoint::destroy_b2Joint() {
 
 void Box2DJoint::_notification(int p_what) {
 	switch (p_what) {
-		case NOTIFICATION_READY: {
-			update_joint_bodies();
-		} break;
 		case NOTIFICATION_ENTER_TREE: {
+
+			// Find the Box2DWorld
+			Node *_ancestor = get_parent();
+			Box2DWorld *new_world = NULL;
+			while (_ancestor && !new_world) {
+				new_world = Object::cast_to<Box2DWorld>(_ancestor);
+			}
+
+			// If new world, destroy joint.
+			if (new_world != world_node) {
+				if (world_node) {
+					world_node->box2d_children.erase(this);
+				}
+				destroy_b2Joint();
+
+				world_node = new_world;
+			}
+
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
 				set_process_internal(true);
 			}
+
 		} break;
 		case NOTIFICATION_EXIT_TREE: {
+
 			set_process_internal(false);
-		} break;
-		case NOTIFICATION_PARENTED: {
-			parent = Object::cast_to<Box2DWorld>(get_parent());
-			if (parent) {
-				parent->box2d_children.insert(this);
-				if (parent->world) {
-					create_b2Joint();
-				}
-			}
-		} break;
-		case NOTIFICATION_UNPARENTED: {
-			destroy_b2Joint();
 
-			if (parent) {
-				parent->box2d_children.erase(this);
-			}
-			Box2DPhysicsBody *body_a = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyA_cache));
-			Box2DPhysicsBody *body_b = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyB_cache));
-			if (body_a)
-				body_a->joints.erase(this);
-			if (body_b)
-				body_b->joints.erase(this);
+		} break;
+		case NOTIFICATION_POST_ENTER_TREE: {
 
-			parent = NULL;
+			// After all bodies created in ENTER_TREE, create joint if valid
+			update_joint_bodies();
+
 		} break;
 		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
+
 			if (breaking_enabled && joint) {
 				real_t force = get_reaction_force().length();
 				real_t torque = get_reaction_torque();
@@ -133,8 +134,10 @@ void Box2DJoint::_notification(int p_what) {
 					queue_delete();
 				}
 			}
+
 		} break;
 		case NOTIFICATION_INTERNAL_PROCESS: {
+
 			//if (body) { // && body->IsAwake()) {
 			//	set_block_transform_notify(true);
 			//	set_transform(b2_to_gd(body->GetTransform()));
@@ -143,8 +146,10 @@ void Box2DJoint::_notification(int p_what) {
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
 				update();
 			}
+
 		} break;
 		case NOTIFICATION_DRAW: {
+
 			if (!Engine::get_singleton()->is_editor_hint() && !get_tree()->is_debugging_collisions_hint()) {
 				break;
 			}
@@ -172,6 +177,7 @@ void Box2DJoint::_notification(int p_what) {
 				}
 			}
 			debug_draw(get_canvas_item(), debug_col);
+
 		} break;
 	}
 }
@@ -302,12 +308,12 @@ real_t Box2DJoint::get_reaction_torque() const {
 }
 
 Box2DJoint::Box2DJoint() :
-		parent(NULL), bodyA_cache(0), bodyB_cache(0), breaking_enabled(false), max_force(0.0f), max_torque(0.0f) {
+		world_node(NULL), bodyA_cache(0), bodyB_cache(0), breaking_enabled(false), max_force(0.0f), max_torque(0.0f) {
 }
 
 Box2DJoint::~Box2DJoint() {
-	if (joint && parent) {
-		parent->world->DestroyJoint(joint);
+	if (joint && world_node) {
+		destroy_b2Joint();
 	} // else Box2D has/will clean up joint
 }
 
