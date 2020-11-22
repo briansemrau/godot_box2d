@@ -48,6 +48,10 @@ private:
 	ObjectID bodyA_cache;
 	ObjectID bodyB_cache;
 
+	bool breaking_enabled;
+	real_t max_force;
+	real_t max_torque;
+
 	void on_b2Joint_destroyed();
 
 	void update_joint_bodies();
@@ -71,6 +75,11 @@ protected:
 public:
 	virtual String get_configuration_warning() const override;
 
+	// TODO enabled property
+	// Breaking should set enabled -> false
+
+	// TODO decide on free_on_break property
+
 	void set_node_a(const NodePath &p_node_a);
 	NodePath get_node_a() const;
 
@@ -80,8 +89,17 @@ public:
 	void set_collide_connected(bool p_collide);
 	bool get_collide_connected() const;
 
-	Vector2 get_reaction_impulse() const;
-	real_t get_reaction_torque_impulse() const;
+	void set_breaking_enabled(bool p_enabled);
+	bool is_breaking_enabled() const;
+
+	void set_max_force(real_t p_max_force);
+	real_t get_max_force() const;
+
+	void set_max_torque(real_t p_max_torque);
+	real_t get_max_torque() const;
+
+	Vector2 get_reaction_force() const;
+	real_t get_reaction_torque() const;
 
 	Box2DJoint();
 	~Box2DJoint();

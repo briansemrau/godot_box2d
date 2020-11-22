@@ -123,20 +123,55 @@ void Box2DJoint::_notification(int p_what) {
 
 			parent = NULL;
 		} break;
+		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
+			if (breaking_enabled && joint) {
+				real_t force = get_reaction_force().length();
+				real_t torque = get_reaction_torque();
+
+				if ((max_force > 0 && force > max_force) || (max_torque > 0 && torque > max_torque)) {
+					//emit_signal("joint_broken"); TODO
+					queue_delete();
+				}
+			}
+		} break;
 		case NOTIFICATION_INTERNAL_PROCESS: {
 			//if (body) { // && body->IsAwake()) {
 			//	set_block_transform_notify(true);
 			//	set_transform(b2_to_gd(body->GetTransform()));
 			//	set_block_transform_notify(false);
 			//}
-			update();
+			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
+				update();
+			}
 		} break;
 		case NOTIFICATION_DRAW: {
 			if (!Engine::get_singleton()->is_editor_hint() && !get_tree()->is_debugging_collisions_hint()) {
 				break;
 			}
 
-			debug_draw(get_canvas_item(), Color(0.7, 0.6, 0.0, 0.5));
+			Color debug_col = Color(0.7, 0.6, 0.0, 0.5);
+			if (breaking_enabled && joint) {
+				// TODO redo this maybe, meh
+				if (max_force > 0) {
+					// TODO which max/abs functions should I be using? not that it matters, just for cleanliness
+					real_t stress = get_reaction_force().length() / max_force;
+					debug_col.r = MAX(1.0, stress * 2.0);
+					debug_col.g = MAX(1.0, 1.0 - (stress * 2.0));
+					debug_col.b = 0.0;
+					if (max_torque > 0) {
+						stress = abs(get_reaction_torque() / max_torque);
+						debug_col.b = stress;
+					}
+				} else if (max_torque > 0) {
+					real_t stress = abs(get_reaction_torque() / max_torque);
+					debug_col.r = MAX(1.0, stress * 2.0);
+					debug_col.g = MAX(1.0, (1.0 - stress) * 2.0);
+					debug_col.b = 0.0;
+				} else {
+					// color UNCHANGED
+				}
+			}
+			debug_draw(get_canvas_item(), debug_col);
 		} break;
 	}
 }
@@ -148,13 +183,22 @@ void Box2DJoint::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_node_b"), &Box2DJoint::get_node_b);
 	ClassDB::bind_method(D_METHOD("set_collide_connected", "collide_connected"), &Box2DJoint::set_collide_connected);
 	ClassDB::bind_method(D_METHOD("get_collide_connected"), &Box2DJoint::get_collide_connected);
+	ClassDB::bind_method(D_METHOD("set_breaking_enabled", "breaking_enabled"), &Box2DJoint::set_breaking_enabled);
+	ClassDB::bind_method(D_METHOD("is_breaking_enabled"), &Box2DJoint::is_breaking_enabled);
+	ClassDB::bind_method(D_METHOD("set_max_force", "max_force"), &Box2DJoint::set_max_force);
+	ClassDB::bind_method(D_METHOD("get_max_force"), &Box2DJoint::get_max_force);
+	ClassDB::bind_method(D_METHOD("set_max_torque", "max_torque"), &Box2DJoint::set_max_torque);
+	ClassDB::bind_method(D_METHOD("get_max_torque"), &Box2DJoint::get_max_torque);
 
-	ClassDB::bind_method(D_METHOD("get_reaction_impulse"), &Box2DJoint::get_reaction_impulse);
-	ClassDB::bind_method(D_METHOD("get_reaction_torque_impulse"), &Box2DJoint::get_reaction_torque_impulse);
+	ClassDB::bind_method(D_METHOD("get_reaction_force"), &Box2DJoint::get_reaction_force);
+	ClassDB::bind_method(D_METHOD("get_reaction_torque"), &Box2DJoint::get_reaction_torque);
 
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_a"), "set_node_a", "get_node_a");
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_b"), "set_node_b", "get_node_b");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collide_connected"), "set_collide_connected", "get_collide_connected");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "breaking_enabled"), "set_breaking_enabled", "is_breaking_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "max_force"), "set_max_force", "get_max_force");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "max_torque"), "set_max_torque", "get_max_torque");
 }
 
 void Box2DJoint::on_parent_created(Node *p_parent) {
@@ -222,18 +266,43 @@ bool Box2DJoint::get_collide_connected() const {
 	return jointDef->collideConnected;
 }
 
-Vector2 Box2DJoint::get_reaction_impulse() const {
-	ERR_FAIL_COND_V_MSG(!joint, Vector2(), "b2Joint is null.");
-	return b2_to_gd(joint->GetReactionForce(1.0f));
+void Box2DJoint::set_breaking_enabled(bool p_enabled) {
+	breaking_enabled = p_enabled;
+	set_physics_process_internal(breaking_enabled);
 }
 
-real_t Box2DJoint::get_reaction_torque_impulse() const {
+bool Box2DJoint::is_breaking_enabled() const {
+	return breaking_enabled;
+}
+
+void Box2DJoint::set_max_force(real_t p_max_force) {
+	max_force = p_max_force;
+}
+
+real_t Box2DJoint::get_max_force() const {
+	return max_force;
+}
+
+void Box2DJoint::set_max_torque(real_t p_max_torque) {
+	max_torque = p_max_torque;
+}
+
+real_t Box2DJoint::get_max_torque() const {
+	return max_torque;
+}
+
+Vector2 Box2DJoint::get_reaction_force() const {
+	ERR_FAIL_COND_V_MSG(!joint, Vector2(), "b2Joint is null.");
+	return b2_to_gd(joint->GetReactionForce(1.0f / get_physics_process_delta_time()));
+}
+
+real_t Box2DJoint::get_reaction_torque() const {
 	ERR_FAIL_COND_V_MSG(!joint, real_t(), "b2Joint is null.");
-	return joint->GetReactionTorque(1.0);
+	return joint->GetReactionTorque(1.0f / get_physics_process_delta_time());
 }
 
 Box2DJoint::Box2DJoint() :
-		parent(NULL), bodyA_cache(0), bodyB_cache(0) {
+		parent(NULL), bodyA_cache(0), bodyB_cache(0), breaking_enabled(false), max_force(0.0f), max_torque(0.0f) {
 }
 
 Box2DJoint::~Box2DJoint() {
@@ -283,9 +352,9 @@ void Box2DRevoluteJoint::debug_draw(RID p_to_rid, Color p_color) {
 		p1 += b2_to_gd(j->GetAnchorA()) - get_position();
 		p2 += b2_to_gd(j->GetAnchorB()) - get_position();
 	}
-	draw_arc(p1, 5, 0, Math_PI * 2.0f, 10, p_color, 2.0f);
+	draw_arc(p1, 5, 0, Math_PI * 2.0f, 12, p_color, 2.0f);
 	draw_circle(p2, 2, p_color);
-	
+
 	if (jointDef.enableLimit) {
 		draw_line(p1, p1 + Point2(8, 0).rotated(jointDef.referenceAngle), p_color);
 		draw_line(p1, p1 + Point2(8, 0).rotated(jointDef.lowerAngle), p_color);
@@ -293,8 +362,15 @@ void Box2DRevoluteJoint::debug_draw(RID p_to_rid, Color p_color) {
 	}
 	if (jointDef.enableMotor) {
 		float a = jointDef.referenceAngle;
-		Color c = jointDef.motorSpeed > 0 ? Color(0.0, 1.0, 0.0) : Color(1.0, 0.0, 0.0);
-		draw_arc(p1, 10, a, a + jointDef.motorSpeed, 10, c);
+		Color c = jointDef.motorSpeed > 0 ? Color(0.0, 1.0, 0.0, 0.5) : Color(1.0, 0.0, 0.0, 0.5);
+		float arclen = jointDef.motorSpeed;
+		draw_arc(p1, 7, a, a + arclen, MAX(static_cast<int>(5.0f * arclen), 2), c, 2.0f);
+		if (j) {
+			float torqueUsage = j->GetReactionTorque(1.0f / get_physics_process_delta_time()) / j->GetMaxMotorTorque();
+			arclen *= torqueUsage;
+			c = Color(1.0, 1.0, 0.0, 0.5);
+			draw_arc(p1, 9, a, a + arclen, MAX(static_cast<int>(5.0f * arclen), 2), c, 2.0f);
+		}
 	}
 }
 
