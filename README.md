@@ -20,26 +20,31 @@ There is currently no real documentation for this module. However, most features
 
 Unlike Godot 2D physics, this module does not add a physics server. Instead, everything must be done in the scene tree. The `Box2DWorld` node controls all the physics processing.
 
-All physics happens in the physics step, and there is no issue with modifying physics outside of `_physics_process`.
+To use this module, first add a `Box2DWorld` node to the scene. This node must be the "ancestor" to all `Box2D` nodes within this world. It's okay to have multiple `Box2DWorld` nodes in one scene, but they will not interact, nor their bodies nor joints.
 
-To hopefully make usage clear without too many words, this is an example of a functional scene:
+To create a body, add a `Box2DPhysicsBody` in the node hierarchy beneath the world. This node will do nothing until you add a `Box2DFixture` node as a direct child. The body type (rigid/static/kinematic) is selected with the property `Box2DPhysicsBody.type`.
 
-```
+Here is an example of a functional scene tree:
+
+<pre>
 root
 └─ MyGame [Node]
-    ├─ [stuff]
-    └─ Box2DWorld
-        ├─ Box2DPhysicsBody1
-        │   ├─ [sprite]
-        │   └─ Box2DCircleFixture
-        └─ Box2DPhysicsBody2
-        │   ├─ [sprite]
-        │   ├─ Box2DRectFixture1
-        │   └─ Box2DRectFixture2
-        └─ Box2DWeldJoint
-```
-
-While Godot uses distinct nodes for physics object types (RigidBody2D, StaticBody2D, etc.), Box2DPhysicsBody has a `type` property that allows you to pick what kind of body to use.
+    ├─ some control nodes or whatever
+    └─ <span style="color:#3cc24a">Box2DWorld</span>
+        ├─ <span style="color:#a5b7f3">Box2DPhysicsBody1</span>
+        │   ├─ MySprite
+        │   └─ <span style="color:#54d1c6">Box2DCircleFixture</span>
+        ├─ <span style="color:#a5b7f3">Box2DPhysicsBody2</span>
+        │   ├─ <span style="color:#54d1c6">Box2DRectFixture1</span>
+        │   └─ <span style="color:#54d1c6">Box2DRectFixture2</span>
+        ├─ <span style="color:#e5b23b">Box2DWeldJoint</span>
+        └─ WheelOnAStick
+            ├─ <span style="color:#a5b7f3">Box2DPhysicsBody1</span>
+            │   └─ <span style="color:#54d1c6">Box2DRectFixture</span>
+            ├─ <span style="color:#a5b7f3">Box2DPhysicsBody2</span>
+            │   └─ <span style="color:#54d1c6">Box2DCircleFixture</span>
+            └─ <span style="color:#e5b23b">Box2DRevoluteJoint</span>
+</pre>
 
 # Building
 
