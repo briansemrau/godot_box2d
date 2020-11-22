@@ -69,6 +69,7 @@ public:
 	//bool isLocked() const;
 
 	Array intersect_point(const Point2 &p_point);
+	Array intersect_shape();
 	Array query_aabb(const Rect2 &p_bounds); // TODO add more parameters like Physics2DDirectSpaceState::_intersect_point
 
 	//void shiftOrigin(const Vector2 &newOrigin);

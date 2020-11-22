@@ -16,6 +16,7 @@
 #include "box2d_types_converter.h"
 
 #include "box2d_physics_body.h"
+#include "box2d_shapes.h"
 #include "box2d_world.h"
 
 class Box2DFixture : public Node2D, public virtual IBox2DChildObject {
@@ -24,32 +25,37 @@ class Box2DFixture : public Node2D, public virtual IBox2DChildObject {
 	friend class Box2DWorld;
 
 public:
-	enum FixtureType { // TODO figure out why the frick I added this
-		CIRCLE = b2Shape::e_circle,
-		//EDGE = b2Shape::e_edge, // TODO
-		POLYGON = b2Shape::e_polygon, // TODO polygon: add N>8gon decomposition to allow N>8 polys OR just force use of chain shape
-		//CHAIN = b2Shape::e_chain, // TODO
-	};
+	//enum FixtureType { // TODO figure out why the frick I added this
+	//	CIRCLE = b2Shape::e_circle,
+	//	//EDGE = b2Shape::e_edge, // TODO
+	//	POLYGON = b2Shape::e_polygon, // TODO polygon: add N>8gon decomposition to allow N>8 polys OR just force use of chain shape
+	//	//CHAIN = b2Shape::e_chain, // TODO
+	//};
 
 private:
-	b2Fixture *fixture;
 	Box2DPhysicsBody *body_node;
 
 	void on_b2Fixture_destroyed(){}; // TODO is there any case when this is needed?
 
-	bool create_b2Fixture();
-	bool destroy_b2Fixture();
+	void _shape_changed();
 
 protected:
+	Ref<Box2DShape> shape;
+
+	b2Fixture *fixture;
+	b2FixtureDef fixtureDef;
+
 	void _notification(int p_what);
 	static void _bind_methods();
 
-	virtual void on_parent_created(Node *) override;
+	virtual void on_parent_created(Node *) override final;
 
-	b2FixtureDef fixtureDef;
+	void create_b2Fixture(b2Body *p_body, b2Fixture *&p_fixture_out, const b2FixtureDef &p_def, const Transform2D &p_shape_xform);
+
+	virtual bool create_b2();
+	virtual bool destroy_b2();
 
 	void update_shape();
-	virtual void debug_draw(RID p_to_rid, Color p_color) = 0;
 
 public:
 	// TODO should this be in a TOOLS_ENABLED guard?
@@ -63,7 +69,10 @@ public:
 	// mass data?
 
 	// gettype (shape type)
-	FixtureType get_type() const;
+	//FixtureType get_type() const;
+
+	void set_shape(const Ref<Box2DShape> &p_shape);
+	Ref<Box2DShape> get_shape();
 
 	// sensor?
 	// filterdata?
@@ -86,71 +95,5 @@ public:
 	};
 	~Box2DFixture();
 };
-
-class Box2DCircleFixture : public Box2DFixture {
-	GDCLASS(Box2DCircleFixture, Box2DFixture);
-
-	b2CircleShape shape;
-
-protected:
-	static void _bind_methods();
-
-	virtual void debug_draw(RID p_to_rid, Color p_color) override;
-
-public:
-	void set_radius(real_t p_radius);
-	real_t get_radius() const;
-
-	Box2DCircleFixture();
-};
-
-class Box2DRectFixture : public Box2DFixture {
-	GDCLASS(Box2DRectFixture, Box2DFixture);
-
-	b2PolygonShape shape;
-	real_t width;
-	real_t height;
-
-protected:
-	static void _bind_methods();
-
-	virtual void debug_draw(RID p_to_rid, Color p_color) override;
-
-public:
-	void set_width(real_t p_width);
-	real_t get_width() const;
-
-	void set_height(real_t p_height);
-	real_t get_height() const;
-
-	Box2DRectFixture();
-};
-
-//class Box2DPolygonFixture : public Box2DFixture {
-//	GDCLASS(Box2DPolygonFixture, Box2DFixture);
-//
-//public:
-//	enum BuildMode {
-//		BUILD_SOLIDS,
-//		//BUILD_SEGMENTS, // TODO
-//	};
-//
-//private:
-//	Vector<Point2> polygon;
-//	PoolVector<b2PolygonShape> shape_vector; //TODO determine whether to use PoolVector/Vector. PoolVector is meant for larger arrays.
-//
-//protected:
-//	static void _bind_methods();
-//
-//	virtual void debug_draw(RID p_to_rid, Color p_color) override;
-//
-//public:
-//	void set_build_mode(BuildMode p_mode);
-//	BuildMode get_build_mode() const;
-//
-//	Box2DPolygonFixture();
-//};
-//
-//VARIANT_ENUM_CAST(Box2DPolygonFixture::BuildMode);
 
 #endif // BOX2D_FIXTURES_H

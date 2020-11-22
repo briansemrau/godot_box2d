@@ -1,10 +1,11 @@
 
 #include "register_types.h"
 
-#include "box2d_world.h"
-#include "box2d_physics_body.h"
 #include "box2d_fixtures.h"
 #include "box2d_joints.h"
+#include "box2d_physics_body.h"
+#include "box2d_shapes.h"
+#include "box2d_world.h"
 
 /**
 * @author Brian Semrau
@@ -16,10 +17,11 @@ void register_godot_box2d_types() {
 
 	ClassDB::register_class<Box2DWorld>();
 	ClassDB::register_class<Box2DPhysicsBody>();
-	ClassDB::register_virtual_class<Box2DFixture>();
-	ClassDB::register_class<Box2DCircleFixture>();
-	ClassDB::register_class<Box2DRectFixture>();
-	// TODO more fixtures
+	ClassDB::register_class<Box2DFixture>();
+	ClassDB::register_virtual_class<Box2DShape>();
+	ClassDB::register_class<Box2DCircleShape>();
+	ClassDB::register_class<Box2DRectShape>();
+	// TODO more shapes
 	ClassDB::register_virtual_class<Box2DJoint>();
 	ClassDB::register_class<Box2DRevoluteJoint>();
 	ClassDB::register_class<Box2DWeldJoint>();
