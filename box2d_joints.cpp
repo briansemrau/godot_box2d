@@ -40,7 +40,7 @@ void Box2DJoint::update_joint_bodies() {
 
 	bodyA_cache = body_a->get_instance_id();
 	bodyB_cache = body_b->get_instance_id();
-	// Make sure we receive body creation events
+	// Make sure we receive b2Body creation events
 	body_a->joints.insert(this);
 	body_a->joints.insert(this);
 
@@ -61,7 +61,8 @@ bool Box2DJoint::create_b2Joint() {
 		ERR_FAIL_COND_V_MSG(!jointDef->bodyB, false, "Tried to create joint with invalid bodyB.");
 
 		// Allow subtypes to do final initialization before they're created
-		init_b2JointDef();
+		b2Vec2 joint_pos = get_b2_pos();
+		init_b2JointDef(joint_pos);
 
 		joint = world_node->world->CreateJoint(jointDef);
 		joint->GetUserData().owner = this;
@@ -86,6 +87,11 @@ bool Box2DJoint::destroy_b2Joint() {
 	return false;
 }
 
+b2Vec2 Box2DJoint::get_b2_pos() const {
+	ERR_FAIL_COND_V(!world_node, b2Vec2());
+	return gd_to_b2(get_global_position() - world_node->get_global_position());
+}
+
 void Box2DJoint::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE: {
@@ -95,6 +101,7 @@ void Box2DJoint::_notification(int p_what) {
 			Box2DWorld *new_world = NULL;
 			while (_ancestor && !new_world) {
 				new_world = Object::cast_to<Box2DWorld>(_ancestor);
+				_ancestor = _ancestor->get_parent();
 			}
 
 			// If new world, destroy joint.
@@ -223,11 +230,18 @@ void Box2DJoint::on_parent_created(Node *p_parent) {
 String Box2DJoint::get_configuration_warning() const {
 	String warning = Node2D::get_configuration_warning();
 
-	if (!Object::cast_to<Box2DWorld>(get_parent())) {
+	Node *_ancestor = get_parent();
+	Box2DWorld *new_world = NULL;
+	while (_ancestor && !new_world) {
+		new_world = Object::cast_to<Box2DWorld>(_ancestor);
+		_ancestor = _ancestor->get_parent();
+	}
+
+	if (!new_world) {
 		if (warning != String()) {
 			warning += "\n\n";
 		}
-		warning += TTR("Box2DJoint only serves to create joints under a Box2DWorld node. Please only use it as a child of Box2DWorld.");
+		warning += TTR("Box2DJoint only serves to create joints under the hierarchy of a Box2DWorld node. Please only use it as a descendant of Box2DWorld.");
 	}
 
 	if (a.is_empty() || b.is_empty()) {
@@ -346,17 +360,21 @@ void Box2DRevoluteJoint::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "max_motor_torque"), "set_max_motor_torque", "get_max_motor_torque");
 }
 
-void Box2DRevoluteJoint::init_b2JointDef() {
-	jointDef.Initialize(jointDef.bodyA, jointDef.bodyB, gd_to_b2(get_transform().get_origin()));
+void Box2DRevoluteJoint::init_b2JointDef(const b2Vec2 &p_joint_pos) {
+	jointDef.Initialize(jointDef.bodyA, jointDef.bodyB, p_joint_pos);
 }
 
 void Box2DRevoluteJoint::debug_draw(RID p_to_rid, Color p_color) {
 	Point2 p1;
 	Point2 p2;
-	b2RevoluteJoint *j;
-	if (j = static_cast<b2RevoluteJoint *>(get_b2Joint())) {
-		p1 += b2_to_gd(j->GetAnchorA()) - get_position();
-		p2 += b2_to_gd(j->GetAnchorB()) - get_position();
+	b2RevoluteJoint *j = static_cast<b2RevoluteJoint *>(get_b2Joint());
+	if (j) {
+		b2Vec2 b2p1 = j->GetAnchorA();
+		b2p1 -= get_b2_pos();
+		b2Vec2 b2p2 = j->GetAnchorB();
+		b2p2 -= get_b2_pos();
+		p1 += b2_to_gd(b2p1); // - get_position();
+		p2 += b2_to_gd(b2p2); // - get_position();
 	}
 	draw_arc(p1, 5, 0, Math_PI * 2.0f, 12, p_color, 2.0f);
 	draw_circle(p2, 2, p_color);
@@ -475,8 +493,8 @@ void Box2DWeldJoint::_bind_methods() {
 	//ADD_PROPERTY(PropertyInfo(Variant::BOOL, ""), "set_", "get_");
 }
 
-void Box2DWeldJoint::init_b2JointDef() {
-	jointDef.Initialize(jointDef.bodyA, jointDef.bodyB, gd_to_b2(get_transform().get_origin()));
+void Box2DWeldJoint::init_b2JointDef(const b2Vec2 &p_joint_pos) {
+	jointDef.Initialize(jointDef.bodyA, jointDef.bodyB, p_joint_pos);
 }
 
 void Box2DWeldJoint::debug_draw(RID p_to_rid, Color p_color) {
@@ -484,8 +502,12 @@ void Box2DWeldJoint::debug_draw(RID p_to_rid, Color p_color) {
 	Point2 p2;
 	b2RevoluteJoint *j;
 	if (j = static_cast<b2RevoluteJoint *>(get_b2Joint())) {
-		p1 += b2_to_gd(j->GetAnchorA()) - get_position();
-		p2 += b2_to_gd(j->GetAnchorB()) - get_position();
+		b2Vec2 b2p1 = j->GetAnchorA();
+		b2p1 -= get_b2_pos();
+		b2Vec2 b2p2 = j->GetAnchorB();
+		b2p2 -= get_b2_pos();
+		p1 += b2_to_gd(b2p1);
+		p2 += b2_to_gd(b2p2);
 	}
 	draw_line(p1 + Point2(-5, 0), p1 + Point2(+5, 0), p_color, 2);
 	draw_line(p1 + Point2(0, -5), p1 + Point2(0, +5), p_color, 2);

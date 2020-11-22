@@ -11,6 +11,7 @@ bool Box2DPhysicsBody::create_b2Body() {
 
 		body = world_node->world->CreateBody(&bodyDef);
 		body->GetUserData().owner = this;
+		print_line("body created");
 
 		// Create fixtures
 		auto child = fixtures.front();
@@ -62,6 +63,7 @@ void Box2DPhysicsBody::_notification(int p_what) {
 			Box2DWorld *new_world = NULL;
 			while (_ancestor && !new_world) {
 				new_world = Object::cast_to<Box2DWorld>(_ancestor);
+				_ancestor = _ancestor->get_parent();
 			}
 
 			// If new parent, recreate body
@@ -178,11 +180,18 @@ void Box2DPhysicsBody::on_parent_created(Node *) {
 String Box2DPhysicsBody::get_configuration_warning() const {
 	String warning = Node2D::get_configuration_warning();
 
-	if (!Object::cast_to<Box2DWorld>(get_parent())) {
+	Node *_ancestor = get_parent();
+	Box2DWorld *new_world = NULL;
+	while (_ancestor && !new_world) {
+		new_world = Object::cast_to<Box2DWorld>(_ancestor);
+		_ancestor = _ancestor->get_parent();
+	}
+
+	if (!new_world) {
 		if (warning != String()) {
 			warning += "\n\n";
 		}
-		warning += TTR("Box2DPhysicsBody only serves to provide bodies to a Box2DWorld node. Please only use it as a child of Box2DWorld.");
+		warning += TTR("Box2DPhysicsBody only serves to provide bodies to a Box2DWorld node. Please only use it under the hierarchy of Box2DWorld.");
 	}
 
 	if (fixtures.size() == 0) {

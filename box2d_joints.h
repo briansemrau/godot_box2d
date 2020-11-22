@@ -63,12 +63,14 @@ protected:
 	b2Joint *get_b2Joint() { return joint; }
 	b2Joint *get_b2Joint() const { return joint; }
 
+	b2Vec2 get_b2_pos() const;
+
 	void _notification(int p_what);
 	static void _bind_methods();
 
 	virtual void on_parent_created(Node *p_parent) override;
 
-	virtual void init_b2JointDef() = 0;
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) = 0;
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) = 0;
 
@@ -119,7 +121,7 @@ class Box2DRevoluteJoint : public Box2DJoint {
 protected:
 	static void _bind_methods();
 
-	virtual void init_b2JointDef() override;
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) override;
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) override;
 
@@ -171,7 +173,7 @@ class Box2DWeldJoint : public Box2DJoint {
 protected:
 	static void _bind_methods();
 
-	virtual void init_b2JointDef() override;
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) override;
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) override;
 
