@@ -21,11 +21,16 @@ void register_godot_box2d_types() {
 	ClassDB::register_virtual_class<Box2DShape>();
 	ClassDB::register_class<Box2DCircleShape>();
 	ClassDB::register_class<Box2DRectShape>();
+	ClassDB::register_class<Box2DPolygonShape>();
 	// TODO more shapes
 	ClassDB::register_virtual_class<Box2DJoint>();
 	ClassDB::register_class<Box2DRevoluteJoint>();
 	ClassDB::register_class<Box2DWeldJoint>();
 	// TODO more joints
+
+#ifdef TOOLS_ENABLED
+	EditorPlugins::add_by_type<Box2DPolygonEditorPlugin>();
+#endif
 }
 
 void unregister_godot_box2d_types() {

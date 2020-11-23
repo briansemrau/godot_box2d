@@ -42,7 +42,7 @@ private:
 protected:
 	Ref<Box2DShape> shape;
 
-	b2Fixture *fixture;
+	Vector<b2Fixture *> fixtures;
 	b2FixtureDef fixtureDef;
 
 	void _notification(int p_what);
@@ -89,7 +89,6 @@ public:
 	// restitution threshold?
 
 	Box2DFixture() :
-			fixture(NULL),
 			body_node(NULL) {
 		fixtureDef.density = 1.0f;
 	};

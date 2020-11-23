@@ -45,14 +45,29 @@ void Box2DFixture::create_b2Fixture(b2Body *p_body, b2Fixture *&p_fixture_out, c
 }
 
 bool Box2DFixture::create_b2() {
-	if (!fixture) {
+	if (fixtures.size() <= 0) {
 		ERR_FAIL_COND_V(!body_node, false);
 		ERR_FAIL_COND_V(!body_node->body, false);
 		ERR_FAIL_COND_V(!shape.is_valid(), false);
-		ERR_FAIL_COND_V(!shape->shape, false);
 
-		fixtureDef.shape = shape->shape;
-		create_b2Fixture(body_node->body, fixture, fixtureDef, get_transform());
+		Box2DPolygonShape *polyshape = dynamic_cast<Box2DPolygonShape *>(shape.ptr());
+		if (polyshape) {
+			for (int i = 0; i < polyshape->shape_vector.size(); i++) {
+				fixtureDef.shape = &polyshape->shape_vector[i];
+				b2Fixture *fixture = NULL;
+				create_b2Fixture(body_node->body, fixture, fixtureDef, get_transform());
+				if (fixture)
+					fixtures.push_back(fixture);
+			}
+		} else {
+			ERR_FAIL_COND_V(!shape->shape, false);
+
+			fixtureDef.shape = shape->shape;
+			b2Fixture *fixture = NULL;
+			create_b2Fixture(body_node->body, fixture, fixtureDef, get_transform());
+			if (fixture)
+				fixtures.push_back(fixture);
+		}
 
 		print_line("fixture created");
 		return true;
@@ -61,13 +76,15 @@ bool Box2DFixture::create_b2() {
 }
 
 bool Box2DFixture::destroy_b2() {
-	if (fixture) {
+	if (fixtures.size() > 0) {
 		ERR_FAIL_COND_V(!body_node, false);
 		if (body_node->body) {
-			body_node->body->DestroyFixture(fixture);
+			for (int i = 0; i < fixtures.size(); i++) {
+				body_node->body->DestroyFixture(fixtures[i]);
+			}
+			fixtures.clear();
 			print_line("fixture destroyed");
 		}
-		fixture = NULL;
 		return true;
 	}
 	return false;
@@ -207,8 +224,8 @@ Ref<Box2DShape> Box2DFixture::get_shape() {
 }
 
 void Box2DFixture::set_density(real_t p_density) {
-	if (fixture) {
-		fixture->SetDensity(p_density);
+	for (int i = 0; i < fixtures.size(); i++) {
+		fixtures[i]->SetDensity(p_density);
 		body_node->body->ResetMassData();
 	}
 	fixtureDef.density = p_density;
@@ -219,8 +236,8 @@ real_t Box2DFixture::get_density() const {
 }
 
 void Box2DFixture::set_friction(real_t p_friction) {
-	if (fixture) {
-		fixture->SetFriction(p_friction);
+	for (int i = 0; i < fixtures.size(); i++) {
+		fixtures[i]->SetFriction(p_friction);
 	}
 	fixtureDef.friction = p_friction;
 }
@@ -230,8 +247,8 @@ real_t Box2DFixture::get_friction() const {
 }
 
 void Box2DFixture::set_restitution(real_t p_restitution) {
-	if (fixture) {
-		fixture->SetRestitution(p_restitution);
+	for (int i = 0; i < fixtures.size(); i++) {
+		fixtures[i]->SetRestitution(p_restitution);
 	}
 	fixtureDef.restitution = p_restitution;
 }
@@ -241,7 +258,7 @@ real_t Box2DFixture::get_restitution() const {
 }
 
 Box2DFixture::~Box2DFixture() {
-	if (fixture && body_node) {
+	if (body_node) {
 		destroy_b2();
 	}
 }

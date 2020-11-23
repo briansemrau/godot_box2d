@@ -118,8 +118,9 @@ void Box2DWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_gravity", "gravity"), &Box2DWorld::set_gravity);
 	ClassDB::bind_method(D_METHOD("get_gravity"), &Box2DWorld::get_gravity);
 
-	ClassDB::bind_method(D_METHOD("query_aabb", "bounds"), &Box2DWorld::query_aabb);
-	ClassDB::bind_method(D_METHOD("intersect_point", "point"), &Box2DWorld::intersect_point);
+	//ClassDB::bind_method(D_METHOD("query_aabb", "bounds"), &Box2DWorld::query_aabb);
+	ClassDB::bind_method(D_METHOD("intersect_point", "point"), &Box2DWorld::intersect_point, DEFVAL(32));
+	//ClassDB::bind_method(D_METHOD("intersect_shape", "TODO"), &Box2DWorld::intersect_shape);
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
 }
@@ -143,9 +144,12 @@ Vector2 Box2DWorld::get_gravity() const {
 	return gravity;
 }
 
-Array Box2DWorld::intersect_point(const Point2 &p_point) {
+Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results) {//, const Vector<Ref<Box2DPhysicsBody> > &p_exclude/*, uint32_t p_layers*/) {
 	pointCallback.results.clear();
 	pointCallback.point = gd_to_b2(p_point);
+	//pointCallback.exclude.clear();
+	//for (int i = 0; i < p_exclude.size(); i++)
+	//	pointCallback.exclude.insert(p_exclude[i]);
 	world->QueryAABB(&pointCallback, gd_to_b2(Rect2(p_point, Size2(0, 0))));
 
 	int n = pointCallback.results.size();
@@ -166,27 +170,27 @@ Array Box2DWorld::intersect_point(const Point2 &p_point) {
 	return arr;
 }
 
-Array Box2DWorld::query_aabb(const Rect2 &p_bounds) {
-	aabbCallback.results.clear();
-	world->QueryAABB(&aabbCallback, gd_to_b2(p_bounds));
-
-	int n = aabbCallback.results.size();
-	Array arr;
-	arr.resize(n);
-	for (int i = 0; i < n; i++) {
-		b2Fixture *fixture = aabbCallback.results.get(i);
-
-		Dictionary d;
-		d["body"] = fixture->GetBody()->GetUserData().owner;
-		d["fixture"] = fixture->GetUserData().owner;
-		// TODO do we really need to return a dict, or can we just return an
-		//      array of Box2DFixture objects and let the user get data from just that?
-
-		arr[i] = d;
-	}
-
-	return arr;
-}
+//Array Box2DWorld::query_aabb(const Rect2 &p_bounds) {
+//	aabbCallback.results.clear();
+//	world->QueryAABB(&aabbCallback, gd_to_b2(p_bounds));
+//
+//	int n = aabbCallback.results.size();
+//	Array arr;
+//	arr.resize(n);
+//	for (int i = 0; i < n; i++) {
+//		b2Fixture *fixture = aabbCallback.results.get(i);
+//
+//		Dictionary d;
+//		d["body"] = fixture->GetBody()->GetUserData().owner;
+//		d["fixture"] = fixture->GetUserData().owner;
+//		// TODO do we really need to return a dict, or can we just return an
+//		//      array of Box2DFixture objects and let the user get data from just that?
+//
+//		arr[i] = d;
+//	}
+//
+//	return arr;
+//}
 
 bool Box2DWorld::QueryCallback::ReportFixture(b2Fixture *fixture) {
 	results.push_back(fixture);
@@ -194,7 +198,7 @@ bool Box2DWorld::QueryCallback::ReportFixture(b2Fixture *fixture) {
 }
 
 bool Box2DWorld::IntersectPointCallback::ReportFixture(b2Fixture *fixture) {
-	if (fixture->TestPoint(point))
+	if (fixture->TestPoint(point))// && exclude.find(fixture->GetBody()->GetUserData().owner) > 0)
 		results.push_back(fixture);
-	return true;
+	return results.size() < max_results;
 }
