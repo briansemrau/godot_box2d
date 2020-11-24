@@ -1,4 +1,6 @@
 #include "box2d_physics_body.h"
+
+#include "box2d_joints.h"
 #include "box2d_world.h"
 
 bool Box2DPhysicsBody::create_b2Body() {
@@ -15,7 +17,9 @@ bool Box2DPhysicsBody::create_b2Body() {
 		//print_line("body created");
 
 		// Create fixtures
-		// TODO does this actually ever do anything? I believe this is handled by ENTER/EXIT_TREE
+		// TODO Does this actually ever do anything? I believe this is handled by ENTER/EXIT_TREE.
+		//      If we add an enabled/disabled property that destroys/recreates b2Objects, then
+		//      this callback is a MUST
 		auto child = fixtures.front();
 		while (child) {
 			print_line("calling child fixture");
@@ -26,10 +30,10 @@ bool Box2DPhysicsBody::create_b2Body() {
 		update_mass(false);
 
 		// Notify joints
-		child = joints.front();
-		while (child) {
-			child->get()->on_parent_created(this);
-			child = child->next();
+		auto joint = joints.front();
+		while (joint) {
+			joint->get()->on_parent_created(this);
+			joint = joint->next();
 		}
 
 		set_physics_process_internal(true);
@@ -48,7 +52,9 @@ bool Box2DPhysicsBody::destroy_b2Body() {
 		//print_line("body destroyed");
 		body = NULL;
 
-		// Fixture destruction is handled by destruction listener
+		// b2Fixture destruction is handled by Box2D
+
+		// b2Joint destruction is handled by Box2D
 
 		set_physics_process_internal(false);
 		return true;
@@ -69,6 +75,16 @@ void Box2DPhysicsBody::update_mass(bool p_calc_reset) {
 void Box2DPhysicsBody::_notification(int p_what) {
 	// TODO finalize implementation to imitate behavior from RigidBody2D and Kinematic (static too?)
 	switch (p_what) {
+		case NOTIFICATION_PREDELETE: {
+
+			// Inform joints that this node is no more
+			auto joint = joints.front();
+			while (joint) {
+				joint->get()->on_node_predelete(this);
+				joint = joint->next();
+			}
+
+		} break;
 		case NOTIFICATION_ENTER_TREE: {
 
 			last_valid_xform = get_global_transform();

@@ -117,8 +117,14 @@ Many features of Box2D have very clear parallels to Godot physics. Here are a fe
 
 ## Additional features this module provides:
 (Features not provided by the Box2D library)
+
 ### Breakable joints
-Gives joints new properties `breaking_enabled`, `max_force`, and `max_torque` to configure maximum linear force and/or torque
+Gives joints new properties:
+- `broken`: Enables/disables the joint
+- `breaking_enabled`: Lets the joint break when `max_force` and/or `max_torque` are exceeded
+- `free_on_break`: Whether the joint frees itself when broken. (This feature may be removed)
+- `max_force` and `max_torque`: Maximum linear force and torque. Either can be disabled by setting the property to 0.
+
 ### Concave polygons
 Godot physics provides this, but the Box2D library doesn't. This module bridges the gap so you don't have to think about polygon concavity or vertex count.
 

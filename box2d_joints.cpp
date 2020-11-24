@@ -5,52 +5,99 @@
 
 void Box2DJoint::on_b2Joint_destroyed() {
 	joint = NULL;
-	update();
-}
 
-void Box2DJoint::update_joint_bodies() {
-	// Clear preexisting state
-	destroy_b2Joint();
-
-	if (bodyA_cache) {
-		Box2DPhysicsBody *body_a = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyA_cache));
-		if (body_a)
-			body_a->joints.erase(this);
-		bodyA_cache = 0;
-	}
-	if (bodyB_cache) {
-		Box2DPhysicsBody *body_b = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyB_cache));
-		if (body_b)
-			body_b->joints.erase(this);
-		bodyB_cache = 0;
-	}
-
-	// If valid, update node cache
-	Node *node_a = has_node(get_node_a()) ? get_node(get_node_a()) : (Node *)NULL;
-	Node *node_b = has_node(get_node_b()) ? get_node(get_node_b()) : (Node *)NULL;
-
-	if (!node_a || !node_b)
-		return;
-
+	// Check if destroyed because nodes were freed
+	// TODO instead, attach signal Box2DPhysicsBody.freed (name uncertain) to Box2DJoint within update_joint_bodies
+	Node *node_a = has_node(get_nodepath_a()) ? get_node(get_nodepath_a()) : (Node *)NULL;
+	Node *node_b = has_node(get_nodepath_b()) ? get_node(get_nodepath_b()) : (Node *)NULL;
 	Box2DPhysicsBody *body_a = Object::cast_to<Box2DPhysicsBody>(node_a);
 	Box2DPhysicsBody *body_b = Object::cast_to<Box2DPhysicsBody>(node_b);
 
-	if (!body_a || !body_b)
-		return;
+	// both nodes freed is possible
+	if (!body_a) {
+		a = NodePath();
+		update_joint_bodies();
+	}
+	if (!body_b) {
+		b = NodePath();
+		update_joint_bodies();
+	}
 
-	bodyA_cache = body_a->get_instance_id();
-	bodyB_cache = body_b->get_instance_id();
-	// Make sure we receive b2Body creation events
-	body_a->joints.insert(this);
-	body_a->joints.insert(this);
+	update();
+}
 
-	// Create joint if b2Bodys are already created
-	jointDef->bodyA = body_a->body;
-	jointDef->bodyB = body_b->body;
-	// TODO do we need to regenerate anchor points? or should that be done inside set_node_x?
-	//      if in set_node_x, there should be additional parameters to give anchor point options
-	if (jointDef->bodyA && jointDef->bodyB) {
-		create_b2Joint();
+void Box2DJoint::update_joint_bodies(bool p_recalc_if_unchanged) {
+	// This is called whenever the joint's body nodes are reassigned via set_node_a/b.
+	// If the bodies haven't actually changed, it is assumed that the joint should
+	// be unchanged, unless `p_force_reinit = true`
+
+	// Check if bodies have changed
+	Node *node_a = has_node(get_nodepath_a()) ? get_node(get_nodepath_a()) : (Node *)NULL;
+	Node *node_b = has_node(get_nodepath_b()) ? get_node(get_nodepath_b()) : (Node *)NULL;
+	Box2DPhysicsBody *body_a = Object::cast_to<Box2DPhysicsBody>(node_a);
+	Box2DPhysicsBody *body_b = Object::cast_to<Box2DPhysicsBody>(node_b);
+
+	const bool joint_invalid = !joint || (!joint->GetBodyA() || !joint->GetBodyB());
+
+	b2Body *body_a_body = body_a ? body_a->body : NULL;
+	b2Body *body_b_body = body_b ? body_b->body : NULL;
+	b2Body *joint_body_a = joint ? joint->GetBodyA() : NULL;
+	b2Body *joint_body_b = joint ? joint->GetBodyB() : NULL;
+	const bool bodies_unchanged = (body_a_body == joint_body_a) && (body_b_body == joint_body_b);
+
+	const bool recalc = joint_invalid || (p_recalc_if_unchanged && bodies_unchanged);
+
+	if (recalc) {
+		// Clear preexisting state
+		destroy_b2Joint();
+
+		// Clear previous cache
+		if (bodyA_cache) {
+			Box2DPhysicsBody *body_a = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyA_cache));
+			if (body_a) {
+				body_a->joints.erase(this);
+				body_a->disconnect("tree_entered", this, "_node_a_tree_entered");
+			}
+			bodyA_cache = 0;
+		}
+		if (bodyB_cache) {
+			Box2DPhysicsBody *body_b = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyB_cache));
+			if (body_b) {
+				body_b->joints.erase(this);
+				body_b->disconnect("tree_entered", this, "_node_b_tree_entered");
+			}
+			bodyB_cache = 0;
+		}
+
+		// If valid, update node cache
+
+		if (!node_a || !node_b || !body_a || !body_b) {
+			jointDef->bodyA = NULL;
+			jointDef->bodyB = NULL;
+			return;
+		}
+
+		bodyA_cache = body_a->get_instance_id();
+		bodyB_cache = body_b->get_instance_id();
+		// Make sure we receive b2Body creation/deletion events
+		body_a->joints.insert(this);
+		body_b->joints.insert(this);
+		body_a->connect("tree_entered", this, "_node_a_tree_entered");
+		body_b->connect("tree_entered", this, "_node_b_tree_entered");
+
+		// Create joint if b2Bodys are already created
+
+		jointDef->bodyA = body_a->body;
+		jointDef->bodyB = body_b->body;
+
+		if (jointDef->bodyA && jointDef->bodyB) {
+			// Allow subtypes to do final initialization
+			b2Vec2 joint_pos = get_b2_pos();
+			init_b2JointDef(joint_pos);
+
+			if (!broken)
+				create_b2Joint();
+		}
 	}
 }
 
@@ -60,14 +107,18 @@ bool Box2DJoint::create_b2Joint() {
 		ERR_FAIL_COND_V_MSG(!jointDef->bodyA, false, "Tried to create joint with invalid bodyA.");
 		ERR_FAIL_COND_V_MSG(!jointDef->bodyB, false, "Tried to create joint with invalid bodyB.");
 
-		// Allow subtypes to do final initialization before they're created
-		b2Vec2 joint_pos = get_b2_pos();
-		init_b2JointDef(joint_pos);
+		// Don't reinit the joint. That should only happen when calling update_joint_bodies.
 
 		joint = world_node->world->CreateJoint(jointDef);
 		joint->GetUserData().owner = this;
 
-		print_line("joint created");
+		// TODO determine whether we should wake bodies
+		// Cleanest solution may be to add a param `p_wake_bodies` to set_broken, set_node_a/b
+		// Those params would pass to this function with new param `p_wake_bodies`
+		joint->GetBodyA()->SetAwake(true);
+		joint->GetBodyB()->SetAwake(true);
+
+		//print_line("joint created");
 		return true;
 	}
 	return false;
@@ -81,10 +132,39 @@ bool Box2DJoint::destroy_b2Joint() {
 		world_node->world->DestroyJoint(joint);
 		joint = NULL;
 
-		print_line("joint destroyed");
+		//print_line("joint destroyed");
 		return true;
 	}
 	return false;
+}
+
+void Box2DJoint::on_node_predelete(Box2DPhysicsBody *node) {
+	ObjectID id = node->get_instance_id();
+	if (bodyA_cache == id) {
+		set_nodepath_a(NodePath());
+	} else if (bodyB_cache == id) {
+		set_nodepath_b(NodePath());
+	} else {
+		ERR_FAIL_MSG("A joint's callback was triggered from a node it does not recognize.");
+	}
+}
+
+void Box2DJoint::_node_a_tree_entered() {
+	// Update path in case node moved
+	// TODO figure out: is this weird to do? This is making the nodepath property "sticky"
+	Node *node = Object::cast_to<Node>(ObjectDB::get_instance(bodyA_cache));
+	if (node)
+		a = node->get_path();
+	// Don't update_joint_bodies because the body node hasn't changed
+}
+
+void Box2DJoint::_node_b_tree_entered() {
+	// Update path in case node moved
+	// TODO figure out: is this weird to do? This is making the nodepath property "sticky"
+	Node *node = Object::cast_to<Node>(ObjectDB::get_instance(bodyB_cache));
+	if (node)
+		b = node->get_path();
+	// Don't update_joint_bodies because the body node hasn't changed
 }
 
 b2Vec2 Box2DJoint::get_b2_pos() const {
@@ -94,6 +174,16 @@ b2Vec2 Box2DJoint::get_b2_pos() const {
 
 void Box2DJoint::_notification(int p_what) {
 	switch (p_what) {
+		case NOTIFICATION_PREDELETE: {
+
+			Box2DPhysicsBody *body_a = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyA_cache));
+			Box2DPhysicsBody *body_b = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyB_cache));
+			if (body_a)
+				body_a->joints.erase(this);
+			if (body_b)
+				body_b->joints.erase(this);
+
+		} break;
 		case NOTIFICATION_ENTER_TREE: {
 
 			// Find the Box2DWorld
@@ -121,35 +211,35 @@ void Box2DJoint::_notification(int p_what) {
 		} break;
 		case NOTIFICATION_EXIT_TREE: {
 
+			destroy_b2Joint();
 			set_process_internal(false);
 
 		} break;
 		case NOTIFICATION_POST_ENTER_TREE: {
 
-			// After all bodies created in ENTER_TREE, create joint if valid
+			// After all bodies created in ENTER_TREE, create joint if valid.
+			// If just exiting/entering tree, joint isn't at risk for reinitialization.
 			update_joint_bodies();
 
 		} break;
 		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
 
 			if (breaking_enabled && joint) {
-				real_t force = get_reaction_force().length();
-				real_t torque = get_reaction_torque();
+				Vector2 force = get_reaction_force();
+				real_t torque = abs(get_reaction_torque());
 
-				if ((max_force > 0 && force > max_force) || (max_torque > 0 && torque > max_torque)) {
-					//emit_signal("joint_broken"); TODO
-					queue_delete();
+				const bool exceeded_force = max_force > 0 && force.length() > max_force;
+				const bool exceeded_torque = max_torque > 0 && torque > max_torque;
+
+				if (exceeded_force || exceeded_torque) {
+					emit_signal("joint_broken", force, torque);
+					set_broken(true);
 				}
 			}
 
 		} break;
 		case NOTIFICATION_INTERNAL_PROCESS: {
 
-			//if (body) { // && body->IsAwake()) {
-			//	set_block_transform_notify(true);
-			//	set_transform(b2_to_gd(body->GetTransform()));
-			//	set_block_transform_notify(false);
-			//}
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
 				update();
 			}
@@ -165,7 +255,8 @@ void Box2DJoint::_notification(int p_what) {
 			if (breaking_enabled && joint) {
 				// TODO redo this maybe, meh
 				if (max_force > 0) {
-					// TODO which max/abs functions should I be using? not that it matters, just for cleanliness
+					// TODO which max/abs functions should I be using? not that it matters, just for cleanliness.
+					// Using a macro MAX and function abs feels dirty.
 					real_t stress = get_reaction_force().length() / max_force;
 					debug_col.r = MAX(1.0, stress * 2.0);
 					debug_col.g = MAX(1.0, 1.0 - (stress * 2.0));
@@ -190,14 +281,24 @@ void Box2DJoint::_notification(int p_what) {
 }
 
 void Box2DJoint::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_node_a", "node_a"), &Box2DJoint::set_node_a);
-	ClassDB::bind_method(D_METHOD("get_node_a"), &Box2DJoint::get_node_a);
-	ClassDB::bind_method(D_METHOD("set_node_b", "node_b"), &Box2DJoint::set_node_b);
-	ClassDB::bind_method(D_METHOD("get_node_b"), &Box2DJoint::get_node_b);
+	ClassDB::bind_method(D_METHOD("set_node_a", "node_a", "force_reinit"), &Box2DJoint::set_nodepath_a), DEFVAL(false);
+	ClassDB::bind_method(D_METHOD("get_node_a"), &Box2DJoint::get_nodepath_a);
+	ClassDB::bind_method(D_METHOD("set_node_b", "node_b", "force_reinit"), &Box2DJoint::set_nodepath_b), DEFVAL(false);
+	ClassDB::bind_method(D_METHOD("get_node_b"), &Box2DJoint::get_nodepath_b);
+
+	// TODO temporary until resolved: https://github.com/godotengine/godot/issues/43821
+	// remember to update ADD_PROPERTY set functions when this is removed
+	ClassDB::bind_method(D_METHOD("_set_node_a", "node_a"), &Box2DJoint::_set_nodepath_a);
+	ClassDB::bind_method(D_METHOD("_set_node_b", "node_b"), &Box2DJoint::_set_nodepath_b);
+
 	ClassDB::bind_method(D_METHOD("set_collide_connected", "collide_connected"), &Box2DJoint::set_collide_connected);
 	ClassDB::bind_method(D_METHOD("get_collide_connected"), &Box2DJoint::get_collide_connected);
+	ClassDB::bind_method(D_METHOD("set_broken", "broken"), &Box2DJoint::set_broken);
+	ClassDB::bind_method(D_METHOD("is_broken"), &Box2DJoint::is_broken);
 	ClassDB::bind_method(D_METHOD("set_breaking_enabled", "breaking_enabled"), &Box2DJoint::set_breaking_enabled);
 	ClassDB::bind_method(D_METHOD("is_breaking_enabled"), &Box2DJoint::is_breaking_enabled);
+	ClassDB::bind_method(D_METHOD("set_free_on_break", "free_on_break"), &Box2DJoint::set_free_on_break);
+	ClassDB::bind_method(D_METHOD("get_free_on_break"), &Box2DJoint::get_free_on_break);
 	ClassDB::bind_method(D_METHOD("set_max_force", "max_force"), &Box2DJoint::set_max_force);
 	ClassDB::bind_method(D_METHOD("get_max_force"), &Box2DJoint::get_max_force);
 	ClassDB::bind_method(D_METHOD("set_max_torque", "max_torque"), &Box2DJoint::set_max_torque);
@@ -206,12 +307,20 @@ void Box2DJoint::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_reaction_force"), &Box2DJoint::get_reaction_force);
 	ClassDB::bind_method(D_METHOD("get_reaction_torque"), &Box2DJoint::get_reaction_torque);
 
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_a"), "set_node_a", "get_node_a");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_b"), "set_node_b", "get_node_b");
+	ClassDB::bind_method(D_METHOD("_node_a_tree_entered"), &Box2DJoint::_node_a_tree_entered);
+	ClassDB::bind_method(D_METHOD("_node_b_tree_entered"), &Box2DJoint::_node_b_tree_entered);
+
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_a"), "_set_node_a", "get_node_a");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_b"), "_set_node_b", "get_node_b");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collide_connected"), "set_collide_connected", "get_collide_connected");
+	ADD_GROUP("Breaking", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "broken"), "set_broken", "is_broken");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "breaking_enabled"), "set_breaking_enabled", "is_breaking_enabled");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "max_force"), "set_max_force", "get_max_force");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "max_torque"), "set_max_torque", "get_max_torque");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "free_on_break"), "set_free_on_break", "get_free_on_break");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "max_force", PROPERTY_HINT_EXP_RANGE, "0,65535,0.01"), "set_max_force", "get_max_force");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "max_torque", PROPERTY_HINT_EXP_RANGE, "0,65535,0.01"), "set_max_torque", "get_max_torque");
+
+	ADD_SIGNAL(MethodInfo("joint_broken", PropertyInfo(Variant::VECTOR2, "break_force"), PropertyInfo(Variant::REAL, "break_torque")));
 }
 
 void Box2DJoint::on_parent_created(Node *p_parent) {
@@ -221,9 +330,10 @@ void Box2DJoint::on_parent_created(Node *p_parent) {
 	if (body_a && body_b) {
 		jointDef->bodyA = body_a->body;
 		jointDef->bodyB = body_b->body;
-		if (create_b2Joint()) {
-			print_line("joint created");
-		}
+		if (!broken)
+			if (create_b2Joint()) { // TODO this might need to call update_joint_bodies because joint may not be initialized
+				print_line("JOINT CREATED FROM CALLBACK");
+			}
 	}
 }
 
@@ -254,42 +364,71 @@ String Box2DJoint::get_configuration_warning() const {
 	return warning;
 }
 
-void Box2DJoint::set_node_a(const NodePath &p_node_a) {
+void Box2DJoint::set_nodepath_a(const NodePath &p_node_a, bool p_force_reinit) {
 	if (a == p_node_a)
 		return;
 	a = p_node_a;
 	if (Engine::get_singleton()->is_editor_hint()) {
 		update_configuration_warning();
 	}
-	update_joint_bodies();
+	if (is_inside_tree()) {
+		update_joint_bodies(p_force_reinit);
+	}
 }
 
-NodePath Box2DJoint::get_node_a() const {
+NodePath Box2DJoint::get_nodepath_a() const {
 	return a;
 }
 
-void Box2DJoint::set_node_b(const NodePath &p_node_b) {
+void Box2DJoint::set_nodepath_b(const NodePath &p_node_b, bool p_force_reinit) {
 	if (b == p_node_b)
 		return;
 	b = p_node_b;
 	if (Engine::get_singleton()->is_editor_hint()) {
 		update_configuration_warning();
 	}
-	update_joint_bodies();
+	if (is_inside_tree()) {
+		update_joint_bodies(p_force_reinit);
+	}
 }
 
-NodePath Box2DJoint::get_node_b() const {
+NodePath Box2DJoint::get_nodepath_b() const {
 	return b;
 }
 
 void Box2DJoint::set_collide_connected(bool p_collide) {
 	jointDef->collideConnected = p_collide;
-	if (joint)
-		; // TODO recreate the joint // TODO test if this even works
+	if (joint) {
+		// Joints anchors are not reinitialized using these functions
+		if (!broken) {
+			destroy_b2Joint();
+			create_b2Joint();
+		}
+	}
 }
 
 bool Box2DJoint::get_collide_connected() const {
 	return jointDef->collideConnected;
+}
+
+void Box2DJoint::set_broken(bool p_broken) {
+	if (p_broken && !broken) {
+		// TODO fix: when broken, collision exception between bodies does not always reset
+		// This may be a Box2D issue. Needs testing.
+		destroy_b2Joint();
+		if (free_on_break) {
+			queue_delete();
+		}
+	} else if (!p_broken && broken) {
+		if (jointDef->bodyA && jointDef->bodyB) {
+			create_b2Joint();
+		}
+	}
+	broken = p_broken;
+}
+
+bool Box2DJoint::is_broken() const {
+	return broken;
 }
 
 void Box2DJoint::set_breaking_enabled(bool p_enabled) {
@@ -299,6 +438,14 @@ void Box2DJoint::set_breaking_enabled(bool p_enabled) {
 
 bool Box2DJoint::is_breaking_enabled() const {
 	return breaking_enabled;
+}
+
+void Box2DJoint::set_free_on_break(bool p_should_free) {
+	free_on_break = p_should_free;
+}
+
+bool Box2DJoint::get_free_on_break() const {
+	return free_on_break;
 }
 
 void Box2DJoint::set_max_force(real_t p_max_force) {
@@ -318,17 +465,28 @@ real_t Box2DJoint::get_max_torque() const {
 }
 
 Vector2 Box2DJoint::get_reaction_force() const {
+	if (broken)
+		return Vector2(); // Don't print a fail message for intended behavior
 	ERR_FAIL_COND_V_MSG(!joint, Vector2(), "b2Joint is null.");
 	return b2_to_gd(joint->GetReactionForce(1.0f / get_physics_process_delta_time()));
 }
 
 real_t Box2DJoint::get_reaction_torque() const {
+	if (broken)
+		return real_t(); // Don't print a fail message for intended behavior
 	ERR_FAIL_COND_V_MSG(!joint, real_t(), "b2Joint is null.");
 	return joint->GetReactionTorque(1.0f / get_physics_process_delta_time());
 }
 
 Box2DJoint::Box2DJoint() :
-		world_node(NULL), bodyA_cache(0), bodyB_cache(0), breaking_enabled(false), max_force(0.0f), max_torque(0.0f) {
+		world_node(NULL),
+		bodyA_cache(0),
+		bodyB_cache(0),
+		broken(false),
+		breaking_enabled(false),
+		free_on_break(false),
+		max_force(0.0f),
+		max_torque(0.0f) {
 }
 
 Box2DJoint::~Box2DJoint() {

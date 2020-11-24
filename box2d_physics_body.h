@@ -40,8 +40,8 @@ private:
 
 	Box2DWorld *world_node;
 
-	Set<IBox2DChildObject *> fixtures;
-	Set<IBox2DChildObject *> joints;
+	Set<IBox2DChildObject *> fixtures; // TODO might remove.
+	Set<Box2DJoint *> joints;
 
 	Transform2D last_valid_xform;
 

@@ -26,17 +26,13 @@
 #include "box2d_types_converter.h"
 
 class Box2DWorld;
-class IBox2DChildObject;
 
 class Box2DJoint : public Node2D, public virtual IBox2DChildObject {
 	GDCLASS(Box2DJoint, Node2D);
 
 	friend class Box2DWorld;
+	friend class Box2DPhysicsBody;
 
-public:
-	// TODO do we need a joint type enum?
-
-private:
 	b2JointDef *jointDef = nullptr;
 	b2Joint *joint = nullptr;
 
@@ -48,16 +44,23 @@ private:
 	ObjectID bodyA_cache;
 	ObjectID bodyB_cache;
 
+	bool broken;
 	bool breaking_enabled;
+	bool free_on_break; // TODO This feature may not be necessary. Perhaps this should be handled by a "on_broken" signal.
 	real_t max_force;
 	real_t max_torque;
 
 	void on_b2Joint_destroyed();
 
-	void update_joint_bodies();
+	void update_joint_bodies(bool p_recalc_if_unchanged = false);
 
 	bool create_b2Joint();
 	bool destroy_b2Joint();
+
+	void on_node_predelete(Box2DPhysicsBody *node);
+
+	void _node_a_tree_entered();
+	void _node_b_tree_entered();
 
 protected:
 	b2Joint *get_b2Joint() { return joint; }
@@ -80,19 +83,28 @@ public:
 	// TODO enabled property
 	// Breaking should set enabled -> false
 
-	// TODO decide on free_on_break property
+	// TODO IMPORTANT for (future) documentation:
+	//      `p_force_reinit = true` allows you to reconstruct the joint even if the assigned
+	//      node is unchanged. This lets you re-place the joint on the same bodies.
+	void set_nodepath_a(const NodePath &p_node_a, bool p_force_reinit = false);
+	void _set_nodepath_a(const NodePath &p_node_a) { set_nodepath_a(p_node_a, false); } // TODO temporary until resolved: https://github.com/godotengine/godot/issues/43821
+	NodePath get_nodepath_a() const;
 
-	void set_node_a(const NodePath &p_node_a);
-	NodePath get_node_a() const;
-
-	void set_node_b(const NodePath &p_node_b);
-	NodePath get_node_b() const;
+	void set_nodepath_b(const NodePath &p_node_b, bool p_force_reinit = false);
+	void _set_nodepath_b(const NodePath &p_node_b) { set_nodepath_b(p_node_b, false); } // TODO temporary until resolved: https://github.com/godotengine/godot/issues/43821
+	NodePath get_nodepath_b() const;
 
 	void set_collide_connected(bool p_collide);
 	bool get_collide_connected() const;
 
+	void set_broken(bool p_broken);
+	bool is_broken() const;
+
 	void set_breaking_enabled(bool p_enabled);
 	bool is_breaking_enabled() const;
+
+	void set_free_on_break(bool p_should_free);
+	bool get_free_on_break() const;
 
 	void set_max_force(real_t p_max_force);
 	real_t get_max_force() const;
