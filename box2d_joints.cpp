@@ -258,6 +258,9 @@ void Box2DJoint::set_node_a(const NodePath &p_node_a) {
 	if (a == p_node_a)
 		return;
 	a = p_node_a;
+	if (Engine::get_singleton()->is_editor_hint()) {
+		update_configuration_warning();
+	}
 	update_joint_bodies();
 }
 
@@ -269,6 +272,9 @@ void Box2DJoint::set_node_b(const NodePath &p_node_b) {
 	if (b == p_node_b)
 		return;
 	b = p_node_b;
+	if (Engine::get_singleton()->is_editor_hint()) {
+		update_configuration_warning();
+	}
 	update_joint_bodies();
 }
 

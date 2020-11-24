@@ -50,7 +50,7 @@ protected:
 
 	virtual void on_parent_created(Node *) override final;
 
-	void create_b2Fixture(b2Body *p_body, b2Fixture *&p_fixture_out, const b2FixtureDef &p_def, const Transform2D &p_shape_xform);
+	void create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDef &p_def, const Transform2D &p_shape_xform);
 
 	virtual bool create_b2();
 	virtual bool destroy_b2();

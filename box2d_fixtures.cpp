@@ -2,7 +2,7 @@
 
 #include <core/engine.h>
 
-void Box2DFixture::create_b2Fixture(b2Body *p_body, b2Fixture *&p_fixture_out, const b2FixtureDef &p_def, const Transform2D &p_shape_xform) {
+void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDef &p_def, const Transform2D &p_shape_xform) {
 	// Transform shape with local transform
 	b2FixtureDef transformedDef = b2FixtureDef(p_def);
 	switch (p_def.shape->m_type) {
@@ -10,7 +10,7 @@ void Box2DFixture::create_b2Fixture(b2Body *p_body, b2Fixture *&p_fixture_out, c
 			b2CircleShape shp = b2CircleShape(*dynamic_cast<const b2CircleShape *>(p_def.shape));
 			shp.m_p = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_p)));
 			transformedDef.shape = &shp;
-			p_fixture_out = p_body->CreateFixture(&transformedDef); // Write here because shp is in scope
+			p_fixture_out = body_node->body->CreateFixture(&transformedDef); // Write here because shp is in scope
 		} break;
 		case b2Shape::Type::e_edge: {
 			b2EdgeShape shp = b2EdgeShape(*dynamic_cast<const b2EdgeShape *>(p_def.shape));
@@ -19,7 +19,7 @@ void Box2DFixture::create_b2Fixture(b2Body *p_body, b2Fixture *&p_fixture_out, c
 			shp.m_vertex2 = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertex2)));
 			shp.m_vertex3 = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertex3)));
 			transformedDef.shape = &shp;
-			p_fixture_out = p_body->CreateFixture(&transformedDef); // Write here because shp is in scope
+			p_fixture_out = body_node->body->CreateFixture(&transformedDef); // Write here because shp is in scope
 		} break;
 		case b2Shape::Type::e_polygon: {
 			b2PolygonShape shp = b2PolygonShape(*dynamic_cast<const b2PolygonShape *>(p_def.shape));
@@ -29,12 +29,12 @@ void Box2DFixture::create_b2Fixture(b2Body *p_body, b2Fixture *&p_fixture_out, c
 			}
 			shp.m_centroid = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_centroid)));
 			transformedDef.shape = &shp;
-			p_fixture_out = p_body->CreateFixture(&transformedDef); // Write here because shp is in scope
+			p_fixture_out = body_node->body->CreateFixture(&transformedDef); // Write here because shp is in scope
 		} break;
 		case b2Shape::Type::e_chain: {
 			// TODO
 			ERR_FAIL_MSG("Not yet implemented");
-			p_fixture_out = p_body->CreateFixture(&transformedDef); // Write here because shp is in scope
+			p_fixture_out = body_node->body->CreateFixture(&transformedDef); // Write here because shp is in scope
 		} break;
 		default: {
 			ERR_FAIL();
@@ -42,6 +42,7 @@ void Box2DFixture::create_b2Fixture(b2Body *p_body, b2Fixture *&p_fixture_out, c
 	}
 
 	p_fixture_out->GetUserData().owner = this;
+	body_node->update_mass();
 }
 
 bool Box2DFixture::create_b2() {
@@ -55,7 +56,7 @@ bool Box2DFixture::create_b2() {
 			for (int i = 0; i < polyshape->shape_vector.size(); i++) {
 				fixtureDef.shape = &polyshape->shape_vector[i];
 				b2Fixture *fixture = NULL;
-				create_b2Fixture(body_node->body, fixture, fixtureDef, get_transform());
+				create_b2Fixture(fixture, fixtureDef, get_transform());
 				if (fixture)
 					fixtures.push_back(fixture);
 			}
@@ -64,12 +65,12 @@ bool Box2DFixture::create_b2() {
 
 			fixtureDef.shape = shape->shape;
 			b2Fixture *fixture = NULL;
-			create_b2Fixture(body_node->body, fixture, fixtureDef, get_transform());
+			create_b2Fixture(fixture, fixtureDef, get_transform());
 			if (fixture)
 				fixtures.push_back(fixture);
 		}
 
-		print_line("fixture created");
+		//print_line("fixture created");
 		return true;
 	}
 	return false;
@@ -83,7 +84,7 @@ bool Box2DFixture::destroy_b2() {
 				body_node->body->DestroyFixture(fixtures[i]);
 			}
 			fixtures.clear();
-			print_line("fixture destroyed");
+			//print_line("fixture destroyed");
 		}
 		return true;
 	}
@@ -112,7 +113,7 @@ void Box2DFixture::_notification(int p_what) {
 				body_node = new_body;
 				if (body_node) {
 					body_node->fixtures.insert(this);
-					if (body_node->body) {
+					if (body_node->body && shape.is_valid()) {
 						create_b2();
 					}
 				}
@@ -164,8 +165,9 @@ void Box2DFixture::_bind_methods() {
 }
 
 void Box2DFixture::on_parent_created(Node *) {
-	destroy_b2();
-	create_b2();
+	//destroy_b2();
+	//create_b2();
+	WARN_PRINT("FIXTURE CREATED IN CALLBACK");
 }
 
 void Box2DFixture::update_shape() {
@@ -175,7 +177,9 @@ void Box2DFixture::update_shape() {
 		create_b2();
 	}
 	update();
-	update_configuration_warning();
+	if (Engine::get_singleton()->is_editor_hint()) {
+		update_configuration_warning();
+	}
 }
 
 bool Box2DFixture::_edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const {

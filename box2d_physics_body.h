@@ -31,6 +31,11 @@ public:
 
 private:
 	b2BodyDef bodyDef;
+	b2MassData massDataDef;
+	bool use_custom_massdata;
+	real_t linear_damping;
+	real_t angular_damping;
+	
 	b2Body *body = nullptr;
 
 	Box2DWorld *world_node;
@@ -40,10 +45,10 @@ private:
 
 	Transform2D last_valid_xform;
 
-	//void _state_changed();// TODO but probably not because box2D doesn't support this
-
 	bool create_b2Body();
 	bool destroy_b2Body();
+
+	void update_mass(bool p_calc_reset = true);
 
 protected:
 	void _notification(int p_what);
@@ -54,22 +59,21 @@ protected:
 public:
 	virtual String get_configuration_warning() const override;
 
-	//const Vector2 &get_world_center() const;
-	//const Vector2 &get_local_center() const;
-
 	void set_linear_velocity(const Vector2 &p_vel);
 	Vector2 get_linear_velocity() const;
 
 	void set_angular_velocity(const real_t p_omega);
 	real_t get_angular_velocity() const;
 
-	//real_t get_mass() const;
-	//real_t get_inertia() const;
-	//void set_mass(const real_t p_mass);
-	//void set_inertia(const real_t p_inertia);
-	//void reset_mass_data();
-
-	// local/global transform functions not needed
+	void set_use_custom_massdata(bool p_use_custom);
+	bool get_use_custom_massdata() const;
+	void set_mass(const real_t p_mass);
+	real_t get_mass() const;
+	void set_inertia(real_t p_inertia);
+	real_t get_inertia() const;
+	void set_center_of_mass(const Vector2 &p_center);
+	Vector2 get_center_of_mass() const;
+	void set_mass_data(real_t p_mass, real_t p_inertia, const Vector2 &p_center);
 
 	void set_linear_damping(real_t p_damping);
 	real_t get_linear_damping() const;
@@ -86,8 +90,10 @@ public:
 	void set_bullet(bool p_ccd);
 	bool is_bullet() const;
 
-	// get/set awake
-	// get/set can sleep
+	void set_awake(bool p_awake);
+	bool is_awake() const;
+	void set_can_sleep(bool p_can_sleep);
+	bool get_can_sleep() const;
 
 	void set_fixed_rotation(bool p_fixed);
 	bool is_fixed_rotation() const;
