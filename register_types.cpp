@@ -1,9 +1,10 @@
-
 #include "register_types.h"
 
 #include "box2d_fixtures.h"
 #include "box2d_joints.h"
 #include "box2d_physics_body.h"
+#include "box2d_polygon_editor_plugin.h"
+#include "box2d_shape_editor_plugin.h"
 #include "box2d_shapes.h"
 #include "box2d_world.h"
 
@@ -21,8 +22,10 @@ void register_godot_box2d_types() {
 	ClassDB::register_virtual_class<Box2DShape>();
 	ClassDB::register_class<Box2DCircleShape>();
 	ClassDB::register_class<Box2DRectShape>();
+	// TODO segment shape
 	ClassDB::register_class<Box2DPolygonShape>();
-	// TODO more shapes
+	// TODO capsule shape
+
 	ClassDB::register_virtual_class<Box2DJoint>();
 	ClassDB::register_class<Box2DRevoluteJoint>();
 	ClassDB::register_class<Box2DWeldJoint>();
@@ -30,6 +33,7 @@ void register_godot_box2d_types() {
 
 #ifdef TOOLS_ENABLED
 	EditorPlugins::add_by_type<Box2DPolygonEditorPlugin>();
+	EditorPlugins::add_by_type<Box2DShapeEditorPlugin>();
 #endif
 }
 

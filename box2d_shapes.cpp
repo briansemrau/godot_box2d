@@ -12,6 +12,14 @@ void Box2DShape::_bind_methods() {
 	// Anything to bind?
 }
 
+bool Box2DShape::is_composite_shape() const {
+	return false;
+}
+
+const Vector<const b2Shape *> Box2DShape::get_shapes() const {
+	ERR_FAIL_V(Vector<const b2Shape *>());
+}
+
 Box2DShape::Box2DShape(b2Shape *const p_shape) :
 		shape(p_shape) {}
 
@@ -38,12 +46,12 @@ void Box2DCircleShape::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_radius", "radius"), &Box2DCircleShape::set_radius);
 	ClassDB::bind_method(D_METHOD("get_radius"), &Box2DCircleShape::get_radius);
 
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "radius"), "set_radius", "get_radius");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "radius", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_radius", "get_radius");
 }
 
 void Box2DCircleShape::set_radius(real_t p_radius) {
 	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	circleShape.m_radius = p_radius * factor;
+	circleShape.m_radius = MAX(p_radius * factor, b2_linearSlop);
 	emit_changed();
 }
 
@@ -70,18 +78,30 @@ Box2DCircleShape::Box2DCircleShape() :
 }
 
 void Box2DRectShape::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_size", "size"), &Box2DRectShape::set_size);
+	ClassDB::bind_method(D_METHOD("get_size"), &Box2DRectShape::get_size);
 	ClassDB::bind_method(D_METHOD("set_width", "width"), &Box2DRectShape::set_width);
 	ClassDB::bind_method(D_METHOD("get_width"), &Box2DRectShape::get_width);
 	ClassDB::bind_method(D_METHOD("set_height", "height"), &Box2DRectShape::set_height);
 	ClassDB::bind_method(D_METHOD("get_height"), &Box2DRectShape::get_height);
 
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "width"), "set_width", "get_width");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "height"), "set_height", "get_height");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "size"), "set_size", "get_size");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "width", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_width", "get_width");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "height", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_height", "get_height");
+}
+
+void Box2DRectShape::set_size(const Vector2 &p_size) {
+	set_width(p_size.width);
+	set_height(p_size.height);
+}
+
+Vector2 Box2DRectShape::get_size() const {
+	return Vector2(width, height);
 }
 
 void Box2DRectShape::set_width(real_t p_width) {
 	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	width = p_width;
+	width = MAX(p_width * factor, b2_linearSlop) / factor;
 	shape.SetAsBox(width * factor * 0.5, height * factor * 0.5);
 	emit_changed();
 }
@@ -92,7 +112,7 @@ real_t Box2DRectShape::get_width() const {
 
 void Box2DRectShape::set_height(real_t p_height) {
 	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	height = p_height;
+	height = MAX(p_height * factor, b2_linearSlop) / factor;
 	shape.SetAsBox(width * factor * 0.5, height * factor * 0.5);
 	emit_changed();
 }
@@ -227,74 +247,125 @@ bool isPolygonValid(const b2Vec2 *vertices, int32 count) {
 }
 
 void Box2DPolygonShape::build_polygon() {
-	// Ensure all points are counterclockwise
-	Vector<Vector2> ccw_points = points;
-	if (Geometry::is_polygon_clockwise(ccw_points)) {
-		ccw_points.invert();
-	}
-
 	// Remove previous b2Shapes
-	shape_vector.clear();
+	polygon_shape_vector.clear();
+	//_set_shape_ptr(NULL);
 
-	//if (build_mode == BUILD_SOLIDS)
-	{
+	chain_shape.Clear();
+
+	// can he do it? yes he can!
+	switch (build_mode) {
+		case Box2DPolygonShape::BUILD_SOLIDS: {
 #ifdef DEBUG_DECOMPOSE_BOX2D
-		decomposed.clear();
+			decomposed.clear();
 #endif
+			ERR_FAIL_COND_MSG(points.size() < 3, "Solid polygon must have N>2 points.");
 
-		ERR_FAIL_COND_MSG(ccw_points.size() < 3, "Solid polygon must have N>2 points.");
-
-		// Decompose concave into multiple convex
-		Vector<Vector<Vector2> > decomp = Geometry::decompose_polygon_in_convex(ccw_points);
-
-		// Cut convex into small N<=8 gons and create b2Shapes
-		constexpr int N = b2_maxPolygonVertices;
-		for (int i = 0; i < decomp.size(); i++) {
-			const Vector<Vector2> *bigpoly = &decomp[i];
-
-			b2Vec2 b2_pts[N];
-
-			int count = N;
-			for (int j = 0; j < bigpoly->size() - 2; j += (count - 2)) {
-				Vector<Vector2> smallpoly;
-
-				count = bigpoly->size() - j;
-				if (count > N && count < N + 3)
-					count = N - 2;
-				else
-					count = MIN(count, N);
-
-				smallpoly.push_back((*bigpoly)[0]);
-				//print_line((std::to_string(0)).c_str());
-				for (int k = 1; k < count; k++) {
-					smallpoly.push_back((*bigpoly)[j + k]);
-					//print_line((std::to_string(j + k)).c_str());
-				}
-
-				// Create b2Shape
-				b2PolygonShape shape;
-				for (int k = 0; k < count; k++) {
-					b2_pts[k] = gd_to_b2(smallpoly[k]);
-				}
-
-				if (likely(isPolygonValid(b2_pts, count))) {
-					shape.Set(b2_pts, count);
-#ifdef DEBUG_DECOMPOSE_BOX2D
-					decomposed.push_back(smallpoly);
-#endif
-				} else {
-					// Box2D thinks our polygon is degenerate. Abort!
-					emit_changed();
-					ERR_FAIL_MSG("Polygon is ill-formed.");
-				}
-
-				shape_vector.push_back(shape);
+			// Ensure all points are counterclockwise
+			Vector<Vector2> ccw_points = points;
+			if (Geometry::is_polygon_clockwise(ccw_points)) {
+				ccw_points.invert();
 			}
-		}
+
+			// Decompose concave into multiple convex
+			Vector<Vector<Vector2> > decomp = Geometry::decompose_polygon_in_convex(ccw_points);
+
+			// Cut convex into small N<=8 gons and create b2Shapes
+			constexpr int N = b2_maxPolygonVertices;
+			for (int i = 0; i < decomp.size(); i++) {
+				const Vector<Vector2> *bigpoly = &decomp[i];
+
+				b2Vec2 b2_pts[N];
+
+				int count = N;
+				for (int j = 0; j < bigpoly->size() - 2; j += (count - 2)) {
+					Vector<Vector2> smallpoly;
+
+					count = bigpoly->size() - j;
+					if (count > N && count < N + 3)
+						count = N - 2;
+					else
+						count = MIN(count, N);
+
+					smallpoly.push_back((*bigpoly)[0]);
+					//print_line((std::to_string(0)).c_str());
+					for (int k = 1; k < count; k++) {
+						smallpoly.push_back((*bigpoly)[j + k]);
+						//print_line((std::to_string(j + k)).c_str());
+					}
+
+					// Create b2Shape
+					b2PolygonShape shape;
+					for (int k = 0; k < count; k++) {
+						b2_pts[k] = gd_to_b2(smallpoly[k]);
+					}
+
+					if (likely(isPolygonValid(b2_pts, count))) {
+						shape.Set(b2_pts, count);
+#ifdef DEBUG_DECOMPOSE_BOX2D
+						decomposed.push_back(smallpoly);
+#endif
+					} else {
+						// Box2D thinks our polygon is degenerate. Abort!
+						emit_changed();
+						ERR_FAIL_MSG("Polygon is ill-formed.");
+					}
+
+					polygon_shape_vector.push_back(shape);
+				}
+			}
+		} break;
+
+		case Box2DPolygonShape::BUILD_SEGMENTS: {
+			ERR_FAIL_COND_MSG(points.size() < 2, "Segment polygon must have N>1 points.");
+
+			Vector<Vector2> ordered_points = points;
+			if (invert_order) {
+				ordered_points.invert();
+			}
+
+			// Convert vertices
+			const int n = ordered_points.size();
+			b2Vec2 *b2Vertices = new b2Vec2[n];
+
+			for (int i = 0; i < n; i++) {
+				b2Vertices[i] = gd_to_b2(ordered_points[i]);
+			}
+
+			chain_shape.CreateLoop(b2Vertices, n);
+			delete[] b2Vertices;
+		} break;
+
+		case Box2DPolygonShape::BUILD_OPEN_SEGMENTS: {
+			ERR_FAIL_COND_MSG(points.size() < 4, "Open segment polygon must have N>3 points.");
+
+			Vector<Vector2> ordered_points = points;
+			if (invert_order) {
+				ordered_points.invert();
+			}
+
+			// Convert vertices
+			const int n = ordered_points.size();
+			b2Vec2 *b2Vertices = new b2Vec2[n];
+
+			for (int i = 0; i < n; i++) {
+				b2Vertices[i] = gd_to_b2(ordered_points[i]);
+			}
+
+			chain_shape.CreateChain(b2Vertices + 1, n - 2, b2Vertices[0], b2Vertices[n - 1]);
+			delete[] b2Vertices;
+		} break;
+
+		case Box2DPolygonShape::BUILD_OVERLAPPING_SOLIDS: {
+			emit_changed();
+			ERR_FAIL_MSG("Not yet implemented.");
+		} break;
+
+		default: {
+			emit_changed();
+			ERR_FAIL();
+		} break;
 	}
-	//else {
-	//	// TODO
-	//}
 
 	emit_changed();
 }
@@ -303,8 +374,32 @@ void Box2DPolygonShape::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_point_cloud", "points"), &Box2DPolygonShape::set_point_cloud);
 	ClassDB::bind_method(D_METHOD("set_points", "points"), &Box2DPolygonShape::set_points);
 	ClassDB::bind_method(D_METHOD("get_points"), &Box2DPolygonShape::get_points);
+	ClassDB::bind_method(D_METHOD("set_invert_order", "invert_order"), &Box2DPolygonShape::set_invert_order);
+	ClassDB::bind_method(D_METHOD("get_invert_order"), &Box2DPolygonShape::get_invert_order);
+	ClassDB::bind_method(D_METHOD("set_build_mode", "build_mode"), &Box2DPolygonShape::set_build_mode);
+	ClassDB::bind_method(D_METHOD("get_build_mode"), &Box2DPolygonShape::get_build_mode);
 
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "points"), "set_points", "get_points");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "invert_order"), "set_invert_order", "get_invert_order");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "build_mode", PROPERTY_HINT_ENUM, "Solids,Segments,Open Segments,Overlapping Solids"), "set_build_mode", "get_build_mode");
+
+	BIND_ENUM_CONSTANT(BUILD_SOLIDS);
+	BIND_ENUM_CONSTANT(BUILD_SEGMENTS);
+	BIND_ENUM_CONSTANT(BUILD_OPEN_SEGMENTS);
+	BIND_ENUM_CONSTANT(BUILD_OVERLAPPING_SOLIDS);
+}
+
+bool Box2DPolygonShape::is_composite_shape() const {
+	return build_mode == BUILD_SOLIDS || build_mode == BUILD_OVERLAPPING_SOLIDS;
+}
+
+const Vector<const b2Shape *> Box2DPolygonShape::get_shapes() const {
+	Vector<const b2Shape *> out;
+	out.resize(polygon_shape_vector.size());
+	for (int i = 0; i < polygon_shape_vector.size(); i++) {
+		out.set(i, &(polygon_shape_vector[i]));
+	}
+	return out;
 }
 
 bool Box2DPolygonShape::_edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const {
@@ -315,11 +410,21 @@ bool Box2DPolygonShape::_edit_is_selected_on_click(const Point2 &p_point, double
 
 	Transform2D cursor_pos(0, p_point);
 
-	for (int i = 0; i < shape_vector.size(); i++) {
-		if (b2TestOverlap(&shape_vector[i], 0, &cursor, 0, gd_to_b2(Transform2D()), gd_to_b2(cursor_pos)))
-			return true;
+	if (build_mode == BUILD_SOLIDS || build_mode == BUILD_OVERLAPPING_SOLIDS) {
+		for (int i = 0; i < polygon_shape_vector.size(); i++) {
+			if (b2TestOverlap(&polygon_shape_vector[i], 0, &cursor, 0, gd_to_b2(Transform2D()), gd_to_b2(cursor_pos))) {
+				return true;
+			}
+		}
+		return false;
+	} else {
+		for (int i = 0; i < chain_shape.m_count; i++) {
+			if (b2TestOverlap(&chain_shape, i, &cursor, 0, gd_to_b2(Transform2D()), gd_to_b2(cursor_pos))) {
+				return true;
+			}
+		}
+		return false;
 	}
-	return false;
 }
 
 void Box2DPolygonShape::set_point_cloud(const Vector<Vector2> &p_points) {
@@ -337,74 +442,109 @@ Vector<Vector2> Box2DPolygonShape::get_points() const {
 	return points;
 }
 
-void Box2DPolygonShape::draw(const RID &p_to_rid, const Color &p_color) {
-	int vertex_count = points.size();
-	for (int i = 0; i < vertex_count; i++) {
-		Vector2 p = points[i];
-		Vector2 n = points[(i + 1) % vertex_count];
-		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, Color(0.9, 0.2, 0.0, 0.8), 1);
+void Box2DPolygonShape::set_build_mode(BuildMode p_mode) {
+	if (build_mode != p_mode) {
+		build_mode = p_mode;
+		build_polygon();
 	}
+}
+
+Box2DPolygonShape::BuildMode Box2DPolygonShape::get_build_mode() const {
+	return build_mode;
+}
+
+void Box2DPolygonShape::set_invert_order(bool p_inverted) {
+	if (invert_order != p_inverted) {
+		invert_order = p_inverted;
+		build_polygon();
+	}
+}
+
+bool Box2DPolygonShape::get_invert_order() const {
+	return invert_order;
+}
+
+void draw_arrow(const RID &p_to_rid, const Vector2 &start, const Vector2 &end, const Color &p_color, float p_width) {
+	Vector2 norm = (end - start).normalized();
+	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, start, end, p_color, p_width);
+	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, end, end - norm.rotated(Math_PI * 0.17f) * 4.0f, p_color, p_width);
+	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, end, end - norm.rotated(-Math_PI * 0.17f) * 4.0f, p_color, p_width);
+}
+
+void Box2DPolygonShape::draw(const RID &p_to_rid, const Color &p_color) {
+	if (build_mode == BUILD_SOLIDS || build_mode == BUILD_OVERLAPPING_SOLIDS) {
+
+		int vertex_count = points.size();
+		for (int i = 0; i < vertex_count; i++) {
+			Vector2 p = points[i];
+			Vector2 n = points[(i + 1) % vertex_count];
+			VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, Color(0.9, 0.2, 0.0, 0.8), 1);
+		}
 
 #if defined(TOOLS_ENABLED) && defined(DEBUG_DECOMPOSE_BOX2D)
-	Color c(0.4, 0.9, 0.1);
-	for (int i = 0; i < decomposed.size(); i++) {
-		c.set_hsv(Math::fmod(c.get_h() + 0.738, 1), c.get_s(), c.get_v(), 0.5);
-		Vector<Color> colors;
-		colors.push_back(c);
-		VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, decomposed[i], colors);
-	}
+		Color c(0.4, 0.9, 0.1);
+		for (int i = 0; i < decomposed.size(); i++) {
+			c.set_hsv(Math::fmod(c.get_h() + 0.738, 1), c.get_s(), c.get_v(), 0.5);
+			Vector<Color> colors;
+			colors.push_back(c);
+			VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, decomposed[i], colors);
+		}
 #else
-	Vector<Color> colors;
-	colors.push_back(p_color);
-	VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, colors);
+		Vector<Color> colors;
+		colors.push_back(p_color);
+		VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, colors);
 #endif
+
+	} else if (build_mode == BUILD_SEGMENTS) {
+
+		Color c = Color(0.9, 0.2, 0.0, 0.8);
+
+		int vertex_count = points.size();
+		for (int i = 0; i < vertex_count; i++) {
+			Vector2 p = points[i];
+			Vector2 n = points[(i + 1) % vertex_count];
+			VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, c, 2.0f);
+
+			// Draw normal arrow
+			Vector2 midpoint = (p + n) / 2.0;
+			Vector2 norm = (n - p).normalized().rotated(Math_PI * -0.5f);
+			if (invert_order)
+				norm = -norm;
+			Vector2 tip = midpoint + norm * 10.0f;
+			draw_arrow(p_to_rid, midpoint, tip, c, 1.0f);
+		}
+
+	} else if (build_mode == BUILD_OPEN_SEGMENTS) {
+
+		Color c = Color(0.9, 0.2, 0.0, 0.8);
+
+		int vertex_count = points.size();
+		for (int i = 0; i < vertex_count - 1; i++) {
+			Vector2 p = points[i];
+			Vector2 n = points[i + 1];
+
+			Color c_tmp = c;
+			float width = 2.0f;
+			if (i == 0 || i == vertex_count - 2) {
+				c_tmp.set_hsv(c_tmp.get_h(), c_tmp.get_s() * 0.5, c_tmp.get_v(), c_tmp.a * 0.5);
+				width = 1.0f;
+			}
+			VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, c_tmp, width);
+
+			if (!(i == 0 || i == vertex_count - 2)) {
+				// Draw arrow in normal direction
+				Vector2 midpoint = (p + n) / 2.0;
+				Vector2 norm = (n - p).normalized().rotated(Math_PI * -0.5f);
+				if (invert_order)
+					norm = -norm;
+				Vector2 tip = midpoint + norm * 10.0f;
+				draw_arrow(p_to_rid, midpoint, tip, c, 1.0f);
+			}
+		}
+	}
 }
 
 Box2DPolygonShape::Box2DPolygonShape() :
-		Box2DShape() {
-}
-
-Node2D *Box2DPolygonEditor::_get_node() const {
-	return node;
-}
-
-void Box2DPolygonEditor::_set_node(Node *p_polygon) {
-	node = Object::cast_to<Box2DFixture>(p_polygon);
-}
-
-Variant Box2DPolygonEditor::_get_polygon(int p_idx) const {
-	if (node->get_shape().is_valid()) {
-		Box2DPolygonShape *poly = dynamic_cast<Box2DPolygonShape *>(*node->get_shape());
-		if (poly) {
-			return poly->get_points();
-		}
-	}
-	return Vector<Vector2>();
-}
-
-void Box2DPolygonEditor::_set_polygon(int p_idx, const Variant &p_polygon) const {
-	if (node->get_shape().is_valid()) {
-		Box2DPolygonShape *poly = dynamic_cast<Box2DPolygonShape *>(*node->get_shape());
-		if (poly) {
-			poly->set_points(p_polygon);
-		}
-	}
-}
-
-void Box2DPolygonEditor::_action_set_polygon(int p_idx, const Variant &p_previous, const Variant &p_polygon) {
-	undo_redo->add_do_method(*node->get_shape(), "set_points", p_polygon);
-	undo_redo->add_undo_method(*node->get_shape(), "set_points", p_previous);
-}
-
-Box2DPolygonEditor::Box2DPolygonEditor(EditorNode *p_editor) :
-		AbstractPolygon2DEditor(p_editor), node(NULL), shape(NULL) {
-}
-
-bool Box2DPolygonEditorPlugin::handles(Object *p_object) const {
-	Box2DFixture *node = Object::cast_to<Box2DFixture>(p_object);
-	return node && node->get_shape().is_valid() && dynamic_cast<Box2DPolygonShape *>(*node->get_shape());
-}
-
-Box2DPolygonEditorPlugin::Box2DPolygonEditorPlugin(EditorNode *p_node) :
-		AbstractPolygon2DEditorPlugin(p_node, memnew(Box2DPolygonEditor(p_node)), "Box2DFixture") {
-}
+		Box2DShape(&chain_shape),
+		build_mode(BuildMode::BUILD_SOLIDS),
+		invert_order(false) {}

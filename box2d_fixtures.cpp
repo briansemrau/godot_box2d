@@ -32,8 +32,11 @@ void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDe
 			p_fixture_out = body_node->body->CreateFixture(&transformedDef); // Write here because shp is in scope
 		} break;
 		case b2Shape::Type::e_chain: {
-			// TODO
-			ERR_FAIL_MSG("Not yet implemented");
+			b2ChainShape shp = b2ChainShape(*dynamic_cast<const b2ChainShape *>(p_def.shape));
+			for (int i = 0; i < shp.m_count; i++) {
+				shp.m_vertices[i] = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertices[i])));
+			}
+			transformedDef.shape = &shp;
 			p_fixture_out = body_node->body->CreateFixture(&transformedDef); // Write here because shp is in scope
 		} break;
 		default: {
@@ -51,14 +54,15 @@ bool Box2DFixture::create_b2() {
 		ERR_FAIL_COND_V(!body_node->body, false);
 		ERR_FAIL_COND_V(!shape.is_valid(), false);
 
-		Box2DPolygonShape *polyshape = dynamic_cast<Box2DPolygonShape *>(shape.ptr());
-		if (polyshape) {
-			for (int i = 0; i < polyshape->shape_vector.size(); i++) {
-				fixtureDef.shape = &polyshape->shape_vector[i];
+		if (shape->is_composite_shape()) {
+			Vector<const b2Shape *> shape_vector = shape.ptr()->get_shapes();
+			for (int i = 0; i < shape_vector.size(); i++) {
+				fixtureDef.shape = shape_vector[i];
 				b2Fixture *fixture = NULL;
 				create_b2Fixture(fixture, fixtureDef, get_transform());
-				if (fixture)
+				if (fixture) {
 					fixtures.push_back(fixture);
+				}
 			}
 		} else {
 			ERR_FAIL_COND_V(!shape->shape, false);
@@ -66,8 +70,9 @@ bool Box2DFixture::create_b2() {
 			fixtureDef.shape = shape->shape;
 			b2Fixture *fixture = NULL;
 			create_b2Fixture(fixture, fixtureDef, get_transform());
-			if (fixture)
+			if (fixture) {
 				fixtures.push_back(fixture);
+			}
 		}
 
 		//print_line("fixture created");
