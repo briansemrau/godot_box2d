@@ -11,58 +11,10 @@
 * @author Brian Semrau
 */
 
-/*void ContactListener::BeginContact(b2Contact *contact) {
-	// intentionally blank, may remove
-}
-
-void ContactListener::EndContact(b2Contact *contact) {
-	// intentionally blank, may remove
-}
-
-void ContactListener::PreSolve(b2Contact *contact, const b2Manifold *oldManifold) {
-	if (contact->GetFixtureA()->GetBody()->GetUserData().exceptions.has(contact->GetFixtureB()->GetBody()->GetUserData().id)) {
-		contact->SetEnabled(false);
-	}
-}
-
-void ContactListener::PostSolve(b2Contact *contact, const b2ContactImpulse *impulse) {
-	// intentionally blank, may remove
-	// Note: this impulse callback would be very useful if Godot 2D physics added impulse data to contact reporting
-}
-
-void Box2DWorld::body_add_collision_exception(RID p_body, RID p_body_b) {
-	b2Body *body = body_owner.get(p_body)->get_obj();
-	ERR_FAIL_COND(!body);
-
-	body->GetUserData().exceptions.insert(p_body_b);
-	body->SetAwake(true);
-}
-
-void Box2DWorld::body_remove_collision_exception(RID p_body, RID p_body_b) {
-	b2Body *body = body_owner.get(p_body)->get_obj();
-	ERR_FAIL_COND(!body);
-
-	body->GetUserData().exceptions.erase(p_body_b);
-	body->SetAwake(true);
-}
-
-void Box2DWorld::body_get_collision_exceptions(RID p_body, List<RID> *p_exceptions) {
-	b2Body *body = body_owner.get(p_body)->get_obj();
-	ERR_FAIL_COND(!body);
-
-	for (int i = 0; i < body->GetUserData().exceptions.size(); i++) {
-		p_exceptions->push_back(body->GetUserData().exceptions[i]);
-	}
-}*/
-
 Box2DWorld::Box2DWorld() :
 		world(NULL) {
 	gravity = GLOBAL_GET("physics/2d/default_gravity_vector");
 	gravity *= real_t(GLOBAL_GET("physics/2d/default_gravity"));
-
-	//contact_listener = new ContactListener();
-	//world->SetContactListener(contact_listener);
-	//world = memnew(b2World(b2Vec2_zero));
 }
 
 Box2DWorld::~Box2DWorld() {
@@ -76,6 +28,42 @@ void Box2DWorld::SayGoodbye(b2Joint *joint) {
 
 void Box2DWorld::SayGoodbye(b2Fixture *fixture) {
 	fixture->GetUserData().owner->on_b2Fixture_destroyed();
+}
+
+bool Box2DWorld::ShouldCollide(b2Fixture *fixtureA, b2Fixture *fixtureB) {
+	// Default Box2D contact filtering
+
+	const b2Filter &filterA = fixtureA->GetFilterData();
+	const b2Filter &filterB = fixtureB->GetFilterData();
+
+	if (filterA.groupIndex == filterB.groupIndex && filterA.groupIndex != 0) {
+		return filterA.groupIndex > 0;
+	}
+
+	bool collide = (filterA.maskBits & filterB.categoryBits) != 0 && (filterA.categoryBits & filterB.maskBits) != 0;
+
+	// Custom contact filtering
+
+	if (!collide) {
+		return false;
+	}
+
+	// Check for fixture exclusions
+	Box2DFixture *const &ownerA = fixtureA->GetUserData().owner;
+	Box2DFixture *const &ownerB = fixtureB->GetUserData().owner;
+	if (ownerA->filtered.has(ownerB) || ownerB->filtered.has(ownerA)) {
+		return false;
+	} else {
+		// Check for body exclusions
+		Box2DPhysicsBody *const &bodyA = ownerA->body_node;
+		Box2DPhysicsBody *const &bodyB = ownerB->body_node;
+		if ((ownerA->accept_body_collision_exceptions && bodyA->filtered.has(bodyB)) || (ownerB->accept_body_collision_exceptions && bodyB->filtered.has(bodyA))) {
+			return false;
+		} else {
+			// TODO should we bother to let bodies exclude fixtures?
+			return true;
+		}
+	}
 }
 
 void Box2DWorld::_notification(int p_what) {
@@ -95,6 +83,7 @@ void Box2DWorld::_notification(int p_what) {
 					set_physics_process_internal(true);
 
 					world->SetDestructionListener(this);
+					world->SetContactFilter(this);
 				}
 			}
 
@@ -144,7 +133,7 @@ Vector2 Box2DWorld::get_gravity() const {
 	return gravity;
 }
 
-Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results) {//, const Vector<Ref<Box2DPhysicsBody> > &p_exclude/*, uint32_t p_layers*/) {
+Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results) { //, const Vector<Ref<Box2DPhysicsBody> > &p_exclude/*, uint32_t p_layers*/) {
 	pointCallback.results.clear();
 	pointCallback.point = gd_to_b2(p_point);
 	//pointCallback.exclude.clear();
@@ -198,7 +187,7 @@ bool Box2DWorld::QueryCallback::ReportFixture(b2Fixture *fixture) {
 }
 
 bool Box2DWorld::IntersectPointCallback::ReportFixture(b2Fixture *fixture) {
-	if (fixture->TestPoint(point))// && exclude.find(fixture->GetBody()->GetUserData().owner) > 0)
+	if (fixture->TestPoint(point)) // && exclude.find(fixture->GetBody()->GetUserData().owner) > 0)
 		results.push_back(fixture);
 	return results.size() < max_results;
 }

@@ -17,17 +17,6 @@ bool Box2DPhysicsBody::create_b2Body() {
 
 		//print_line("body created");
 
-		// Create fixtures
-		// TODO Does this actually ever do anything? I believe this is handled by ENTER/EXIT_TREE.
-		//      If we add an enabled/disabled property that destroys/recreates b2Objects, then
-		//      this callback is a MUST
-		auto child = fixtures.front();
-		while (child) {
-			print_line("calling child fixture");
-			child->get()->on_parent_created(this);
-			child = child->next();
-		}
-
 		update_mass(false);
 
 		// Notify joints
@@ -89,7 +78,6 @@ void Box2DPhysicsBody::_notification(int p_what) {
 	// TODO finalize implementation to imitate behavior from RigidBody2D and Kinematic (static too?)
 	switch (p_what) {
 		case NOTIFICATION_PREDELETE: {
-
 			// Inform joints that this node is no more
 			auto joint = joints.front();
 			while (joint) {
@@ -97,9 +85,13 @@ void Box2DPhysicsBody::_notification(int p_what) {
 				joint = joint->next();
 			}
 
+			// Inform filterers that this node has gone to a farm far away where it can run around in fields much bigger than we have at home
+			for (int i = 0; i < filtering_me.size(); i++) {
+				filtering_me[i]->filtered.erase(this);
+			}
 		} break;
-		case NOTIFICATION_ENTER_TREE: {
 
+		case NOTIFICATION_ENTER_TREE: {
 			last_valid_xform = get_global_transform();
 
 			// Find the Box2DWorld
@@ -129,20 +121,18 @@ void Box2DPhysicsBody::_notification(int p_what) {
 					}
 				}
 			}
-
 		} break;
-		case NOTIFICATION_EXIT_TREE: {
 
+		case NOTIFICATION_EXIT_TREE: {
 			// Don't destroy body. It could be exiting/entering.
 			// Body should be destroyed in destructor if node is being freed.
 
 			// TODO What do we do if it exits the tree, the ref is kept (in a script), and it's never destroyed?
 			//      Exiting w/o reentering should destroy body.
 			//      This applies to Box2DFixture and Box2DJoint as well.
-
 		} break;
-		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
 
+		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
 			// Send new transform to physics
 			Transform2D new_xform = get_transform();
 
@@ -158,10 +148,9 @@ void Box2DPhysicsBody::_notification(int p_what) {
 					//set_notify_local_transform(true);
 				}
 			}
-
 		} break;
-		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
 
+		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
 			// TODO figure out if this can instead be a callback from Box2D.
 			//		I don't think it can.
 			if (body && body->IsAwake()) {
@@ -171,7 +160,6 @@ void Box2DPhysicsBody::_notification(int p_what) {
 
 				// handle contact monitoring or something? (see RigidBody2D::_direct_state_changed)
 			}
-
 		} break;
 	}
 }
@@ -214,6 +202,10 @@ void Box2DPhysicsBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_group_index"), &Box2DPhysicsBody::get_group_index);
 
 	ClassDB::bind_method(D_METHOD("set_filter_data", "collision_layer", "collision_mask", "group_index"), &Box2DPhysicsBody::set_filter_data);
+
+	ClassDB::bind_method(D_METHOD("get_collision_exceptions"), &Box2DPhysicsBody::get_collision_exceptions);
+	ClassDB::bind_method(D_METHOD("add_collision_exception_with", "body"), &Box2DPhysicsBody::add_collision_exception_with);
+	ClassDB::bind_method(D_METHOD("remove_collision_exception_with", "body"), &Box2DPhysicsBody::remove_collision_exception_with);
 
 	ClassDB::bind_method(D_METHOD("apply_force", "force", "point"), &Box2DPhysicsBody::apply_force, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("apply_central_force", "force"), &Box2DPhysicsBody::apply_central_force, DEFVAL(true));
@@ -273,7 +265,14 @@ String Box2DPhysicsBody::get_configuration_warning() const {
 		warning += TTR("Box2DPhysicsBody only serves to provide bodies to a Box2DWorld node. Please only use it under the hierarchy of Box2DWorld.");
 	}
 
-	if (fixtures.size() == 0) {
+	bool has_fixture_child = false;
+	for (int i = 0; i < get_child_count(); i++) {
+		if (Object::cast_to<Box2DFixture>(get_child(i))) {
+			has_fixture_child = true;
+			break;
+		}
+	}
+	if (!has_fixture_child) {
 		if (warning != String()) {
 			warning += "\n\n";
 		}
@@ -502,6 +501,31 @@ void Box2DPhysicsBody::set_filter_data(uint16_t p_layer, uint16_t p_mask, int16 
 		update_filterdata();
 	}
 }
+
+Array Box2DPhysicsBody::get_collision_exceptions() {
+	Array ret;
+	for (int i = 0; i < filtered.size(); i++) {
+		ret.append(filtered[i]);
+	}
+	return ret;
+}
+
+void Box2DPhysicsBody::add_collision_exception_with(Node *p_node) {
+	ERR_FAIL_NULL(p_node);
+	Box2DPhysicsBody *body = Object::cast_to<Box2DPhysicsBody>(p_node);
+	ERR_FAIL_COND_MSG(!body, "Body collision exceptions only work with other bodies. Submit an issue if you need this.");
+	filtered.insert(body);
+	body->filtering_me.insert(this);
+}
+
+void Box2DPhysicsBody::remove_collision_exception_with(Node *p_node) {
+	ERR_FAIL_NULL(p_node);
+	Box2DPhysicsBody *body = Object::cast_to<Box2DPhysicsBody>(p_node);
+	ERR_FAIL_COND_MSG(!body, "Body collision exceptions only work with other bodies. Submit an issue if you need this.");
+	filtered.erase(body);
+	body->filtering_me.erase(this);
+}
+
 void Box2DPhysicsBody::apply_force(const Vector2 &force, const Vector2 &point, bool wake) {
 	ERR_FAIL_COND_MSG(!body, "b2Body is null.");
 	body->ApplyForce(gd_to_b2(force), gd_to_b2(point), wake);

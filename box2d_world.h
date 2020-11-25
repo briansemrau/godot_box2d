@@ -34,20 +34,12 @@ class Box2DShapeQueryParameters : public Reference {
 	// TODO a bunch of shit ugh
 };
 
-class Box2DWorld : public Node2D, b2DestructionListener {
+class Box2DWorld : public Node2D, public virtual b2DestructionListener, public virtual b2ContactFilter {
 	GDCLASS(Box2DWorld, Node2D);
 
 	friend class Box2DPhysicsBody;
 	friend class Box2DJoint;
 
-private:
-	Vector2 gravity;
-	b2World *world;
-
-	Set<IBox2DChildObject *> box2d_children;
-
-	virtual void SayGoodbye(b2Joint *joint) override;
-	virtual void SayGoodbye(b2Fixture *fixture) override;
 
 	// TODO Refactor this callback garbage.
 	//      It may make sense to do this when/if shape queries are implemented.
@@ -71,6 +63,17 @@ private:
 
 		virtual bool ReportFixture(b2Fixture *fixture) override;
 	};
+
+private:
+	Vector2 gravity;
+	b2World *world;
+
+	Set<IBox2DChildObject *> box2d_children;
+
+	virtual void SayGoodbye(b2Joint *joint) override;
+	virtual void SayGoodbye(b2Fixture *fixture) override;
+
+	virtual bool ShouldCollide(b2Fixture *fixtureA, b2Fixture *fixtureB) override;
 
 	QueryCallback aabbCallback;
 	IntersectPointCallback pointCallback;

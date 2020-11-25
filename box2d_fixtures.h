@@ -30,11 +30,17 @@ class Box2DFixture : public Node2D, public virtual IBox2DChildObject {
 
 	void _shape_changed();
 
-protected:
+//protected:
 	Ref<Box2DShape> shape;
 	b2FixtureDef fixtureDef;
 	b2Filter filterDef;
 	bool override_body_filterdata;
+	bool accept_body_collision_exceptions;
+	// TODO maybe implement a HashSet or use std
+	// Not sure why Godot uses a VSet for this
+	VSet<Box2DFixture *> filtered;
+	VSet<Box2DFixture *> filtering_me;
+	// TODO might fixtures need to filter other whole bodies?
 
 	Vector<b2Fixture *> fixtures;
 
@@ -79,6 +85,13 @@ public:
 	int16_t get_group_index() const;
 
 	void set_filter_data(uint16_t p_layer, uint16_t p_mask, int16 p_group_index);
+
+	void set_use_parent_exceptions(bool p_use);
+	bool get_use_parent_exceptions() const;
+
+	Array get_collision_exceptions();
+	void add_collision_exception_with(Node *p_node);
+	void remove_collision_exception_with(Node *p_node);
 
 	void set_density(real_t p_density);
 	real_t get_density() const;

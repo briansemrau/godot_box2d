@@ -105,47 +105,43 @@ bool Box2DFixture::destroy_b2() {
 }
 
 void Box2DFixture::_shape_changed() {
-
 	update_shape();
 }
 
 void Box2DFixture::_notification(int p_what) {
 	switch (p_what) {
-		case NOTIFICATION_ENTER_TREE: {
+		case NOTIFICATION_PREDELETE: {
+			// Remove self from filterers
+			for (int i = 0; i < filtering_me.size(); i++) {
+				filtering_me[i]->filtered.erase(this);
+			}
+		} break;
 
+		case NOTIFICATION_ENTER_TREE: {
 			Box2DPhysicsBody *new_body = Object::cast_to<Box2DPhysicsBody>(get_parent());
 
 			// If new parent, recreate fixture
 			if (body_node != new_body) {
-				// Remove from previous parent
-				if (body_node) {
-					body_node->fixtures.erase(this);
-					destroy_b2();
-				}
+				destroy_b2();
 
 				body_node = new_body;
-				if (body_node) {
-					body_node->fixtures.insert(this);
-					if (body_node->body && shape.is_valid()) {
-						create_b2();
-					}
+
+				if (body_node && body_node->body && shape.is_valid()) {
+					create_b2();
 				}
 			}
-
 		} break;
-		case NOTIFICATION_EXIT_TREE: {
 
+		case NOTIFICATION_EXIT_TREE: {
 			// Don't destroy fixture. It could be exiting/entering.
 			// Fixture should be destroyed in destructor if node is being freed.
-
 		} break;
+
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
-
 			update_shape();
-
 		} break;
-		case NOTIFICATION_DRAW: {
 
+		case NOTIFICATION_DRAW: {
 			if (!Engine::get_singleton()->is_editor_hint() && !get_tree()->is_debugging_collisions_hint()) {
 				break;
 			}
@@ -154,7 +150,6 @@ void Box2DFixture::_notification(int p_what) {
 			if (shape.is_valid()) {
 				shape->draw(get_canvas_item(), draw_col);
 			}
-
 		} break;
 	}
 }
@@ -172,6 +167,8 @@ void Box2DFixture::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_collision_mask"), &Box2DFixture::get_collision_mask);
 	ClassDB::bind_method(D_METHOD("set_group_index", "group_index"), &Box2DFixture::set_group_index);
 	ClassDB::bind_method(D_METHOD("get_group_index"), &Box2DFixture::get_group_index);
+	ClassDB::bind_method(D_METHOD("set_use_parent_exceptions", "use_parent_exceptions"), &Box2DFixture::set_use_parent_exceptions);
+	ClassDB::bind_method(D_METHOD("get_use_parent_exceptions"), &Box2DFixture::get_use_parent_exceptions);
 	ClassDB::bind_method(D_METHOD("set_density", "density"), &Box2DFixture::set_density);
 	ClassDB::bind_method(D_METHOD("get_density"), &Box2DFixture::get_density);
 	ClassDB::bind_method(D_METHOD("set_friction", "friction"), &Box2DFixture::set_friction);
@@ -180,6 +177,10 @@ void Box2DFixture::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_restitution"), &Box2DFixture::get_restitution);
 
 	ClassDB::bind_method(D_METHOD("set_filter_data", "collision_layer", "collision_mask", "group_index"), &Box2DFixture::set_filter_data);
+
+	ClassDB::bind_method(D_METHOD("get_collision_exceptions"), &Box2DFixture::get_collision_exceptions);
+	ClassDB::bind_method(D_METHOD("add_collision_exception_with", "fixture"), &Box2DFixture::add_collision_exception_with);
+	ClassDB::bind_method(D_METHOD("remove_collision_exception_with", "fixture"), &Box2DFixture::remove_collision_exception_with);
 
 	ClassDB::bind_method(D_METHOD("_shape_changed"), &Box2DFixture::_shape_changed);
 
@@ -192,6 +193,7 @@ void Box2DFixture::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_layer", "get_collision_layer");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_mask", "get_collision_mask");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "group_index"), "set_group_index", "get_group_index");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_parent_exceptions"), "set_use_parent_exceptions", "get_use_parent_exceptions");
 }
 
 void Box2DFixture::on_parent_created(Node *) {
@@ -316,6 +318,38 @@ void Box2DFixture::set_filter_data(uint16_t p_layer, uint16_t p_mask, int16 p_gr
 	}
 }
 
+void Box2DFixture::set_use_parent_exceptions(bool p_use) {
+	accept_body_collision_exceptions = p_use;
+}
+
+bool Box2DFixture::get_use_parent_exceptions() const {
+	return accept_body_collision_exceptions;
+}
+
+Array Box2DFixture::get_collision_exceptions() {
+	Array ret;
+	for (int i = 0; i < filtered.size(); i++) {
+		ret.append(filtered[i]);
+	}
+	return ret;
+}
+
+void Box2DFixture::add_collision_exception_with(Node *p_node) {
+	ERR_FAIL_NULL(p_node);
+	Box2DFixture *fixture = Object::cast_to<Box2DFixture>(p_node);
+	ERR_FAIL_COND_MSG(!fixture, "Fixture collision exceptions only work with other fixtures. Submit an issue if you need this.");
+	filtered.insert(fixture);
+	fixture->filtering_me.insert(this);
+}
+
+void Box2DFixture::remove_collision_exception_with(Node *p_node) {
+	ERR_FAIL_NULL(p_node);
+	Box2DFixture *fixture = Object::cast_to<Box2DFixture>(p_node);
+	ERR_FAIL_COND_MSG(!fixture, "Fixture collision exceptions only work with other fixtures. Submit an issue if you need this.");
+	filtered.erase(fixture);
+	fixture->filtering_me.erase(this);
+}
+
 void Box2DFixture::set_density(real_t p_density) {
 	for (int i = 0; i < fixtures.size(); i++) {
 		fixtures[i]->SetDensity(p_density);
@@ -352,7 +386,8 @@ real_t Box2DFixture::get_restitution() const {
 
 Box2DFixture::Box2DFixture() :
 		body_node(NULL),
-		override_body_filterdata(false) {
+		override_body_filterdata(false),
+		accept_body_collision_exceptions(true) {
 	fixtureDef.density = 1.0f;
 	filterDef.maskBits = 0x0001;
 };

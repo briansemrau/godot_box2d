@@ -38,11 +38,14 @@ private:
 	real_t angular_damping;
 	b2Filter filterDef;
 
+	VSet<Box2DPhysicsBody *> filtered;
+	VSet<Box2DPhysicsBody *> filtering_me;
+	// TODO i don't care enough right now to let bodies exclude specific fixtures
+
 	b2Body *body;
 
 	Box2DWorld *world_node;
 
-	Set<IBox2DChildObject *> fixtures; // TODO might remove.
 	Set<Box2DJoint *> joints;
 
 	Transform2D last_valid_xform;
@@ -111,6 +114,10 @@ public:
 	int16_t get_group_index() const;
 
 	void set_filter_data(uint16_t p_layer, uint16_t p_mask, int16 p_group_index);
+
+	Array get_collision_exceptions();
+	void add_collision_exception_with(Node *p_node);
+	void remove_collision_exception_with(Node *p_node);
 
 	void apply_force(const Vector2 &p_force, const Vector2 &p_point, bool p_wake = true);
 	void apply_central_force(const Vector2 &p_force, bool p_wake = true);
