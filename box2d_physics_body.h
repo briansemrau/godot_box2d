@@ -8,10 +8,11 @@
 #include "scene/2d/node_2d.h"
 
 #include "box2d/b2_body.h"
+#include "box2d/b2_fixture.h"
 #include "box2d/b2_world.h"
 
-#include "box2d_types_converter.h"
 #include "box2d_child_object.h"
+#include "box2d_types_converter.h"
 
 class Box2DWorld;
 
@@ -35,8 +36,9 @@ private:
 	bool use_custom_massdata;
 	real_t linear_damping;
 	real_t angular_damping;
-	
-	b2Body *body = nullptr;
+	b2Filter filterDef;
+
+	b2Body *body;
 
 	Box2DWorld *world_node;
 
@@ -49,6 +51,7 @@ private:
 	bool destroy_b2Body();
 
 	void update_mass(bool p_calc_reset = true);
+	void update_filterdata();
 
 protected:
 	void _notification(int p_what);
@@ -97,6 +100,17 @@ public:
 
 	void set_fixed_rotation(bool p_fixed);
 	bool is_fixed_rotation() const;
+
+	void set_collision_layer(uint16_t p_layer);
+	uint16_t get_collision_layer() const;
+
+	void set_collision_mask(uint16_t p_mask);
+	uint16_t get_collision_mask() const;
+
+	void set_group_index(int16_t p_group_index);
+	int16_t get_group_index() const;
+
+	void set_filter_data(uint16_t p_layer, uint16_t p_mask, int16 p_group_index);
 
 	void apply_force(const Vector2 &p_force, const Vector2 &p_point, bool p_wake = true);
 	void apply_central_force(const Vector2 &p_force, bool p_wake = true);

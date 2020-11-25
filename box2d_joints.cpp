@@ -479,6 +479,8 @@ real_t Box2DJoint::get_reaction_torque() const {
 }
 
 Box2DJoint::Box2DJoint() :
+		jointDef(NULL),
+		joint(NULL),
 		world_node(NULL),
 		bodyA_cache(0),
 		bodyB_cache(0),

@@ -33,8 +33,8 @@ class Box2DJoint : public Node2D, public virtual IBox2DChildObject {
 	friend class Box2DWorld;
 	friend class Box2DPhysicsBody;
 
-	b2JointDef *jointDef = nullptr;
-	b2Joint *joint = nullptr;
+	b2JointDef *jointDef;
+	b2Joint *joint;
 
 	Box2DWorld *world_node;
 

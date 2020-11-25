@@ -3,14 +3,22 @@
 #include <core/engine.h>
 
 void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDef &p_def, const Transform2D &p_shape_xform) {
+	b2FixtureDef finalDef = b2FixtureDef(p_def);
+
+	// Set filter data
+	if (override_body_filterdata) {
+		finalDef.filter = filterDef;
+	} else {
+		finalDef.filter = body_node->filterDef;
+	}
+
 	// Transform shape with local transform
-	b2FixtureDef transformedDef = b2FixtureDef(p_def);
 	switch (p_def.shape->m_type) {
 		case b2Shape::Type::e_circle: {
 			b2CircleShape shp = b2CircleShape(*dynamic_cast<const b2CircleShape *>(p_def.shape));
 			shp.m_p = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_p)));
-			transformedDef.shape = &shp;
-			p_fixture_out = body_node->body->CreateFixture(&transformedDef); // Write here because shp is in scope
+			finalDef.shape = &shp;
+			p_fixture_out = body_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
 		} break;
 		case b2Shape::Type::e_edge: {
 			b2EdgeShape shp = b2EdgeShape(*dynamic_cast<const b2EdgeShape *>(p_def.shape));
@@ -18,8 +26,8 @@ void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDe
 			shp.m_vertex1 = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertex1)));
 			shp.m_vertex2 = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertex2)));
 			shp.m_vertex3 = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertex3)));
-			transformedDef.shape = &shp;
-			p_fixture_out = body_node->body->CreateFixture(&transformedDef); // Write here because shp is in scope
+			finalDef.shape = &shp;
+			p_fixture_out = body_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
 		} break;
 		case b2Shape::Type::e_polygon: {
 			b2PolygonShape shp = b2PolygonShape(*dynamic_cast<const b2PolygonShape *>(p_def.shape));
@@ -28,16 +36,16 @@ void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDe
 				shp.m_normals[i] = gd_to_b2(p_shape_xform.basis_xform(b2_to_gd(shp.m_normals[i])));
 			}
 			shp.m_centroid = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_centroid)));
-			transformedDef.shape = &shp;
-			p_fixture_out = body_node->body->CreateFixture(&transformedDef); // Write here because shp is in scope
+			finalDef.shape = &shp;
+			p_fixture_out = body_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
 		} break;
 		case b2Shape::Type::e_chain: {
 			b2ChainShape shp = b2ChainShape(*dynamic_cast<const b2ChainShape *>(p_def.shape));
 			for (int i = 0; i < shp.m_count; i++) {
 				shp.m_vertices[i] = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertices[i])));
 			}
-			transformedDef.shape = &shp;
-			p_fixture_out = body_node->body->CreateFixture(&transformedDef); // Write here because shp is in scope
+			finalDef.shape = &shp;
+			p_fixture_out = body_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
 		} break;
 		default: {
 			ERR_FAIL();
@@ -152,8 +160,18 @@ void Box2DFixture::_notification(int p_what) {
 }
 
 void Box2DFixture::_bind_methods() {
+	// TODO collision testing funcs
 	ClassDB::bind_method(D_METHOD("set_shape", "shape"), &Box2DFixture::set_shape);
 	ClassDB::bind_method(D_METHOD("get_shape"), &Box2DFixture::get_shape);
+	// TODO sensor
+	ClassDB::bind_method(D_METHOD("set_override_body_collision", "override_body_collision"), &Box2DFixture::set_override_body_collision);
+	ClassDB::bind_method(D_METHOD("get_override_body_collision"), &Box2DFixture::get_override_body_collision);
+	ClassDB::bind_method(D_METHOD("set_collision_layer", "collision_layer"), &Box2DFixture::set_collision_layer);
+	ClassDB::bind_method(D_METHOD("get_collision_layer"), &Box2DFixture::get_collision_layer);
+	ClassDB::bind_method(D_METHOD("set_collision_mask", "collision_mask"), &Box2DFixture::set_collision_mask);
+	ClassDB::bind_method(D_METHOD("get_collision_mask"), &Box2DFixture::get_collision_mask);
+	ClassDB::bind_method(D_METHOD("set_group_index", "group_index"), &Box2DFixture::set_group_index);
+	ClassDB::bind_method(D_METHOD("get_group_index"), &Box2DFixture::get_group_index);
 	ClassDB::bind_method(D_METHOD("set_density", "density"), &Box2DFixture::set_density);
 	ClassDB::bind_method(D_METHOD("get_density"), &Box2DFixture::get_density);
 	ClassDB::bind_method(D_METHOD("set_friction", "friction"), &Box2DFixture::set_friction);
@@ -161,12 +179,19 @@ void Box2DFixture::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_restitution", "restitution"), &Box2DFixture::set_restitution);
 	ClassDB::bind_method(D_METHOD("get_restitution"), &Box2DFixture::get_restitution);
 
+	ClassDB::bind_method(D_METHOD("set_filter_data", "collision_layer", "collision_mask", "group_index"), &Box2DFixture::set_filter_data);
+
 	ClassDB::bind_method(D_METHOD("_shape_changed"), &Box2DFixture::_shape_changed);
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shape", PROPERTY_HINT_RESOURCE_TYPE, "Box2DShape"), "set_shape", "get_shape");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "density"), "set_density", "get_density");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "friction"), "set_friction", "get_friction");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "restitution"), "set_restitution", "get_restitution");
+	ADD_GROUP("Collision", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "override_body_collision"), "set_override_body_collision", "get_override_body_collision");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_layer", "get_collision_layer");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_mask", "get_collision_mask");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "group_index"), "set_group_index", "get_group_index");
 }
 
 void Box2DFixture::on_parent_created(Node *) {
@@ -184,6 +209,12 @@ void Box2DFixture::update_shape() {
 	update();
 	if (Engine::get_singleton()->is_editor_hint()) {
 		update_configuration_warning();
+	}
+}
+
+void Box2DFixture::update_filterdata() {
+	for (int i = 0; i < fixtures.size(); i++) {
+		fixtures[i]->SetFilterData(filterDef);
 	}
 }
 
@@ -232,6 +263,59 @@ Ref<Box2DShape> Box2DFixture::get_shape() {
 	return shape;
 }
 
+void Box2DFixture::set_override_body_collision(bool p_override) {
+	if (override_body_filterdata != p_override) {
+		override_body_filterdata = p_override;
+		update_filterdata();
+	}
+}
+
+bool Box2DFixture::get_override_body_collision() const {
+	return override_body_filterdata;
+}
+
+void Box2DFixture::set_collision_layer(uint16_t p_layer) {
+	if (filterDef.categoryBits != p_layer) {
+		filterDef.categoryBits = p_layer;
+		update_filterdata();
+	}
+}
+
+uint16_t Box2DFixture::get_collision_layer() const {
+	return filterDef.categoryBits;
+}
+
+void Box2DFixture::set_collision_mask(uint16_t p_mask) {
+	if (filterDef.maskBits != p_mask) {
+		filterDef.maskBits = p_mask;
+		update_filterdata();
+	}
+}
+
+uint16_t Box2DFixture::get_collision_mask() const {
+	return filterDef.maskBits;
+}
+
+void Box2DFixture::set_group_index(int16_t p_group_index) {
+	if (filterDef.groupIndex != p_group_index) {
+		filterDef.groupIndex = p_group_index;
+		update_filterdata();
+	}
+}
+
+int16_t Box2DFixture::get_group_index() const {
+	return filterDef.groupIndex;
+}
+
+void Box2DFixture::set_filter_data(uint16_t p_layer, uint16_t p_mask, int16 p_group_index) {
+	if (filterDef.categoryBits != p_layer || filterDef.maskBits != p_mask || filterDef.groupIndex != p_group_index) {
+		filterDef.categoryBits = p_layer;
+		filterDef.maskBits = p_mask;
+		filterDef.groupIndex = p_group_index;
+		update_filterdata();
+	}
+}
+
 void Box2DFixture::set_density(real_t p_density) {
 	for (int i = 0; i < fixtures.size(); i++) {
 		fixtures[i]->SetDensity(p_density);
@@ -265,6 +349,13 @@ void Box2DFixture::set_restitution(real_t p_restitution) {
 real_t Box2DFixture::get_restitution() const {
 	return fixtureDef.restitution;
 }
+
+Box2DFixture::Box2DFixture() :
+		body_node(NULL),
+		override_body_filterdata(false) {
+	fixtureDef.density = 1.0f;
+	filterDef.maskBits = 0x0001;
+};
 
 Box2DFixture::~Box2DFixture() {
 	if (body_node) {

@@ -1,5 +1,6 @@
 #include "box2d_physics_body.h"
 
+#include "box2d_fixtures.h"
 #include "box2d_joints.h"
 #include "box2d_world.h"
 
@@ -68,6 +69,18 @@ void Box2DPhysicsBody::update_mass(bool p_calc_reset) {
 			body->SetMassData(&massDataDef);
 		} else if (p_calc_reset) {
 			body->ResetMassData();
+		}
+	}
+}
+
+void Box2DPhysicsBody::update_filterdata() {
+	if (body) {
+		b2Fixture *fixture = body->GetFixtureList();
+		while (fixture) {
+			if (!fixture->GetUserData().owner->get_override_body_collision()) {
+				fixture->SetFilterData(filterDef);
+			}
+			fixture = fixture->GetNext();
 		}
 	}
 }
@@ -193,6 +206,14 @@ void Box2DPhysicsBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_can_sleep"), &Box2DPhysicsBody::get_can_sleep);
 	ClassDB::bind_method(D_METHOD("set_fixed_rotation", "fixed_rotation"), &Box2DPhysicsBody::set_fixed_rotation);
 	ClassDB::bind_method(D_METHOD("is_fixed_rotation"), &Box2DPhysicsBody::is_fixed_rotation);
+	ClassDB::bind_method(D_METHOD("set_collision_layer", "collision_layer"), &Box2DPhysicsBody::set_collision_layer);
+	ClassDB::bind_method(D_METHOD("get_collision_layer"), &Box2DPhysicsBody::get_collision_layer);
+	ClassDB::bind_method(D_METHOD("set_collision_mask", "collision_mask"), &Box2DPhysicsBody::set_collision_mask);
+	ClassDB::bind_method(D_METHOD("get_collision_mask"), &Box2DPhysicsBody::get_collision_mask);
+	ClassDB::bind_method(D_METHOD("set_group_index", "group_index"), &Box2DPhysicsBody::set_group_index);
+	ClassDB::bind_method(D_METHOD("get_group_index"), &Box2DPhysicsBody::get_group_index);
+
+	ClassDB::bind_method(D_METHOD("set_filter_data", "collision_layer", "collision_mask", "group_index"), &Box2DPhysicsBody::set_filter_data);
 
 	ClassDB::bind_method(D_METHOD("apply_force", "force", "point"), &Box2DPhysicsBody::apply_force, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("apply_central_force", "force"), &Box2DPhysicsBody::apply_central_force, DEFVAL(true));
@@ -218,6 +239,10 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "mass", PROPERTY_HINT_EXP_RANGE, "0.01,65535,0.01"), "set_mass", "get_mass");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "inertia", PROPERTY_HINT_EXP_RANGE, "0.01,65535,0.01"), "set_inertia", "get_inertia");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "center_of_mass"), "set_center_of_mass", "get_center_of_mass");
+	ADD_GROUP("Collision", "");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_layer", "get_collision_layer");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_mask", "get_collision_mask");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "group_index"), "set_group_index", "get_group_index");
 
 	BIND_ENUM_CONSTANT(MODE_RIGID);
 	BIND_ENUM_CONSTANT(MODE_STATIC);
@@ -436,6 +461,47 @@ bool Box2DPhysicsBody::is_fixed_rotation() const {
 	return bodyDef.fixedRotation;
 }
 
+void Box2DPhysicsBody::set_collision_layer(uint16_t p_layer) {
+	if (filterDef.categoryBits != p_layer) {
+		filterDef.categoryBits = p_layer;
+		update_filterdata();
+	}
+}
+
+uint16_t Box2DPhysicsBody::get_collision_layer() const {
+	return filterDef.categoryBits;
+}
+
+void Box2DPhysicsBody::set_collision_mask(uint16_t p_mask) {
+	if (filterDef.maskBits != p_mask) {
+		filterDef.maskBits = p_mask;
+		update_filterdata();
+	}
+}
+
+uint16_t Box2DPhysicsBody::get_collision_mask() const {
+	return filterDef.maskBits;
+}
+
+void Box2DPhysicsBody::set_group_index(int16_t p_group_index) {
+	if (filterDef.groupIndex != p_group_index) {
+		filterDef.groupIndex = p_group_index;
+		update_filterdata();
+	}
+}
+
+int16_t Box2DPhysicsBody::get_group_index() const {
+	return filterDef.groupIndex;
+}
+
+void Box2DPhysicsBody::set_filter_data(uint16_t p_layer, uint16_t p_mask, int16 p_group_index) {
+	if (filterDef.categoryBits != p_layer || filterDef.maskBits != p_mask || filterDef.groupIndex != p_group_index) {
+		filterDef.categoryBits = p_layer;
+		filterDef.maskBits = p_mask;
+		filterDef.groupIndex = p_group_index;
+		update_filterdata();
+	}
+}
 void Box2DPhysicsBody::apply_force(const Vector2 &force, const Vector2 &point, bool wake) {
 	ERR_FAIL_COND_MSG(!body, "b2Body is null.");
 	body->ApplyForce(gd_to_b2(force), gd_to_b2(point), wake);
@@ -471,7 +537,9 @@ Box2DPhysicsBody::Box2DPhysicsBody() :
 		use_custom_massdata(false),
 		linear_damping(0.0f),
 		angular_damping(0.0f),
+		body(NULL),
 		world_node(NULL) {
+	filterDef.maskBits = 0x0001;
 	set_notify_local_transform(true);
 }
 

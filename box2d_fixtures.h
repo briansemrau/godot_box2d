@@ -24,15 +24,6 @@ class Box2DFixture : public Node2D, public virtual IBox2DChildObject {
 
 	friend class Box2DWorld;
 
-public:
-	//enum FixtureType { // TODO figure out why the frick I added this
-	//	CIRCLE = b2Shape::e_circle,
-	//	//EDGE = b2Shape::e_edge, // TODO
-	//	POLYGON = b2Shape::e_polygon, // TODO polygon: add N>8gon decomposition to allow N>8 polys OR just force use of chain shape
-	//	//CHAIN = b2Shape::e_chain, // TODO
-	//};
-
-private:
 	Box2DPhysicsBody *body_node;
 
 	void on_b2Fixture_destroyed(){}; // TODO is there any case when this is needed?
@@ -41,9 +32,11 @@ private:
 
 protected:
 	Ref<Box2DShape> shape;
+	b2FixtureDef fixtureDef;
+	b2Filter filterDef;
+	bool override_body_filterdata;
 
 	Vector<b2Fixture *> fixtures;
-	b2FixtureDef fixtureDef;
 
 	void _notification(int p_what);
 	static void _bind_methods();
@@ -52,30 +45,40 @@ protected:
 
 	void create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDef &p_def, const Transform2D &p_shape_xform);
 
-	virtual bool create_b2();
-	virtual bool destroy_b2();
+	bool create_b2();
+	bool destroy_b2();
 
 	void update_shape();
+	void update_filterdata();
 
 public:
 	// TODO should this be in a TOOLS_ENABLED guard?
-	virtual bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const; // override;
+	virtual bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const override;
 
 	virtual String get_configuration_warning() const override;
 
 	//virtual bool test_point(const Point2 &p_point); // TODO figure out how to handle this with edge/chain/(semantic poly made of chain?)
 
 	// raycast
-	// mass data?
-
-	// gettype (shape type)
-	//FixtureType get_type() const;
 
 	void set_shape(const Ref<Box2DShape> &p_shape);
 	Ref<Box2DShape> get_shape();
 
 	// sensor?
-	// filterdata?
+
+	void set_override_body_collision(bool p_override);
+	bool get_override_body_collision() const;
+
+	void set_collision_layer(uint16_t p_layer);
+	uint16_t get_collision_layer() const;
+
+	void set_collision_mask(uint16_t p_mask);
+	uint16_t get_collision_mask() const;
+
+	void set_group_index(int16_t p_group_index);
+	int16_t get_group_index() const;
+
+	void set_filter_data(uint16_t p_layer, uint16_t p_mask, int16 p_group_index);
 
 	void set_density(real_t p_density);
 	real_t get_density() const;
@@ -88,10 +91,7 @@ public:
 
 	// restitution threshold?
 
-	Box2DFixture() :
-			body_node(NULL) {
-		fixtureDef.density = 1.0f;
-	};
+	Box2DFixture();
 	~Box2DFixture();
 };
 

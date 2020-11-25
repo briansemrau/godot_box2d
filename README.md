@@ -96,8 +96,8 @@ Box2D has...
     - [Rope](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md93) (⚠ unimplemented)
     - [Friction joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md94) (⚠ unimplemented)
     - [Motor joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md95) (⚠ unimplemented)
-- Improved physics stability
-- Additional small features that Godot doesn't have that may be critical for some games, such as:
+- Improved physics stability in some cases
+- Features that support game mechanics that are near-impossible with Godot:
     - Automatically calculated mass properties (body center of mass, body mass given material density, etc.)
     - Joints report what forces they're exerting (allows for breakable joints)
     - Contacts report collision impulse (necessary for destructible bodies)
@@ -133,11 +133,9 @@ Godot physics provides this, but the Box2D library doesn't. This module bridges 
 This is a list of all things that Box2D can do that this module doesn't provide (yet!):
 
 - Edge shape
-- Chain shape
 - Lots of joints
 - Contact monitoring
 - Sensor fixtures
-- Collision filtering/exclusion
 
 If this list is missing anything important, feel free to submit an issue so it can be tracked.
 
