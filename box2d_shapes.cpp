@@ -244,6 +244,8 @@ bool isPolygonValid(const b2Vec2 *vertices, int32 count) {
 			return false;
 		}
 	}
+
+	return true;
 }
 
 void Box2DPolygonShape::build_polygon() {
