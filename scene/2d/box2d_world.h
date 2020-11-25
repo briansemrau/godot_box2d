@@ -1,20 +1,17 @@
-
 #ifndef BOX2D_WORLD_H
 #define BOX2D_WORLD_H
 
-#include "core/object.h"
-#include "core/reference.h"
-#include "core/resource.h"
+#include <core/object.h>
+#include <core/reference.h>
+#include <core/resource.h>
+#include <scene/2d/node_2d.h>
 
-#include "scene/2d/node_2d.h"
+#include <box2d/b2_fixture.h>
+#include <box2d/b2_joint.h>
+#include <box2d/b2_world.h>
+#include <box2d/b2_world_callbacks.h>
 
-#include "box2d/b2_fixture.h"
-#include "box2d/b2_joint.h"
-#include "box2d/b2_world.h"
-#include "box2d/b2_world_callbacks.h"
-
-#include "box2d_child_object.h"
-#include "box2d_types_converter.h"
+#include "../../util/box2d_types_converter.h"
 
 /**
 * @author Brian Semrau
@@ -34,12 +31,22 @@ class Box2DShapeQueryParameters : public Reference {
 	// TODO a bunch of shit ugh
 };
 
+class Box2DWorld;
+class Box2DPhysicsBody;
+
+class IBox2DChildObject {
+	friend class Box2DWorld;
+	friend class Box2DPhysicsBody;
+
+protected:
+	virtual void on_parent_created(Node *p_parent) = 0;
+};
+
 class Box2DWorld : public Node2D, public virtual b2DestructionListener, public virtual b2ContactFilter {
 	GDCLASS(Box2DWorld, Node2D);
 
 	friend class Box2DPhysicsBody;
 	friend class Box2DJoint;
-
 
 	// TODO Refactor this callback garbage.
 	//      It may make sense to do this when/if shape queries are implemented.
@@ -90,7 +97,7 @@ public:
 
 	//bool isLocked() const;
 
-	Array intersect_point(const Vector2 &p_point, int p_max_results = 32);//, const Vector<Ref<Box2DPhysicsBody> > &p_exclude = Vector<Ref<Box2DPhysicsBody> >() /*, uint32_t p_layers = 0*/);
+	Array intersect_point(const Vector2 &p_point, int p_max_results = 32); //, const Vector<Ref<Box2DPhysicsBody> > &p_exclude = Vector<Ref<Box2DPhysicsBody> >() /*, uint32_t p_layers = 0*/);
 	//Array intersect_shape();
 	//Array query_aabb(const Rect2 &p_bounds); // TODO add more parameters like Physics2DDirectSpaceState::_intersect_point
 

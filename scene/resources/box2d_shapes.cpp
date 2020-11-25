@@ -3,10 +3,14 @@
 #include <core/project_settings.h>
 #include <servers/visual_server.h>
 
-#include "box2d_fixtures.h"
-#include "box2d_types_converter.h"
+#include "../../util/box2d_types_converter.h"
+#include "../2d/box2d_fixtures.h"
 
 #include <string> // TODO remove this. For debugging only
+
+/**
+* @author Brian Semrau
+*/
 
 void Box2DShape::_bind_methods() {
 	// Anything to bind?

@@ -1,9 +1,13 @@
 #ifndef BOX2D_POLYGON_EDITOR_PLUGIN_H
 #define BOX2D_POLYGON_EDITOR_PLUGIN_H
 
-#include "editor/plugins/abstract_polygon_2d_editor.h"
+#include <editor/plugins/abstract_polygon_2d_editor.h>
 
-#include "box2d_shapes.h"
+#include "../scene/resources/box2d_shapes.h"
+
+/**
+* @author Brian Semrau
+*/
 
 class Box2DPolygonEditor : public AbstractPolygon2DEditor {
 	GDCLASS(Box2DPolygonEditor, AbstractPolygon2DEditor);

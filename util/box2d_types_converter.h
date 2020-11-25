@@ -1,13 +1,13 @@
 #ifndef BOX2D_TYPES_CONVERTER_H
 #define BOX2D_TYPES_CONVERTER_H
 
-#include "core/math/vector2.h"
-#include "core/math/vector3.h"
-#include "core/math/transform_2d.h"
-#include "core/typedefs.h"
+#include <core/math/transform_2d.h>
+#include <core/math/vector2.h>
+#include <core/math/vector3.h>
+#include <core/typedefs.h>
 
-#include "box2d/b2_math.h"
-#include "box2d/b2_collision.h"
+#include <box2d/b2_collision.h>
+#include <box2d/b2_math.h>
 
 /**
 * @author Brian Semrau
@@ -22,4 +22,4 @@ extern b2Vec2 gd_to_b2(Vector2 const &inVal);
 extern b2Transform gd_to_b2(Transform2D const &inVal);
 extern b2AABB gd_to_b2(Rect2 const &inVal);
 
-#endif //BOX2D_TYPES_CONVERTER_H
+#endif // BOX2D_TYPES_CONVERTER_H

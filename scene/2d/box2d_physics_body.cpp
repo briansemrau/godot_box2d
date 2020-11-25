@@ -4,6 +4,10 @@
 #include "box2d_joints.h"
 #include "box2d_world.h"
 
+/**
+* @author Brian Semrau
+*/
+
 bool Box2DPhysicsBody::create_b2Body() {
 	if (world_node && !body) {
 		ERR_FAIL_COND_V(!world_node->world, false);

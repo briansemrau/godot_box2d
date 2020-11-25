@@ -8,7 +8,11 @@
 #include <box2d/b2_polygon_shape.h>
 #include <box2d/b2_shape.h>
 
-#include "box2d_types_converter.h"
+#include "../../util/box2d_types_converter.h"
+
+/**
+* @author Brian Semrau
+*/
 
 #define DEBUG_DECOMPOSE_BOX2D
 
@@ -24,7 +28,7 @@ protected:
 	static void _bind_methods();
 
 	virtual bool is_composite_shape() const;
-	virtual const Vector<const b2Shape*> get_shapes() const;
+	virtual const Vector<const b2Shape *> get_shapes() const;
 
 	Box2DShape(b2Shape *const p_shape);
 
@@ -115,7 +119,7 @@ protected:
 	static void _bind_methods();
 
 	virtual bool is_composite_shape() const override;
-	virtual const Vector<const b2Shape*> get_shapes() const;
+	virtual const Vector<const b2Shape *> get_shapes() const;
 
 public:
 	bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const override;

@@ -1,6 +1,10 @@
 #include "box2d_polygon_editor_plugin.h"
 
-#include "box2d_fixtures.h"
+#include "../scene/2d/box2d_fixtures.h"
+
+/**
+* @author Brian Semrau
+*/
 
 Node2D *Box2DPolygonEditor::_get_node() const {
 	return node;

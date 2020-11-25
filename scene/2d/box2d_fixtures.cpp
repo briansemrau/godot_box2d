@@ -2,6 +2,10 @@
 
 #include <core/engine.h>
 
+/**
+* @author Brian Semrau
+*/
+
 void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDef &p_def, const Transform2D &p_shape_xform) {
 	b2FixtureDef finalDef = b2FixtureDef(p_def);
 
@@ -220,12 +224,14 @@ void Box2DFixture::update_filterdata() {
 	}
 }
 
+#ifdef TOOLS_ENABLED
 bool Box2DFixture::_edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const {
 	if (!shape.is_valid())
 		return false;
 
 	return shape->_edit_is_selected_on_click(p_point, p_tolerance);
 }
+#endif
 
 String Box2DFixture::get_configuration_warning() const {
 	String warning = Node2D::get_configuration_warning();

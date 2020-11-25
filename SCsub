@@ -3,7 +3,7 @@
 Import('env')
 Import('env_modules')
 
-env_box2d = env_modules.Clone()
+env_godot_box2d = env_modules.Clone()
 
 # Thirdparty source files
 
@@ -73,23 +73,29 @@ box2d_include = [
 
 thirdparty_sources = [thirdparty_dir + "src/" + file for file in box2d_src]
 thirdparty_include = [thirdparty_dir + file for file in box2d_include]
-
 thirdparty_include.append(["#modules/godot_box2d/b2include/"])
 
-# Treat Box2D headers as system headers to avoid raising warnings. Not supported on MSVC.
-# if not env.msvc:
-    # env_box2d.Append(CPPFLAGS=["-isystem", Dir(thirdparty_dir).path])
-# else:
-env_box2d.Prepend(CPPPATH=thirdparty_include)
+# add Box2D includes to our module
+env_godot_box2d.Prepend(CPPPATH=thirdparty_include)
+env_godot_box2d.Append(CPPDEFINES=["B2_USER_SETTINGS"])
 
-env_box2d.Append(CPPDEFINES=["B2_USER_SETTINGS"])
-
-env_thirdparty = env_box2d.Clone()
+# Configure Box2D build environment
+env_thirdparty = env_godot_box2d.Clone()
 env_thirdparty.disable_warnings()
 env_thirdparty.add_source_files(env.modules_sources, thirdparty_sources)
-env_thirdparty.Append(CPPPATH=thirdparty_include)
 
-# Godot source files
-env_box2d.add_source_files(env.modules_sources, "*.cpp")
+
+# Module files
+
+module_subdirs = [
+    "",
+    "util/",
+    "editor/",
+    "scene/2d/",
+    "scene/resources/",
+]
+
+for f in module_subdirs:
+    env_godot_box2d.add_source_files(env.modules_sources, f + "*.cpp")
 
 

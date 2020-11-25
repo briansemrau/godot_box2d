@@ -1,10 +1,16 @@
 #ifndef BOX2D_SHAPE_EDITOR_PLUGIN_H
 #define BOX2D_SHAPE_EDITOR_PLUGIN_H
 
-#include "editor/editor_node.h"
-#include "editor/editor_plugin.h"
+#include <editor/editor_node.h>
+#include <editor/editor_plugin.h>
 
-#include "box2d_shapes.h"
+#include "../scene/resources/box2d_shapes.h"
+
+/**
+* @author Brian Semrau
+*
+* Referenced collision_shape_2d_editor_plugin.h
+*/
 
 class CanvasItemEditor;
 

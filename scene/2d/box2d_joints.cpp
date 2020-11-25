@@ -3,6 +3,10 @@
 
 #include <core/engine.h>
 
+/**
+* @author Brian Semrau
+*/
+
 void Box2DJoint::on_b2Joint_destroyed() {
 	joint = NULL;
 

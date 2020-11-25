@@ -1,18 +1,22 @@
 #ifndef BOX2D_PHYSICS_BODY_H
 #define BOX2D_PHYSICS_BODY_H
 
-#include "core/object.h"
-#include "core/reference.h"
-#include "core/resource.h"
+#include <core/object.h>
+#include <core/reference.h>
+#include <core/resource.h>
+#include <core/vset.h>
+#include <scene/2d/node_2d.h>
 
-#include "scene/2d/node_2d.h"
+#include <box2d/b2_body.h>
+#include <box2d/b2_fixture.h>
+#include <box2d/b2_world.h>
 
-#include "box2d/b2_body.h"
-#include "box2d/b2_fixture.h"
-#include "box2d/b2_world.h"
+#include "../../util/box2d_types_converter.h"
+#include "box2d_world.h"
 
-#include "box2d_child_object.h"
-#include "box2d_types_converter.h"
+/**
+* @author Brian Semrau
+*/
 
 class Box2DWorld;
 

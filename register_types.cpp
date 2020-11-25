@@ -1,12 +1,12 @@
 #include "register_types.h"
 
-#include "box2d_fixtures.h"
-#include "box2d_joints.h"
-#include "box2d_physics_body.h"
-#include "box2d_polygon_editor_plugin.h"
-#include "box2d_shape_editor_plugin.h"
-#include "box2d_shapes.h"
-#include "box2d_world.h"
+#include "editor/box2d_polygon_editor_plugin.h"
+#include "editor/box2d_shape_editor_plugin.h"
+#include "scene/2d/box2d_fixtures.h"
+#include "scene/2d/box2d_joints.h"
+#include "scene/2d/box2d_physics_body.h"
+#include "scene/2d/box2d_world.h"
+#include "scene/resources/box2d_shapes.h"
 
 /**
 * @author Brian Semrau

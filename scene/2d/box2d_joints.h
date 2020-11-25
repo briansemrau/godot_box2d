@@ -1,29 +1,30 @@
-
 #ifndef BOX2D_JOINTS_H
 #define BOX2D_JOINTS_H
 
-#include "core/object.h"
-#include "core/reference.h"
-#include "core/resource.h"
+#include <core/object.h>
+#include <core/reference.h>
+#include <core/resource.h>
+#include <scene/2d/node_2d.h>
 
-#include "scene/2d/node_2d.h"
+#include <box2d/b2_distance_joint.h>
+#include <box2d/b2_friction_joint.h>
+#include <box2d/b2_gear_joint.h>
+#include <box2d/b2_joint.h>
+#include <box2d/b2_motor_joint.h>
+#include <box2d/b2_mouse_joint.h>
+#include <box2d/b2_prismatic_joint.h>
+#include <box2d/b2_pulley_joint.h>
+#include <box2d/b2_revolute_joint.h>
+#include <box2d/b2_rope.h>
+#include <box2d/b2_weld_joint.h>
+#include <box2d/b2_wheel_joint.h>
 
-#include "box2d/b2_distance_joint.h"
-#include "box2d/b2_friction_joint.h"
-#include "box2d/b2_gear_joint.h"
-#include "box2d/b2_joint.h"
-#include "box2d/b2_motor_joint.h"
-#include "box2d/b2_mouse_joint.h"
-#include "box2d/b2_prismatic_joint.h"
-#include "box2d/b2_pulley_joint.h"
-#include "box2d/b2_revolute_joint.h"
-#include "box2d/b2_rope.h"
-#include "box2d/b2_weld_joint.h"
-#include "box2d/b2_wheel_joint.h"
-
-#include "box2d_child_object.h"
+#include "../../util/box2d_types_converter.h"
 #include "box2d_physics_body.h"
-#include "box2d_types_converter.h"
+
+/**
+* @author Brian Semrau
+*/
 
 class Box2DWorld;
 
@@ -206,4 +207,4 @@ public:
 
 // TODO motor
 
-#endif // !BOX2D_JOINTS_H
+#endif // BOX2D_JOINTS_H

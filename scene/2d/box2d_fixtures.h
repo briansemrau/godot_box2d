@@ -1,36 +1,31 @@
 #ifndef BOX2D_FIXTURES_H
 #define BOX2D_FIXTURES_H
 
-#include "core/object.h"
-#include "core/reference.h"
-#include "core/resource.h"
+#include <core/object.h>
+#include <core/reference.h>
+#include <core/resource.h>
+#include <scene/2d/node_2d.h>
 
-#include "scene/2d/node_2d.h"
+#include <box2d/b2_chain_shape.h>
+#include <box2d/b2_circle_shape.h>
+#include <box2d/b2_edge_shape.h>
+#include <box2d/b2_fixture.h>
+#include <box2d/b2_polygon_shape.h>
 
-#include "box2d/b2_chain_shape.h"
-#include "box2d/b2_circle_shape.h"
-#include "box2d/b2_edge_shape.h"
-#include "box2d/b2_fixture.h"
-#include "box2d/b2_polygon_shape.h"
-
-#include "box2d_types_converter.h"
-
+#include "../../util/box2d_types_converter.h"
+#include "../resources/box2d_shapes.h"
 #include "box2d_physics_body.h"
-#include "box2d_shapes.h"
 #include "box2d_world.h"
+
+/**
+* @author Brian Semrau
+*/
 
 class Box2DFixture : public Node2D, public virtual IBox2DChildObject {
 	GDCLASS(Box2DFixture, Node2D);
 
 	friend class Box2DWorld;
 
-	Box2DPhysicsBody *body_node;
-
-	void on_b2Fixture_destroyed(){}; // TODO is there any case when this is needed?
-
-	void _shape_changed();
-
-//protected:
 	Ref<Box2DShape> shape;
 	b2FixtureDef fixtureDef;
 	b2Filter filterDef;
@@ -42,12 +37,11 @@ class Box2DFixture : public Node2D, public virtual IBox2DChildObject {
 	VSet<Box2DFixture *> filtering_me;
 	// TODO might fixtures need to filter other whole bodies?
 
+	Box2DPhysicsBody *body_node;
+
 	Vector<b2Fixture *> fixtures;
 
-	void _notification(int p_what);
-	static void _bind_methods();
-
-	virtual void on_parent_created(Node *) override final;
+	void on_b2Fixture_destroyed(){}; // TODO is there any case when this is needed?
 
 	void create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDef &p_def, const Transform2D &p_shape_xform);
 
@@ -57,9 +51,18 @@ class Box2DFixture : public Node2D, public virtual IBox2DChildObject {
 	void update_shape();
 	void update_filterdata();
 
+	void _shape_changed();
+
+protected:
+	void _notification(int p_what);
+	static void _bind_methods();
+
+	virtual void on_parent_created(Node *) override final;
+
 public:
-	// TODO should this be in a TOOLS_ENABLED guard?
+#ifdef TOOLS_ENABLED
 	virtual bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const override;
+#endif
 
 	virtual String get_configuration_warning() const override;
 

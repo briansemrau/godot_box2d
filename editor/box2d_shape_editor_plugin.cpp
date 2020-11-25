@@ -2,8 +2,14 @@
 
 #include <editor/plugins/canvas_item_editor_plugin.h>
 
-#include "box2d_fixtures.h"
-#include "box2d_shapes.h"
+#include "../scene/2d/box2d_fixtures.h"
+#include "../scene/resources/box2d_shapes.h"
+
+/**
+* @author Brian Semrau
+*
+* Referenced collision_shape_2d_editor_plugin.cpp
+*/
 
 void Box2DShapeEditor::_node_removed(Node *p_node) {
 	if (p_node == node) {
