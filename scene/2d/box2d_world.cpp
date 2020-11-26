@@ -1,6 +1,7 @@
 #include "box2d_world.h"
 
 #include <core/engine.h>
+#include <core/os/os.h>
 
 #include "box2d_fixtures.h"
 #include "box2d_joints.h"
@@ -11,23 +12,12 @@
 * @author Brian Semrau
 */
 
-Box2DWorld::Box2DWorld() :
-		world(NULL) {
-	gravity = GLOBAL_GET("physics/2d/default_gravity_vector");
-	gravity *= real_t(GLOBAL_GET("physics/2d/default_gravity"));
-}
-
-Box2DWorld::~Box2DWorld() {
-	// Make sure Box2D memory is cleaned up
-	memdelete_notnull(world);
-}
-
 void Box2DWorld::SayGoodbye(b2Joint *joint) {
 	joint->GetUserData().owner->on_b2Joint_destroyed();
 }
 
 void Box2DWorld::SayGoodbye(b2Fixture *fixture) {
-	fixture->GetUserData().owner->on_b2Fixture_destroyed();
+	fixture->GetUserData().owner->on_b2Fixture_destroyed(fixture);
 }
 
 bool Box2DWorld::ShouldCollide(b2Fixture *fixtureA, b2Fixture *fixtureB) {
@@ -66,39 +56,83 @@ bool Box2DWorld::ShouldCollide(b2Fixture *fixtureA, b2Fixture *fixtureB) {
 	}
 }
 
-void Box2DWorld::_notification(int p_what) {
-	switch (p_what) {
-		case NOTIFICATION_ENTER_TREE: {
+void Box2DWorld::create_b2World() {
+	if (!world) {
+		world = memnew(b2World(gd_to_b2(gravity)));
 
-			if (!Engine::get_singleton()->is_editor_hint()) {
-				// Create world
-				if (!world) {
-					world = memnew(b2World(gd_to_b2(gravity)));
+		Set<Box2DPhysicsBody *>::Element *body = bodies.front();
+		while (body) {
+			body->get()->on_parent_created(this);
+			body = body->next();
+		}
+		Set<Box2DJoint *>::Element *joint = joints.front();
+		while (joint) {
+			joint->get()->on_parent_created(this);
+			joint = joint->next();
+		}
 
-					auto child = box2d_children.front();
-					while (child) {
-						child->get()->on_parent_created(this);
-						child = child->next();
-					}
-					set_physics_process_internal(true);
+		world->SetDestructionListener(this);
+		world->SetContactFilter(this);
 
-					world->SetDestructionListener(this);
-					world->SetContactFilter(this);
-				}
+		if (!Engine::get_singleton()->is_editor_hint()) {
+			set_physics_process_internal(true);
+		}
+	}
+}
+
+void Box2DWorld::destroy_b2World() {
+	if (world) {
+		// Nullify bodies, joints, and fixtures so that nothing calls their b2 Destroy func.
+		// Normally our wrapper nodes call b2World.DestroyX, but that seems to be slow (vaguely tested, could be wrong) when doing them all at once, in indeterminant order.
+		// Instead we let the b2 allocators free themselves.
+
+		b2Body *body = world->GetBodyList();
+		while (body) {
+			// nullify body
+			body->GetUserData().owner->body = NULL;
+
+			// nullify fixtures
+			b2Fixture *fixture = body->GetFixtureList();
+			while (fixture) {
+				fixture->GetUserData().owner->fixtures.clear();
+				fixture = fixture->GetNext();
 			}
 
+			body = body->GetNext();
+		}
+
+		b2Joint *joint = world->GetJointList();
+		while (joint) {
+			// nullify joint
+			joint->GetUserData().owner->joint = NULL;
+
+			joint = joint->GetNext();
+		}
+
+		memdelete(world);
+		world = NULL;
+	}
+}
+
+void Box2DWorld::_notification(int p_what) {
+	switch (p_what) {
+		case NOTIFICATION_PREDELETE: {
+			destroy_b2World();
 		} break;
+
+		case NOTIFICATION_ENTER_TREE: {
+			// Create world
+			create_b2World();
+		} break;
+
 		case NOTIFICATION_EXIT_TREE: {
-
 			// Don't destroy world. It could be exiting/entering.
-			// World should be destroyed in destructor if node is being freed.
-
+			// World should be destroyed in PREDELETE if node is being freed.
 		} break;
-		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
 
+		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
 			float time = get_physics_process_delta_time();
 			step(time);
-
 		} break;
 	}
 }
@@ -180,6 +214,21 @@ Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results) { /
 //
 //	return arr;
 //}
+
+Box2DWorld::Box2DWorld() :
+		world(NULL) {
+	gravity = GLOBAL_GET("physics/2d/default_gravity_vector");
+	gravity *= real_t(GLOBAL_GET("physics/2d/default_gravity"));
+}
+
+Box2DWorld::~Box2DWorld() {
+	// Make sure Box2D memory is cleaned up
+	if (world) {
+		WARN_PRINT("b2World is being deleted in destructor, not NOTIFICATION_PREDELETE.");
+		//destroy_b2World();
+		memdelete(world);
+	}
+}
 
 bool Box2DWorld::QueryCallback::ReportFixture(b2Fixture *fixture) {
 	results.push_back(fixture);

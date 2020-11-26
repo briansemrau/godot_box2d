@@ -34,14 +34,6 @@ class Box2DShapeQueryParameters : public Reference {
 class Box2DWorld;
 class Box2DPhysicsBody;
 
-class IBox2DChildObject {
-	friend class Box2DWorld;
-	friend class Box2DPhysicsBody;
-
-protected:
-	virtual void on_parent_created(Node *p_parent) = 0;
-};
-
 class Box2DWorld : public Node2D, public virtual b2DestructionListener, public virtual b2ContactFilter {
 	GDCLASS(Box2DWorld, Node2D);
 
@@ -75,7 +67,8 @@ private:
 	Vector2 gravity;
 	b2World *world;
 
-	Set<IBox2DChildObject *> box2d_children;
+	Set<Box2DPhysicsBody *> bodies;
+	Set<Box2DJoint *> joints;
 
 	virtual void SayGoodbye(b2Joint *joint) override;
 	virtual void SayGoodbye(b2Fixture *fixture) override;
@@ -84,6 +77,9 @@ private:
 
 	QueryCallback aabbCallback;
 	IntersectPointCallback pointCallback;
+
+	void create_b2World();
+	void destroy_b2World();
 
 protected:
 	void _notification(int p_what);

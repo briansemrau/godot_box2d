@@ -22,29 +22,28 @@ class Box2DShape : public Resource {
 
 	friend class Box2DFixture;
 
-	b2Shape *shape;
+	virtual bool is_composite_shape() const;
+	virtual const Vector<const b2Shape *> get_shapes() const;
+	virtual const b2Shape *get_shape() const = 0;
 
 protected:
 	static void _bind_methods();
-
-	virtual bool is_composite_shape() const;
-	virtual const Vector<const b2Shape *> get_shapes() const;
-
-	Box2DShape(b2Shape *const p_shape);
 
 public:
 	virtual bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const;
 
 	virtual void draw(const RID &p_to_rid, const Color &p_color) = 0;
 
-	Box2DShape();
-	~Box2DShape();
+	Box2DShape(){};
+	~Box2DShape(){};
 };
 
 class Box2DCircleShape : public Box2DShape {
 	GDCLASS(Box2DCircleShape, Box2DShape);
 
 	b2CircleShape circleShape;
+
+	virtual const b2Shape *get_shape() const { return &circleShape; }
 
 protected:
 	static void _bind_methods();
@@ -65,6 +64,8 @@ class Box2DRectShape : public Box2DShape {
 	real_t width;
 	real_t height;
 	// TODO replace width/height with a Vector2 for consistency
+
+	virtual const b2Shape *get_shape() const { return &shape; }
 
 protected:
 	static void _bind_methods();
@@ -107,7 +108,7 @@ private:
 	Vector<b2PolygonShape> polygon_shape_vector;
 
 	// Used in SEGMENTS mode
-	b2ChainShape chain_shape;
+	b2ChainShape *chain_shape;
 
 #ifdef DEBUG_DECOMPOSE_BOX2D
 	Vector<Vector<Vector2> > decomposed;
@@ -120,6 +121,7 @@ protected:
 
 	virtual bool is_composite_shape() const override;
 	virtual const Vector<const b2Shape *> get_shapes() const;
+	virtual const b2Shape *get_shape() const { return chain_shape; }
 
 public:
 	bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const override;
@@ -137,6 +139,7 @@ public:
 	virtual void draw(const RID &p_to_rid, const Color &p_color) override;
 
 	Box2DPolygonShape();
+	~Box2DPolygonShape();
 };
 
 VARIANT_ENUM_CAST(Box2DPolygonShape::BuildMode);

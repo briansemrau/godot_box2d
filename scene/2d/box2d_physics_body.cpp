@@ -8,6 +8,13 @@
 * @author Brian Semrau
 */
 
+void Box2DPhysicsBody::on_parent_created(Node *) {
+	//if (create_b2Body()) {
+	//	print_line("body created");
+	//}
+	WARN_PRINT("BODY CREATED IN CALLBACK");
+}
+
 bool Box2DPhysicsBody::create_b2Body() {
 	if (world_node && !body) {
 		ERR_FAIL_COND_V(!world_node->world, false);
@@ -93,6 +100,8 @@ void Box2DPhysicsBody::_notification(int p_what) {
 			for (int i = 0; i < filtering_me.size(); i++) {
 				filtering_me[i]->filtered.erase(this);
 			}
+
+			destroy_b2Body();
 		} break;
 
 		case NOTIFICATION_ENTER_TREE: {
@@ -112,13 +121,13 @@ void Box2DPhysicsBody::_notification(int p_what) {
 				if (world_node) {
 					destroy_b2Body();
 					if (world_node) {
-						world_node->box2d_children.erase(this);
+						world_node->bodies.erase(this);
 					}
 				}
 				world_node = new_world;
 				// Create b2Body
 				if (world_node) {
-					world_node->box2d_children.insert(this);
+					world_node->bodies.insert(this);
 
 					if (world_node->world) {
 						create_b2Body();
@@ -175,13 +184,16 @@ void Box2DPhysicsBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_angular_velocity"), &Box2DPhysicsBody::get_angular_velocity);
 	ClassDB::bind_method(D_METHOD("set_use_custom_massdata", "use_custom_massdata"), &Box2DPhysicsBody::set_use_custom_massdata);
 	ClassDB::bind_method(D_METHOD("get_use_custom_massdata"), &Box2DPhysicsBody::get_use_custom_massdata);
-	ClassDB::bind_method(D_METHOD("set_mass", "mass"), &Box2DPhysicsBody::set_mass);
+	ClassDB::bind_method(D_METHOD("set_custom_mass", "custom_mass"), &Box2DPhysicsBody::set_custom_mass);
+	ClassDB::bind_method(D_METHOD("get_custom_mass"), &Box2DPhysicsBody::get_custom_mass);
+	ClassDB::bind_method(D_METHOD("set_custom_inertia", "custom_inertia"), &Box2DPhysicsBody::set_custom_inertia);
+	ClassDB::bind_method(D_METHOD("get_custom_inertia"), &Box2DPhysicsBody::get_custom_inertia);
+	ClassDB::bind_method(D_METHOD("set_custom_center_of_mass", "custom_center_of_mass"), &Box2DPhysicsBody::set_custom_center_of_mass);
+	ClassDB::bind_method(D_METHOD("get_custom_center_of_mass"), &Box2DPhysicsBody::get_custom_center_of_mass);
+	ClassDB::bind_method(D_METHOD("set_custom_mass_data", "mass", "inertia", "center_of_mass"), &Box2DPhysicsBody::set_custom_mass_data);
 	ClassDB::bind_method(D_METHOD("get_mass"), &Box2DPhysicsBody::get_mass);
-	ClassDB::bind_method(D_METHOD("set_inertia", "inertia"), &Box2DPhysicsBody::set_inertia);
 	ClassDB::bind_method(D_METHOD("get_inertia"), &Box2DPhysicsBody::get_inertia);
-	ClassDB::bind_method(D_METHOD("set_center_of_mass", "center_of_mass"), &Box2DPhysicsBody::set_center_of_mass);
 	ClassDB::bind_method(D_METHOD("get_center_of_mass"), &Box2DPhysicsBody::get_center_of_mass);
-	ClassDB::bind_method(D_METHOD("set_mass_data", "mass", "inertia", "center_of_mass"), &Box2DPhysicsBody::set_mass_data);
 	ClassDB::bind_method(D_METHOD("set_linear_damping", "linear_damping"), &Box2DPhysicsBody::set_linear_damping);
 	ClassDB::bind_method(D_METHOD("get_linear_damping"), &Box2DPhysicsBody::get_linear_damping);
 	ClassDB::bind_method(D_METHOD("set_angular_damping", "angular_damping"), &Box2DPhysicsBody::set_angular_damping);
@@ -196,6 +208,8 @@ void Box2DPhysicsBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_awake"), &Box2DPhysicsBody::is_awake);
 	ClassDB::bind_method(D_METHOD("set_can_sleep", "can_sleep"), &Box2DPhysicsBody::set_can_sleep);
 	ClassDB::bind_method(D_METHOD("get_can_sleep"), &Box2DPhysicsBody::get_can_sleep);
+	ClassDB::bind_method(D_METHOD("set_enabled", "enabled"), &Box2DPhysicsBody::set_enabled);
+	ClassDB::bind_method(D_METHOD("is_enabled"), &Box2DPhysicsBody::is_enabled);
 	ClassDB::bind_method(D_METHOD("set_fixed_rotation", "fixed_rotation"), &Box2DPhysicsBody::set_fixed_rotation);
 	ClassDB::bind_method(D_METHOD("is_fixed_rotation"), &Box2DPhysicsBody::is_fixed_rotation);
 	ClassDB::bind_method(D_METHOD("set_collision_layer", "collision_layer"), &Box2DPhysicsBody::set_collision_layer);
@@ -223,6 +237,7 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bullet"), "set_bullet", "is_bullet");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "awake"), "set_awake", "is_awake");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "can_sleep"), "set_can_sleep", "get_can_sleep");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "enabled"), "set_enabled", "is_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "fixed_rotation"), "set_fixed_rotation", "is_fixed_rotation");
 	ADD_GROUP("Linear", "linear_");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "linear_velocity"), "set_linear_velocity", "get_linear_velocity");
@@ -230,11 +245,12 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_GROUP("Angular", "angular_");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "angular_velocity"), "set_angular_velocity", "get_angular_velocity");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "angular_damping"), "set_angular_damping", "get_angular_damping");
-	ADD_GROUP("Custom Mass Data", "");
+	ADD_GROUP("", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_custom_massdata"), "set_use_custom_massdata", "get_use_custom_massdata");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "mass", PROPERTY_HINT_EXP_RANGE, "0.01,65535,0.01"), "set_mass", "get_mass");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "inertia", PROPERTY_HINT_EXP_RANGE, "0.01,65535,0.01"), "set_inertia", "get_inertia");
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "center_of_mass"), "set_center_of_mass", "get_center_of_mass");
+	ADD_GROUP("Custom Mass Data", "custom_");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "custom_mass", PROPERTY_HINT_EXP_RANGE, "0.01,65535,0.01"), "set_custom_mass", "get_custom_mass");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "custom_inertia", PROPERTY_HINT_EXP_RANGE, "0.01,65535,0.01"), "set_custom_inertia", "get_custom_inertia");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "custom_center_of_mass"), "set_custom_center_of_mass", "get_custom_center_of_mass");
 	ADD_GROUP("Collision", "");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_layer", "get_collision_layer");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_mask", "get_collision_mask");
@@ -243,13 +259,6 @@ void Box2DPhysicsBody::_bind_methods() {
 	BIND_ENUM_CONSTANT(MODE_RIGID);
 	BIND_ENUM_CONSTANT(MODE_STATIC);
 	BIND_ENUM_CONSTANT(MODE_KINEMATIC);
-}
-
-void Box2DPhysicsBody::on_parent_created(Node *) {
-	//if (create_b2Body()) {
-	//	print_line("body created");
-	//}
-	WARN_PRINT("BODY CREATED IN CALLBACK");
 }
 
 String Box2DPhysicsBody::get_configuration_warning() const {
@@ -322,54 +331,62 @@ bool Box2DPhysicsBody::get_use_custom_massdata() const {
 	return use_custom_massdata;
 }
 
-void Box2DPhysicsBody::set_mass(const real_t p_mass) {
-	ERR_FAIL_COND_MSG(!body, "b2Body is null.");
+void Box2DPhysicsBody::set_custom_mass(const real_t p_mass) {
+	if (!use_custom_massdata && p_mass != 1.0f) // don't print warn when setting default value
+		WARN_PRINT("Changing mass related data without setting use_custom_massdata=true has no effect on the body.");
+	massDataDef.mass = p_mass;
+	update_mass(false);
+}
+
+real_t Box2DPhysicsBody::get_custom_mass() const {
+
+	return massDataDef.mass;
+}
+
+void Box2DPhysicsBody::set_custom_inertia(const real_t p_inertia) {
+	if (!use_custom_massdata && p_inertia != 0.5f) // don't print warn when setting default value
+		WARN_PRINT("Changing mass related data without setting use_custom_massdata=true has no effect on the body.");
+	massDataDef.I = p_inertia;
+	update_mass(false);
+}
+
+real_t Box2DPhysicsBody::get_custom_inertia() const {
+	return massDataDef.I;
+}
+
+void Box2DPhysicsBody::set_custom_center_of_mass(const Vector2 &p_center) {
+	if (!use_custom_massdata && p_center != Vector2()) // don't print warn when setting default value
+		WARN_PRINT("Changing mass related data without setting use_custom_massdata=true has no effect on the body.");
+	massDataDef.center = gd_to_b2(p_center);
+	update_mass(false);
+}
+
+Vector2 Box2DPhysicsBody::get_custom_center_of_mass() const {
+	return b2_to_gd(massDataDef.center);
+}
+
+void Box2DPhysicsBody::set_custom_mass_data(const real_t p_mass, const real_t p_inertia, const Vector2 &p_center) {
 	if (!use_custom_massdata)
 		WARN_PRINT("Changing mass related data without setting use_custom_massdata=true has no effect on the body.");
 	massDataDef.mass = p_mass;
+	massDataDef.I = p_inertia;
+	massDataDef.center = gd_to_b2(p_center);
 	update_mass(false);
 }
 
 real_t Box2DPhysicsBody::get_mass() const {
-	if (body)
-		return body->GetMass();
-	return massDataDef.mass;
-}
-
-void Box2DPhysicsBody::set_inertia(const real_t p_inertia) {
-	ERR_FAIL_COND_MSG(!body, "b2Body is null.");
-	if (!use_custom_massdata)
-		WARN_PRINT("Changing mass related data without setting use_custom_massdata=true has no effect on the body.");
-	massDataDef.I = p_inertia;
-	update_mass(false);
+	ERR_FAIL_COND_V(!body, real_t());
+	return body->GetMass();
 }
 
 real_t Box2DPhysicsBody::get_inertia() const {
-	if (body)
-		return body->GetInertia();
-	return massDataDef.I;
-}
-
-void Box2DPhysicsBody::set_center_of_mass(const Vector2 &p_center) {
-	ERR_FAIL_COND_MSG(!body, "b2Body is null.");
-	if (!use_custom_massdata)
-		WARN_PRINT("Changing mass related data without setting use_custom_massdata=true has no effect on the body.");
-	massDataDef.center = gd_to_b2(p_center);
-	update_mass(false);
+	ERR_FAIL_COND_V(!body, real_t());
+	return body->GetInertia();
 }
 
 Vector2 Box2DPhysicsBody::get_center_of_mass() const {
-	if (body)
-		return b2_to_gd(body->GetLocalCenter());
-	return b2_to_gd(massDataDef.center);
-}
-
-void Box2DPhysicsBody::set_mass_data(const real_t p_mass, const real_t p_inertia, const Vector2 &p_center) {
-	ERR_FAIL_COND_MSG(!body, "b2Body is null.");
-	massDataDef.mass = p_mass;
-	massDataDef.I = p_inertia;
-	massDataDef.center = gd_to_b2(p_center);
-	update_mass(false);
+	ERR_FAIL_COND_V(!body, Vector2());
+	return b2_to_gd(body->GetLocalCenter());
 }
 
 void Box2DPhysicsBody::set_linear_damping(real_t p_damping) {
@@ -452,6 +469,16 @@ void Box2DPhysicsBody::set_can_sleep(bool p_can_sleep) {
 
 bool Box2DPhysicsBody::get_can_sleep() const {
 	return bodyDef.allowSleep;
+}
+
+void Box2DPhysicsBody::set_enabled(bool p_enabled) {
+	if (body)
+		body->SetEnabled(p_enabled);
+	bodyDef.enabled = p_enabled;
+}
+
+bool Box2DPhysicsBody::is_enabled() const {
+	return bodyDef.enabled;
 }
 
 void Box2DPhysicsBody::set_fixed_rotation(bool p_fixed) {
@@ -561,18 +588,23 @@ void Box2DPhysicsBody::apply_torque_impulse(real_t impulse, bool wake) {
 }
 
 Box2DPhysicsBody::Box2DPhysicsBody() :
-		massDataDef{ 1.0f, b2Vec2_zero, 0.5f }, // default for a disk of 1kg, 1m radius
 		use_custom_massdata(false),
 		linear_damping(0.0f),
 		angular_damping(0.0f),
 		body(NULL),
 		world_node(NULL) {
+
+	massDataDef.mass = 1.0f;
+	massDataDef.center = b2Vec2_zero;
+	massDataDef.I = 0.5f; // default for a disk of 1kg, 1m radius
+
 	filterDef.maskBits = 0x0001;
 	set_notify_local_transform(true);
 }
 
 Box2DPhysicsBody::~Box2DPhysicsBody() {
 	if (body && world_node) {
+		WARN_PRINT("b2Body is being deleted in destructor, not NOTIFICATION_PREDELETE.");
 		destroy_b2Body();
 	} // else Box2D has/will clean up body
 }

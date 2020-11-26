@@ -6,6 +6,16 @@
 * @author Brian Semrau
 */
 
+void Box2DFixture::on_b2Fixture_destroyed(b2Fixture *fixture) {
+	fixtures.erase(fixture);
+}
+
+void Box2DFixture::on_parent_created(Node *) {
+	//destroy_b2();
+	//create_b2();
+	WARN_PRINT("FIXTURE CREATED IN CALLBACK");
+}
+
 void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDef &p_def, const Transform2D &p_shape_xform) {
 	b2FixtureDef finalDef = b2FixtureDef(p_def);
 
@@ -44,7 +54,9 @@ void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDe
 			p_fixture_out = body_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
 		} break;
 		case b2Shape::Type::e_chain: {
-			b2ChainShape shp = b2ChainShape(*dynamic_cast<const b2ChainShape *>(p_def.shape));
+			const b2ChainShape *p_def_chain_shape = dynamic_cast<const b2ChainShape *>(p_def.shape);
+			b2ChainShape shp;
+			shp.CreateChain(p_def_chain_shape->m_vertices, p_def_chain_shape->m_count, p_def_chain_shape->m_prevVertex, p_def_chain_shape->m_nextVertex);
 			for (int i = 0; i < shp.m_count; i++) {
 				shp.m_vertices[i] = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertices[i])));
 			}
@@ -77,9 +89,9 @@ bool Box2DFixture::create_b2() {
 				}
 			}
 		} else {
-			ERR_FAIL_COND_V(!shape->shape, false);
+			ERR_FAIL_COND_V(!shape->get_shape(), false);
 
-			fixtureDef.shape = shape->shape;
+			fixtureDef.shape = shape->get_shape();
 			b2Fixture *fixture = NULL;
 			create_b2Fixture(fixture, fixtureDef, get_transform());
 			if (fixture) {
@@ -119,6 +131,8 @@ void Box2DFixture::_notification(int p_what) {
 			for (int i = 0; i < filtering_me.size(); i++) {
 				filtering_me[i]->filtered.erase(this);
 			}
+
+			destroy_b2();
 		} break;
 
 		case NOTIFICATION_ENTER_TREE: {
@@ -134,15 +148,27 @@ void Box2DFixture::_notification(int p_what) {
 					create_b2();
 				}
 			}
+
+			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
+				set_process_internal(true);
+			}
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
 			// Don't destroy fixture. It could be exiting/entering.
 			// Fixture should be destroyed in destructor if node is being freed.
+
+			set_process_internal(false);
 		} break;
 
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
 			update_shape();
+		} break;
+
+		case NOTIFICATION_INTERNAL_PROCESS: {
+			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
+				update();
+			}
 		} break;
 
 		case NOTIFICATION_DRAW: {
@@ -150,7 +176,21 @@ void Box2DFixture::_notification(int p_what) {
 				break;
 			}
 
-			Color draw_col = get_tree()->get_debug_collisions_color();
+			Color draw_col;
+			if (!body_node || (body_node->get_type() == Box2DPhysicsBody::MODE_RIGID && body_node->get_mass() <= 0.0f)) {
+				draw_col = Color(1.0f, 0.0f, 0.0f);
+			} else if (body_node->is_enabled() == false) {
+				draw_col = Color(0.5f, 0.5f, 0.3f);
+			} else if (body_node->get_type() == Box2DPhysicsBody::MODE_STATIC) {
+				draw_col = Color(0.5f, 0.9f, 0.5f);
+			} else if (body_node->get_type() == Box2DPhysicsBody::MODE_KINEMATIC) {
+				draw_col = Color(0.5f, 0.5f, 0.9f);
+			} else if (body_node->is_awake() == false) {
+				draw_col = Color(0.6f, 0.6f, 0.6f);
+			} else {
+				draw_col = Color(0.9f, 0.7f, 0.7f);
+			}
+
 			if (shape.is_valid()) {
 				shape->draw(get_canvas_item(), draw_col);
 			}
@@ -198,12 +238,6 @@ void Box2DFixture::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_mask", "get_collision_mask");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "group_index"), "set_group_index", "get_group_index");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_parent_exceptions"), "set_use_parent_exceptions", "get_use_parent_exceptions");
-}
-
-void Box2DFixture::on_parent_created(Node *) {
-	//destroy_b2();
-	//create_b2();
-	WARN_PRINT("FIXTURE CREATED IN CALLBACK");
 }
 
 void Box2DFixture::update_shape() {
@@ -396,10 +430,15 @@ Box2DFixture::Box2DFixture() :
 		accept_body_collision_exceptions(true) {
 	fixtureDef.density = 1.0f;
 	filterDef.maskBits = 0x0001;
+
+	if (Engine::get_singleton()->is_editor_hint()) {
+		set_process_internal(true);
+	}
 };
 
 Box2DFixture::~Box2DFixture() {
-	if (body_node) {
+	if (body_node && fixtures.size() > 0) {
+		WARN_PRINT("b2Fixture is being deleted in destructor, not NOTIFICATION_PREDELETE.");
 		destroy_b2();
 	}
 }

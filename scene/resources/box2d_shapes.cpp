@@ -24,9 +24,6 @@ const Vector<const b2Shape *> Box2DShape::get_shapes() const {
 	ERR_FAIL_V(Vector<const b2Shape *>());
 }
 
-Box2DShape::Box2DShape(b2Shape *const p_shape) :
-		shape(p_shape) {}
-
 bool Box2DShape::_edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const {
 	const float factor = static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
 
@@ -35,15 +32,7 @@ bool Box2DShape::_edit_is_selected_on_click(const Point2 &p_point, double p_tole
 
 	Transform2D cursor_pos(0, p_point);
 
-	return b2TestOverlap(shape, 0, &cursor, 0, gd_to_b2(Transform2D()), gd_to_b2(cursor_pos));
-}
-
-Box2DShape::Box2DShape() :
-		shape(NULL) {
-}
-
-Box2DShape::~Box2DShape() {
-	shape = NULL;
+	return b2TestOverlap(get_shape(), 0, &cursor, 0, gd_to_b2(Transform2D()), gd_to_b2(cursor_pos));
 }
 
 void Box2DCircleShape::_bind_methods() {
@@ -71,13 +60,21 @@ void Box2DCircleShape::draw(const RID &p_to_rid, const Color &p_color) {
 		points.push_back(Vector2(Math::cos(i * Math_PI * 2 / 24.0), Math::sin(i * Math_PI * 2 / 24.0)) * get_radius());
 	}
 
+	int vertex_count = points.size();
+	for (int i = 0; i < vertex_count; i++) {
+		Vector2 p = points[i];
+		Vector2 n = points[(i + 1) % vertex_count];
+		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
+	}
+
 	Vector<Color> col;
-	col.push_back(p_color);
+	Color c(p_color);
+	c.a *= 0.5;
+	col.push_back(c);
 	VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
 }
 
-Box2DCircleShape::Box2DCircleShape() :
-		Box2DShape(&circleShape) {
+Box2DCircleShape::Box2DCircleShape() {
 	set_radius(25.0f);
 }
 
@@ -135,13 +132,22 @@ void Box2DRectShape::draw(const RID &p_to_rid, const Color &p_color) {
 	points.push_back(Vector2(-hx, -hy));
 	points.push_back(Vector2(hx, -hy));
 
+	int vertex_count = points.size();
+	for (int i = 0; i < vertex_count; i++) {
+		Vector2 p = points[i];
+		Vector2 n = points[(i + 1) % vertex_count];
+		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
+	}
+
 	Vector<Color> col;
-	col.push_back(p_color);
+	Color c(p_color);
+	c.a *= 0.5;
+	col.push_back(c);
 	VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
 }
 
 Box2DRectShape::Box2DRectShape() :
-		Box2DShape(&shape), width(50.0f), height(50.0f) {
+		width(50.0f), height(50.0f) {
 	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
 	shape.SetAsBox(width * factor * 0.5, height * factor * 0.5);
 }
@@ -255,9 +261,8 @@ bool isPolygonValid(const b2Vec2 *vertices, int32 count) {
 void Box2DPolygonShape::build_polygon() {
 	// Remove previous b2Shapes
 	polygon_shape_vector.clear();
-	//_set_shape_ptr(NULL);
 
-	chain_shape.Clear();
+	memdelete_notnull(chain_shape);
 
 	// can he do it? yes he can!
 	switch (build_mode) {
@@ -332,14 +337,15 @@ void Box2DPolygonShape::build_polygon() {
 
 			// Convert vertices
 			const int n = ordered_points.size();
-			b2Vec2 *b2Vertices = new b2Vec2[n];
+			b2Vec2 *b2Vertices = static_cast<b2Vec2 *>(memalloc(n * sizeof(b2Vec2)));
 
 			for (int i = 0; i < n; i++) {
 				b2Vertices[i] = gd_to_b2(ordered_points[i]);
 			}
 
-			chain_shape.CreateLoop(b2Vertices, n);
-			delete[] b2Vertices;
+			chain_shape = memnew(b2ChainShape);
+			chain_shape->CreateLoop(b2Vertices, n);
+			memfree(b2Vertices);
 		} break;
 
 		case Box2DPolygonShape::BUILD_OPEN_SEGMENTS: {
@@ -352,14 +358,15 @@ void Box2DPolygonShape::build_polygon() {
 
 			// Convert vertices
 			const int n = ordered_points.size();
-			b2Vec2 *b2Vertices = new b2Vec2[n];
+			b2Vec2 *b2Vertices = static_cast<b2Vec2 *>(memalloc(n * sizeof(b2Vec2)));
 
 			for (int i = 0; i < n; i++) {
 				b2Vertices[i] = gd_to_b2(ordered_points[i]);
 			}
 
-			chain_shape.CreateChain(b2Vertices + 1, n - 2, b2Vertices[0], b2Vertices[n - 1]);
-			delete[] b2Vertices;
+			chain_shape = memnew(b2ChainShape);
+			chain_shape->CreateChain(b2Vertices + 1, n - 2, b2Vertices[0], b2Vertices[n - 1]);
+			memfree(b2Vertices);
 		} break;
 
 		case Box2DPolygonShape::BUILD_OVERLAPPING_SOLIDS: {
@@ -424,8 +431,11 @@ bool Box2DPolygonShape::_edit_is_selected_on_click(const Point2 &p_point, double
 		}
 		return false;
 	} else {
-		for (int i = 0; i < chain_shape.m_count; i++) {
-			if (b2TestOverlap(&chain_shape, i, &cursor, 0, gd_to_b2(Transform2D()), gd_to_b2(cursor_pos))) {
+		if (!chain_shape) {
+			return false;
+		}
+		for (int i = 0; i < chain_shape->m_count; i++) {
+			if (b2TestOverlap(chain_shape, i, &cursor, 0, gd_to_b2(Transform2D()), gd_to_b2(cursor_pos))) {
 				return true;
 			}
 		}
@@ -484,32 +494,33 @@ void Box2DPolygonShape::draw(const RID &p_to_rid, const Color &p_color) {
 		for (int i = 0; i < vertex_count; i++) {
 			Vector2 p = points[i];
 			Vector2 n = points[(i + 1) % vertex_count];
-			VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, Color(0.9, 0.2, 0.0, 0.8), 1);
+			VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
 		}
 
+		Color c(p_color);
+		c.a *= 0.5f;
+
 #if defined(TOOLS_ENABLED) && defined(DEBUG_DECOMPOSE_BOX2D)
-		Color c(0.4, 0.9, 0.1);
 		for (int i = 0; i < decomposed.size(); i++) {
-			c.set_hsv(Math::fmod(c.get_h() + 0.738, 1), c.get_s(), c.get_v(), 0.5);
+			// Math::fmod(c.get_h() + 0.738, 1)
+			c.set_hsv(c.get_h(), c.get_s(), Math::fmod(c.get_v() - 0.7f + 0.221f, 0.3f) + 0.7, 0.5f);
 			Vector<Color> colors;
 			colors.push_back(c);
 			VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, decomposed[i], colors);
 		}
 #else
 		Vector<Color> colors;
-		colors.push_back(p_color);
+		colors.push_back(c);
 		VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, colors);
 #endif
 
 	} else if (build_mode == BUILD_SEGMENTS) {
 
-		Color c = Color(0.9, 0.2, 0.0, 0.8);
-
 		int vertex_count = points.size();
 		for (int i = 0; i < vertex_count; i++) {
 			Vector2 p = points[i];
 			Vector2 n = points[(i + 1) % vertex_count];
-			VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, c, 2.0f);
+			VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 2.0f);
 
 			// Draw normal arrow
 			Vector2 midpoint = (p + n) / 2.0;
@@ -517,19 +528,17 @@ void Box2DPolygonShape::draw(const RID &p_to_rid, const Color &p_color) {
 			if (invert_order)
 				norm = -norm;
 			Vector2 tip = midpoint + norm * 10.0f;
-			draw_arrow(p_to_rid, midpoint, tip, c, 1.0f);
+			draw_arrow(p_to_rid, midpoint, tip, p_color, 1.0f);
 		}
 
 	} else if (build_mode == BUILD_OPEN_SEGMENTS) {
-
-		Color c = Color(0.9, 0.2, 0.0, 0.8);
 
 		int vertex_count = points.size();
 		for (int i = 0; i < vertex_count - 1; i++) {
 			Vector2 p = points[i];
 			Vector2 n = points[i + 1];
 
-			Color c_tmp = c;
+			Color c_tmp = p_color;
 			float width = 2.0f;
 			if (i == 0 || i == vertex_count - 2) {
 				c_tmp.set_hsv(c_tmp.get_h(), c_tmp.get_s() * 0.5, c_tmp.get_v(), c_tmp.a * 0.5);
@@ -544,13 +553,17 @@ void Box2DPolygonShape::draw(const RID &p_to_rid, const Color &p_color) {
 				if (invert_order)
 					norm = -norm;
 				Vector2 tip = midpoint + norm * 10.0f;
-				draw_arrow(p_to_rid, midpoint, tip, c, 1.0f);
+				draw_arrow(p_to_rid, midpoint, tip, p_color, 1.0f);
 			}
 		}
 	}
 }
 
 Box2DPolygonShape::Box2DPolygonShape() :
-		Box2DShape(&chain_shape),
 		build_mode(BuildMode::BUILD_SOLIDS),
+		chain_shape(NULL),
 		invert_order(false) {}
+
+Box2DPolygonShape::~Box2DPolygonShape() {
+	memdelete_notnull(chain_shape);
+}

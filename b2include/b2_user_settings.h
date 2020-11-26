@@ -7,6 +7,8 @@
 #include <stdarg.h>
 #include <stdint.h>
 
+#include <core/os/memory.h>
+
 /**
 * @author Brian Semrau
 *
@@ -30,19 +32,22 @@ class Box2DFixture;
 class Box2DJoint;
 
 struct B2_API b2BodyUserData {
-	b2BodyUserData() {}
+	b2BodyUserData() :
+			owner(NULL) {}
 
 	Box2DPhysicsBody *owner;
 };
 
 struct B2_API b2FixtureUserData {
-	b2FixtureUserData() {}
+	b2FixtureUserData() :
+			owner(NULL) {}
 
 	Box2DFixture *owner;
 };
 
 struct B2_API b2JointUserData {
-	b2JointUserData() {}
+	b2JointUserData() :
+			owner(NULL) {}
 
 	Box2DJoint *owner;
 };
@@ -55,14 +60,14 @@ B2_API void b2Free_Default(void *mem);
 
 /// Implement this function to use your own memory allocator.
 inline void *b2Alloc(int32 size) {
-	//return memalloc(size);
-	return b2Alloc_Default(size);
+	return memalloc(size);
+	//return b2Alloc_Default(size);
 }
 
 /// If you implement b2Alloc, you should also implement this function.
 inline void b2Free(void *mem) {
-	//memfree(mem);
-	b2Free_Default(mem);
+	memfree(mem);
+	//b2Free_Default(mem);
 }
 
 /// Default logging function

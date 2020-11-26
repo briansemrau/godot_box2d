@@ -28,7 +28,7 @@
 
 class Box2DWorld;
 
-class Box2DJoint : public Node2D, public virtual IBox2DChildObject {
+class Box2DJoint : public Node2D {
 	GDCLASS(Box2DJoint, Node2D);
 
 	friend class Box2DWorld;
@@ -58,6 +58,7 @@ class Box2DJoint : public Node2D, public virtual IBox2DChildObject {
 	bool create_b2Joint();
 	bool destroy_b2Joint();
 
+	void on_parent_created(Node *p_parent);
 	void on_node_predelete(Box2DPhysicsBody *node);
 
 	void _node_a_tree_entered();
@@ -71,8 +72,6 @@ protected:
 
 	void _notification(int p_what);
 	static void _bind_methods();
-
-	virtual void on_parent_created(Node *p_parent) override;
 
 	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) = 0;
 

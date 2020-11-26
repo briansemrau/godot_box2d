@@ -20,7 +20,7 @@
 
 class Box2DWorld;
 
-class Box2DPhysicsBody : public Node2D, public virtual IBox2DChildObject {
+class Box2DPhysicsBody : public Node2D {
 	GDCLASS(Box2DPhysicsBody, Node2D);
 
 	friend class Box2DWorld;
@@ -54,6 +54,8 @@ private:
 
 	Transform2D last_valid_xform;
 
+	void on_parent_created(Node *);
+
 	bool create_b2Body();
 	bool destroy_b2Body();
 
@@ -63,8 +65,6 @@ private:
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
-
-	virtual void on_parent_created(Node *) override;
 
 public:
 	virtual String get_configuration_warning() const override;
@@ -77,13 +77,17 @@ public:
 
 	void set_use_custom_massdata(bool p_use_custom);
 	bool get_use_custom_massdata() const;
-	void set_mass(const real_t p_mass);
+	void set_custom_mass(const real_t p_mass);
+	real_t get_custom_mass() const;
+	void set_custom_inertia(real_t p_inertia);
+	real_t get_custom_inertia() const;
+	void set_custom_center_of_mass(const Vector2 &p_center);
+	Vector2 get_custom_center_of_mass() const;
+	void set_custom_mass_data(real_t p_mass, real_t p_inertia, const Vector2 &p_center);
+
 	real_t get_mass() const;
-	void set_inertia(real_t p_inertia);
 	real_t get_inertia() const;
-	void set_center_of_mass(const Vector2 &p_center);
 	Vector2 get_center_of_mass() const;
-	void set_mass_data(real_t p_mass, real_t p_inertia, const Vector2 &p_center);
 
 	void set_linear_damping(real_t p_damping);
 	real_t get_linear_damping() const;
@@ -102,8 +106,12 @@ public:
 
 	void set_awake(bool p_awake);
 	bool is_awake() const;
+
 	void set_can_sleep(bool p_can_sleep);
 	bool get_can_sleep() const;
+
+	void set_enabled(bool p_enabled);
+	bool is_enabled() const;
 
 	void set_fixed_rotation(bool p_fixed);
 	bool is_fixed_rotation() const;

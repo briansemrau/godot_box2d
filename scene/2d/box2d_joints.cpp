@@ -142,6 +142,20 @@ bool Box2DJoint::destroy_b2Joint() {
 	return false;
 }
 
+void Box2DJoint::on_parent_created(Node *p_parent) {
+	Box2DPhysicsBody *body_a = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyA_cache));
+	Box2DPhysicsBody *body_b = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyB_cache));
+
+	if (body_a && body_b) {
+		jointDef->bodyA = body_a->body;
+		jointDef->bodyB = body_b->body;
+		if (!broken)
+			if (create_b2Joint()) { // TODO this might need to call update_joint_bodies because joint may not be initialized
+				print_line("JOINT CREATED FROM CALLBACK");
+			}
+	}
+}
+
 void Box2DJoint::on_node_predelete(Box2DPhysicsBody *node) {
 	ObjectID id = node->get_instance_id();
 	if (bodyA_cache == id) {
@@ -179,17 +193,10 @@ b2Vec2 Box2DJoint::get_b2_pos() const {
 void Box2DJoint::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_PREDELETE: {
-
-			Box2DPhysicsBody *body_a = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyA_cache));
-			Box2DPhysicsBody *body_b = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyB_cache));
-			if (body_a)
-				body_a->joints.erase(this);
-			if (body_b)
-				body_b->joints.erase(this);
-
+			destroy_b2Joint();
 		} break;
-		case NOTIFICATION_ENTER_TREE: {
 
+		case NOTIFICATION_ENTER_TREE: {
 			// Find the Box2DWorld
 			Node *_ancestor = get_parent();
 			Box2DWorld *new_world = NULL;
@@ -201,7 +208,7 @@ void Box2DJoint::_notification(int p_what) {
 			// If new world, destroy joint.
 			if (new_world != world_node) {
 				if (world_node) {
-					world_node->box2d_children.erase(this);
+					world_node->joints.erase(this);
 				}
 				destroy_b2Joint();
 
@@ -211,23 +218,34 @@ void Box2DJoint::_notification(int p_what) {
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
 				set_process_internal(true);
 			}
-
 		} break;
+
 		case NOTIFICATION_EXIT_TREE: {
+			// Detatch from body nodes
+			Box2DPhysicsBody *body_a = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyA_cache));
+			Box2DPhysicsBody *body_b = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyB_cache));
+			if (body_a) {
+				body_a->joints.erase(this);
+				body_a->disconnect("tree_entered", this, "_node_a_tree_entered");
+				bodyA_cache = 0;
+			}
+			if (body_b) {
+				body_b->joints.erase(this);
+				body_b->disconnect("tree_entered", this, "_node_b_tree_entered");
+				bodyB_cache = 0;
+			}
 
 			destroy_b2Joint();
 			set_process_internal(false);
-
 		} break;
-		case NOTIFICATION_POST_ENTER_TREE: {
 
+		case NOTIFICATION_POST_ENTER_TREE: {
 			// After all bodies created in ENTER_TREE, create joint if valid.
 			// If just exiting/entering tree, joint isn't at risk for reinitialization.
-			update_joint_bodies();
-
+			update_joint_bodies(true);
 		} break;
-		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
 
+		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
 			if (breaking_enabled && joint) {
 				Vector2 force = get_reaction_force();
 				real_t torque = abs(get_reaction_torque());
@@ -240,46 +258,44 @@ void Box2DJoint::_notification(int p_what) {
 					set_broken(true);
 				}
 			}
-
 		} break;
-		case NOTIFICATION_INTERNAL_PROCESS: {
 
+		case NOTIFICATION_INTERNAL_PROCESS: {
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
 				update();
 			}
-
 		} break;
-		case NOTIFICATION_DRAW: {
 
+		case NOTIFICATION_DRAW: {
 			if (!Engine::get_singleton()->is_editor_hint() && !get_tree()->is_debugging_collisions_hint()) {
 				break;
 			}
 
-			Color debug_col = Color(0.7, 0.6, 0.0, 0.5);
-			if (breaking_enabled && joint) {
+			Color debug_col = Color(0.5f, 0.8f, 0.8f);
+			if (broken) {
+				debug_col = Color(0.5f, 0.25f, 0.0f);
+			} else { //if (breaking_enabled && joint) {
 				// TODO redo this maybe, meh
 				if (max_force > 0) {
-					// TODO which max/abs functions should I be using? not that it matters, just for cleanliness.
-					// Using a macro MAX and function abs feels dirty.
 					real_t stress = get_reaction_force().length() / max_force;
-					debug_col.r = MAX(1.0, stress * 2.0);
-					debug_col.g = MAX(1.0, 1.0 - (stress * 2.0));
-					debug_col.b = 0.0;
+					debug_col.r = CLAMP(stress * 2.0f, 0.0f, 1.0f);
+					debug_col.g = CLAMP(2.0f - (stress * 2.0f), 0.0f, 1.0f);
+					debug_col.b = 0.0f;
 					if (max_torque > 0) {
-						stress = abs(get_reaction_torque() / max_torque);
+						stress = Math::abs(get_reaction_torque() / max_torque);
 						debug_col.b = stress;
 					}
 				} else if (max_torque > 0) {
-					real_t stress = abs(get_reaction_torque() / max_torque);
-					debug_col.r = MAX(1.0, stress * 2.0);
-					debug_col.g = MAX(1.0, (1.0 - stress) * 2.0);
-					debug_col.b = 0.0;
+					real_t stress = Math::abs(get_reaction_torque() / max_torque);
+					debug_col.r = CLAMP(stress * 2.0f, 0.0f, 1.0f);
+					debug_col.g = CLAMP(2.0f - (stress * 2.0f), 0.0f, 1.0f);
+					debug_col.b = 0.0f;
 				} else {
 					// color UNCHANGED
 				}
 			}
-			debug_draw(get_canvas_item(), debug_col);
 
+			debug_draw(get_canvas_item(), debug_col);
 		} break;
 	}
 }
@@ -325,20 +341,6 @@ void Box2DJoint::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "max_torque", PROPERTY_HINT_EXP_RANGE, "0,65535,0.01"), "set_max_torque", "get_max_torque");
 
 	ADD_SIGNAL(MethodInfo("joint_broken", PropertyInfo(Variant::VECTOR2, "break_force"), PropertyInfo(Variant::REAL, "break_torque")));
-}
-
-void Box2DJoint::on_parent_created(Node *p_parent) {
-	Box2DPhysicsBody *body_a = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyA_cache));
-	Box2DPhysicsBody *body_b = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyB_cache));
-
-	if (body_a && body_b) {
-		jointDef->bodyA = body_a->body;
-		jointDef->bodyB = body_b->body;
-		if (!broken)
-			if (create_b2Joint()) { // TODO this might need to call update_joint_bodies because joint may not be initialized
-				print_line("JOINT CREATED FROM CALLBACK");
-			}
-	}
 }
 
 String Box2DJoint::get_configuration_warning() const {
@@ -497,6 +499,7 @@ Box2DJoint::Box2DJoint() :
 
 Box2DJoint::~Box2DJoint() {
 	if (joint && world_node) {
+		WARN_PRINT("b2Joint is being deleted in destructor, not NOTIFICATION_PREDELETE.");
 		destroy_b2Joint();
 	} // else Box2D has/will clean up joint
 }
@@ -535,17 +538,40 @@ void Box2DRevoluteJoint::init_b2JointDef(const b2Vec2 &p_joint_pos) {
 }
 
 void Box2DRevoluteJoint::debug_draw(RID p_to_rid, Color p_color) {
-	Point2 p1;
-	Point2 p2;
 	b2RevoluteJoint *j = static_cast<b2RevoluteJoint *>(get_b2Joint());
+	b2Vec2 anchorA;
+	b2Vec2 anchorB;
 	if (j) {
-		b2Vec2 b2p1 = j->GetAnchorA();
-		b2p1 -= get_b2_pos();
-		b2Vec2 b2p2 = j->GetAnchorB();
-		b2p2 -= get_b2_pos();
-		p1 += b2_to_gd(b2p1); // - get_position();
-		p2 += b2_to_gd(b2p2); // - get_position();
+		anchorA = j->GetAnchorA();
+		anchorB = j->GetAnchorB();
+		anchorA -= get_b2_pos();
+		anchorB -= get_b2_pos();
+	} else {
+		if (jointDef.bodyA) {
+			anchorA = jointDef.bodyA->GetWorldPoint(jointDef.localAnchorA);
+			anchorA -= get_b2_pos();
+		}
+		if (jointDef.bodyB) {
+			anchorB = jointDef.bodyB->GetWorldPoint(jointDef.localAnchorB);
+			anchorB -= get_b2_pos();
+		}
 	}
+	b2Vec2 posA;
+	b2Vec2 posB;
+	if (jointDef.bodyA) {
+		posA = jointDef.bodyA->GetTransform().p;
+		posA -= get_b2_pos();
+	}
+	if (jointDef.bodyB) {
+		posB = jointDef.bodyB->GetTransform().p;
+		posB -= get_b2_pos();
+	}
+
+	Point2 p1 = b2_to_gd(anchorA);
+	Point2 p2 = b2_to_gd(anchorB);
+	Point2 x1 = b2_to_gd(posA);
+	Point2 x2 = b2_to_gd(posB);
+
 	draw_arc(p1, 5, 0, Math_PI * 2.0f, 12, p_color, 2.0f);
 	draw_circle(p2, 2, p_color);
 
@@ -668,19 +694,39 @@ void Box2DWeldJoint::init_b2JointDef(const b2Vec2 &p_joint_pos) {
 }
 
 void Box2DWeldJoint::debug_draw(RID p_to_rid, Color p_color) {
-	Point2 p1;
-	Point2 p2;
-	b2RevoluteJoint *j;
-	if (j = static_cast<b2RevoluteJoint *>(get_b2Joint())) {
-		b2Vec2 b2p1 = j->GetAnchorA();
-		b2p1 -= get_b2_pos();
-		b2Vec2 b2p2 = j->GetAnchorB();
-		b2p2 -= get_b2_pos();
-		p1 += b2_to_gd(b2p1);
-		p2 += b2_to_gd(b2p2);
+	//b2WeldJoint *j = static_cast<b2WeldJoint *>(get_b2Joint());
+	b2Vec2 anchorA;
+	b2Vec2 anchorB;
+	if (jointDef.bodyA) {
+		anchorA = jointDef.bodyA->GetWorldPoint(jointDef.localAnchorA);
+		//anchorA -= get_b2_pos();
 	}
-	draw_line(p1 + Point2(-5, 0), p1 + Point2(+5, 0), p_color, 2);
-	draw_line(p1 + Point2(0, -5), p1 + Point2(0, +5), p_color, 2);
+	if (jointDef.bodyB) {
+		anchorB = jointDef.bodyB->GetWorldPoint(jointDef.localAnchorB);
+		//anchorB -= get_b2_pos();
+	}
+
+	b2Vec2 posA;
+	b2Vec2 posB;
+	if (jointDef.bodyA) {
+		posA = jointDef.bodyA->GetWorldCenter();
+		//posA -= get_b2_pos();
+	}
+	if (jointDef.bodyB) {
+		posB = jointDef.bodyB->GetWorldCenter();
+		//posB -= get_b2_pos();
+	}
+
+	Point2 p1 = to_local(b2_to_gd(anchorA));
+	Point2 p2 = to_local(b2_to_gd(anchorB));
+	Point2 x1 = to_local(b2_to_gd(posA));
+	Point2 x2 = to_local(b2_to_gd(posB));
+
+	draw_line(p1 + Point2(-5, 0), p1 + Point2(+5, 0), p_color, 2.0f);
+	draw_line(p1 + Point2(0, -5), p1 + Point2(0, +5), p_color, 2.0f);
+
+	draw_line(x1, p1, p_color, 1.0f);
+	draw_line(x2, p2, p_color, 1.0f);
 }
 
 void Box2DWeldJoint::set_stiffness(real_t p_hz) {

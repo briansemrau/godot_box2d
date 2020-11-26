@@ -21,7 +21,7 @@
 * @author Brian Semrau
 */
 
-class Box2DFixture : public Node2D, public virtual IBox2DChildObject {
+class Box2DFixture : public Node2D {
 	GDCLASS(Box2DFixture, Node2D);
 
 	friend class Box2DWorld;
@@ -41,7 +41,8 @@ class Box2DFixture : public Node2D, public virtual IBox2DChildObject {
 
 	Vector<b2Fixture *> fixtures;
 
-	void on_b2Fixture_destroyed(){}; // TODO is there any case when this is needed?
+	void on_b2Fixture_destroyed(b2Fixture *fixture);
+	void on_parent_created(Node *);
 
 	void create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDef &p_def, const Transform2D &p_shape_xform);
 
@@ -56,8 +57,6 @@ class Box2DFixture : public Node2D, public virtual IBox2DChildObject {
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
-
-	virtual void on_parent_created(Node *) override final;
 
 public:
 #ifdef TOOLS_ENABLED
