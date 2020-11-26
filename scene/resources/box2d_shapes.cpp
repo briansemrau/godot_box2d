@@ -12,6 +12,13 @@
 * @author Brian Semrau
 */
 
+void draw_arrow(const RID &p_to_rid, const Vector2 &start, const Vector2 &end, const Color &p_color, float p_width) {
+	Vector2 norm = (end - start).normalized();
+	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, start, end, p_color, p_width);
+	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, end, end - norm.rotated(Math_PI * 0.17f) * 4.0f, p_color, p_width);
+	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, end, end - norm.rotated(-Math_PI * 0.17f) * 4.0f, p_color, p_width);
+}
+
 void Box2DShape::_bind_methods() {
 	// Anything to bind?
 }
@@ -150,6 +157,114 @@ Box2DRectShape::Box2DRectShape() :
 		width(50.0f), height(50.0f) {
 	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
 	shape.SetAsBox(width * factor * 0.5, height * factor * 0.5);
+}
+
+void Box2DSegmentShape::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_a", "a"), &Box2DSegmentShape::set_a);
+	ClassDB::bind_method(D_METHOD("get_a"), &Box2DSegmentShape::get_a);
+	ClassDB::bind_method(D_METHOD("set_b", "b"), &Box2DSegmentShape::set_b);
+	ClassDB::bind_method(D_METHOD("get_b"), &Box2DSegmentShape::get_b);
+	ClassDB::bind_method(D_METHOD("set_a_adjacent", "a_adjacent"), &Box2DSegmentShape::set_a_adjacent);
+	ClassDB::bind_method(D_METHOD("get_a_adjacent"), &Box2DSegmentShape::get_a_adjacent);
+	ClassDB::bind_method(D_METHOD("set_b_adjacent", "b_adjacent"), &Box2DSegmentShape::set_b_adjacent);
+	ClassDB::bind_method(D_METHOD("get_b_adjacent"), &Box2DSegmentShape::get_b_adjacent);
+	ClassDB::bind_method(D_METHOD("set_one_sided", "one_sided"), &Box2DSegmentShape::set_one_sided);
+	ClassDB::bind_method(D_METHOD("is_one_sided"), &Box2DSegmentShape::is_one_sided);
+
+	ClassDB::bind_method(D_METHOD("set_as_one_sided", "p_a_adj", "p_a", "p_b", "p_b_adj"), &Box2DSegmentShape::set_as_one_sided);
+	ClassDB::bind_method(D_METHOD("set_as_two_sided", "p_a", "p_b"), &Box2DSegmentShape::set_as_two_sided);
+
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "a"), "set_a", "get_a");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "b"), "set_b", "get_b");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "a_adjacent"), "set_a_adjacent", "get_a_adjacent");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "b_adjacent"), "set_b_adjacent", "get_b_adjacent");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "one_sided"), "set_one_sided", "is_one_sided");
+}
+
+void Box2DSegmentShape::set_a(const Vector2 &p_a) {
+	shape.m_vertex1 = gd_to_b2(p_a);
+	emit_changed();
+}
+
+Vector2 Box2DSegmentShape::get_a() const {
+	return b2_to_gd(shape.m_vertex1);
+}
+
+void Box2DSegmentShape::set_b(const Vector2 &p_b) {
+	shape.m_vertex2 = gd_to_b2(p_b);
+	emit_changed();
+}
+
+Vector2 Box2DSegmentShape::get_b() const {
+	return b2_to_gd(shape.m_vertex2);
+}
+
+void Box2DSegmentShape::set_a_adjacent(const Vector2 &p_a_adj) {
+	if (!is_one_sided())
+		WARN_PRINT("Modifying adjacent vertices on a two-sided segment shape has no effect.")
+	shape.m_vertex0 = gd_to_b2(p_a_adj);
+	emit_changed();
+}
+
+Vector2 Box2DSegmentShape::get_a_adjacent() const {
+	return b2_to_gd(shape.m_vertex0);
+}
+
+void Box2DSegmentShape::set_b_adjacent(const Vector2 &p_b_adj) {
+	if (!is_one_sided())
+		WARN_PRINT("Modifying adjacent vertices on a two-sided segment shape has no effect.")
+	shape.m_vertex3 = gd_to_b2(p_b_adj);
+	emit_changed();
+}
+
+Vector2 Box2DSegmentShape::get_b_adjacent() const {
+	return b2_to_gd(shape.m_vertex3);
+}
+
+void Box2DSegmentShape::set_one_sided(bool p_one_sided) {
+	shape.m_oneSided = p_one_sided;
+	emit_changed();
+}
+
+bool Box2DSegmentShape::is_one_sided() const {
+	return shape.m_oneSided;
+}
+
+void Box2DSegmentShape::set_as_one_sided(const Vector2 &p_a_adj, const Vector2 &p_a, const Vector2 &p_b, const Vector2 &p_b_adj) {
+	shape.SetOneSided(gd_to_b2(p_a_adj), gd_to_b2(p_a), gd_to_b2(p_b), gd_to_b2(p_b_adj));
+	emit_changed();
+}
+
+void Box2DSegmentShape::set_as_two_sided(const Vector2 &p_a, const Vector2 &p_b) {
+	shape.SetTwoSided(gd_to_b2(p_a), gd_to_b2(p_b));
+	emit_changed();
+}
+
+void Box2DSegmentShape::draw(const RID &p_to_rid, const Color &p_color) {
+	const Vector2 a = get_a();
+	const Vector2 b = get_b();
+
+	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, a, b, p_color, 2.0f);
+
+	if (is_one_sided()) {
+		Color c_adj = p_color;
+		c_adj.set_hsv(c_adj.get_h(), c_adj.get_s() * 0.5, c_adj.get_v(), c_adj.a * 0.5);
+
+		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, get_a_adjacent(), a, c_adj, 1.0f);
+		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, get_b_adjacent(), b, c_adj, 1.0f);
+
+		// Draw arrow in normal direction
+		Vector2 midpoint = (a + b) / 2.0;
+		Vector2 norm = (b - a).normalized().rotated(Math_PI * -0.5f);
+		Vector2 tip = midpoint + norm * 10.0f;
+		draw_arrow(p_to_rid, midpoint, tip, p_color, 1.0f);
+	}
+}
+
+Box2DSegmentShape::Box2DSegmentShape() {
+	shape.SetTwoSided(gd_to_b2(Vector2(-25, 0)), gd_to_b2(Vector2(25, 0)));
+	shape.m_vertex0 = gd_to_b2(Vector2(-50, 0));
+	shape.m_vertex3 = gd_to_b2(Vector2(50, 0));
 }
 
 bool isPolygonValid(const b2Vec2 *vertices, int32 count) {
@@ -478,13 +593,6 @@ void Box2DPolygonShape::set_invert_order(bool p_inverted) {
 
 bool Box2DPolygonShape::get_invert_order() const {
 	return invert_order;
-}
-
-void draw_arrow(const RID &p_to_rid, const Vector2 &start, const Vector2 &end, const Color &p_color, float p_width) {
-	Vector2 norm = (end - start).normalized();
-	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, start, end, p_color, p_width);
-	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, end, end - norm.rotated(Math_PI * 0.17f) * 4.0f, p_color, p_width);
-	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, end, end - norm.rotated(-Math_PI * 0.17f) * 4.0f, p_color, p_width);
 }
 
 void Box2DPolygonShape::draw(const RID &p_to_rid, const Color &p_color) {

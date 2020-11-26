@@ -1,22 +1,33 @@
 # Box2D for Godot
 
-An unofficial [Box2D](https://github.com/erincatto/box2d) module for the Godot game engine.
+An unofficial [Box2D](https://box2d.org/) module for the [Godot game engine](https://github.com/godotengine/godot/).
 
 ## **This is a work in progress!**
 **⚠ Expect frequent renames, reworks, crashes, and bugs. ⚠**
 
-Using Box2D v2.4.1
+Using [Box2D v2.4.1](https://github.com/erincatto/box2d)
 
-This should work on all platforms.
+This module should work on all platforms.
 
-This supports Godot 3.2.
+This module supports Godot 3.2.
 This should work with 4.0, but is untested.
 
-# Purpose
+## Purpose
 
 This module aims to provide the awesome features of the Box2D physics library to the Godot Engine in an easy to use way, similar to the existing 2D physics engine in Godot.
 
-Hopefully the usage of this module is clear whether you're coming with experience from Box2D or from Godot.
+Hopefully the usage of this module is clear whether you're experienced using just Box2D or just Godot.
+
+# Roadmap:
+
+This is a list of unimplemented features that are planned:
+
+- All remaining Box2D joints not yet implemented
+- Godot-style contact monitoring with Box2D sensor fixtures
+- Run Box2D on a separate thread
+- Look into a [multithreaded implementation of Box2D](https://github.com/jhoffman0x/Box2D-MT)
+
+If this list is missing anything important, feel free to submit an issue so that it can be discussed.
 
 # Documentation
 
@@ -127,17 +138,6 @@ Gives joints new properties:
 
 ### Concave polygons
 Godot physics provides this, but the Box2D library doesn't. This module bridges the gap so you don't have to think about polygon concavity or vertex count.
-
-# Development Plans:
-
-This is a list of all things that Box2D can do that this module doesn't provide (yet!):
-
-- Edge shape
-- Lots of joints
-- Contact monitoring
-- Sensor fixtures
-
-If this list is missing anything important, feel free to submit an issue so it can be tracked.
 
 # Contributing
 

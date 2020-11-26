@@ -38,7 +38,18 @@ Variant Box2DShapeEditor::get_handle_value(int idx) const {
 		} break;
 
 		case Box2DShapeEditor::SEGMENT_SHAPE: {
-			ERR_PRINT("Not yet implemented");
+			Ref<Box2DSegmentShape> segment = node->get_shape();
+
+			if (idx == 0) {
+				return segment->get_a();
+			} else if (idx == 1) {
+				return segment->get_b();
+			} else if (idx == 2) {
+				return segment->get_a_adjacent();
+			} else if (idx == 3) {
+				return segment->get_b_adjacent();
+			}
+
 		} break;
 
 		case Box2DShapeEditor::POLYGON_SHAPE: {
@@ -84,7 +95,21 @@ void Box2DShapeEditor::set_handle(int idx, Point2 &p_point) {
 		} break;
 
 		case Box2DShapeEditor::SEGMENT_SHAPE: {
-			ERR_PRINT("Not yet implemented");
+			// if (edit_handle < 2) {
+			Ref<Box2DSegmentShape> segment = node->get_shape();
+
+			if (idx == 0) {
+				segment->set_a(p_point);
+			} else if (idx == 1) {
+				segment->set_b(p_point);
+			} else if (idx == 2) {
+				segment->set_a_adjacent(p_point);
+			} else if (idx == 3) {
+				segment->set_b_adjacent(p_point);
+			}
+
+			canvas_item_editor->update_viewport();
+			// }
 		} break;
 
 		case Box2DShapeEditor::POLYGON_SHAPE: {
@@ -127,7 +152,29 @@ void Box2DShapeEditor::commit_handle(int idx, Variant &p_org) {
 		} break;
 
 		case Box2DShapeEditor::SEGMENT_SHAPE: {
-			ERR_PRINT("Not yet implemented");
+			Ref<Box2DSegmentShape> segment = node->get_shape();
+
+			if (idx == 0) {
+				undo_redo->add_do_method(segment.ptr(), "set_a", segment->get_a());
+				undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+				undo_redo->add_undo_method(segment.ptr(), "set_a", p_org);
+				undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+			} else if (idx == 1) {
+				undo_redo->add_do_method(segment.ptr(), "set_b", segment->get_b());
+				undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+				undo_redo->add_undo_method(segment.ptr(), "set_b", p_org);
+				undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+			} else if (idx == 2) {
+				undo_redo->add_do_method(segment.ptr(), "set_a_adjacent", segment->get_a_adjacent());
+				undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+				undo_redo->add_undo_method(segment.ptr(), "set_a_adjacent", p_org);
+				undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+			} else if (idx == 3) {
+				undo_redo->add_do_method(segment.ptr(), "set_b_adjacent", segment->get_b_adjacent());
+				undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+				undo_redo->add_undo_method(segment.ptr(), "set_b_adjacent", p_org);
+				undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+			}
 		} break;
 
 		case Box2DShapeEditor::POLYGON_SHAPE: {
@@ -236,10 +283,10 @@ void Box2DShapeEditor::_get_current_shape_type() {
 		shape_type = CIRCLE_SHAPE;
 	} else if (Object::cast_to<Box2DRectShape>(*s)) {
 		shape_type = RECTANGLE_SHAPE;
-		//} else if (Object::cast_to<Box2DSegmentShape>(*s)) {
-		//	shape_type = SEGMENT_SHAPE;
-		//} else if (Object::cast_to<Box2DPolygonShape>(*s)) {
-		//	shape_type = POLYGON_SHAPE;
+	} else if (Object::cast_to<Box2DSegmentShape>(*s)) {
+		shape_type = SEGMENT_SHAPE;
+	} else if (Object::cast_to<Box2DPolygonShape>(*s)) {
+		shape_type = UNEDITABLE_SHAPE;
 		//} else if (Object::cast_to<Box2DCapsuleShape>(*s)) {
 		//	shape_type = CAPSULE_SHAPE;
 	} else {
@@ -296,7 +343,29 @@ void Box2DShapeEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 		} break;
 
 		case Box2DShapeEditor::SEGMENT_SHAPE: {
-			ERR_PRINT("Not yet implemented");
+			Ref<Box2DSegmentShape> shape = node->get_shape();
+
+			if (shape->is_one_sided()) {
+				handles.resize(4);
+
+				handles.write[0] = shape->get_a();
+				handles.write[1] = shape->get_b();
+				handles.write[2] = shape->get_a_adjacent();
+				handles.write[3] = shape->get_b_adjacent();
+
+				p_overlay->draw_texture(h, gt.xform(handles[0]) - size);
+				p_overlay->draw_texture(h, gt.xform(handles[1]) - size);
+				p_overlay->draw_texture(h, gt.xform(handles[2]) - size);
+				p_overlay->draw_texture(h, gt.xform(handles[3]) - size);
+			} else {
+				handles.resize(2);
+
+				handles.write[0] = shape->get_a();
+				handles.write[1] = shape->get_b();
+
+				p_overlay->draw_texture(h, gt.xform(handles[0]) - size);
+				p_overlay->draw_texture(h, gt.xform(handles[1]) - size);
+			}
 		} break;
 
 		case Box2DShapeEditor::POLYGON_SHAPE: {

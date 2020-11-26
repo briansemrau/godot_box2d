@@ -22,7 +22,7 @@ void register_godot_box2d_types() {
 	ClassDB::register_virtual_class<Box2DShape>();
 	ClassDB::register_class<Box2DCircleShape>();
 	ClassDB::register_class<Box2DRectShape>();
-	// TODO segment shape
+	ClassDB::register_class<Box2DSegmentShape>();
 	ClassDB::register_class<Box2DPolygonShape>();
 	// TODO capsule shape
 

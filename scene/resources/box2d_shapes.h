@@ -5,6 +5,7 @@
 
 #include <box2d/b2_chain_shape.h>
 #include <box2d/b2_circle_shape.h>
+#include <box2d/b2_edge_shape.h>
 #include <box2d/b2_polygon_shape.h>
 #include <box2d/b2_shape.h>
 
@@ -83,6 +84,40 @@ public:
 	virtual void draw(const RID &p_to_rid, const Color &p_color) override;
 
 	Box2DRectShape();
+};
+
+class Box2DSegmentShape : public Box2DShape {
+	GDCLASS(Box2DSegmentShape, Box2DShape);
+
+	b2EdgeShape shape;
+
+	virtual const b2Shape *get_shape() const { return &shape; }
+
+protected:
+	static void _bind_methods();
+
+public:
+	void set_a(const Vector2 &p_a);
+	Vector2 get_a() const;
+
+	void set_b(const Vector2 &p_b);
+	Vector2 get_b() const;
+
+	void set_a_adjacent(const Vector2 &p_a_adj);
+	Vector2 get_a_adjacent() const;
+
+	void set_b_adjacent(const Vector2 &p_b_adj);
+	Vector2 get_b_adjacent() const;
+
+	void set_one_sided(bool p_one_sided);
+	bool is_one_sided() const;
+
+	void set_as_one_sided(const Vector2 &p_a_adj, const Vector2 &p_a, const Vector2 &p_b, const Vector2 &p_b_adj);
+	void set_as_two_sided(const Vector2 &p_a, const Vector2 &p_b);
+
+	virtual void draw(const RID &p_to_rid, const Color &p_color) override;
+
+	Box2DSegmentShape();
 };
 
 class Box2DPolygonShape : public Box2DShape {
