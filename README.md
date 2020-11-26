@@ -23,7 +23,8 @@ Hopefully the usage of this module is clear whether you're experienced using jus
 This is a list of unimplemented features that are planned:
 
 - All remaining Box2D joints not yet implemented
-- Godot-style contact monitoring with Box2D sensor fixtures
+- Godot-style contact monitoring
+- Area2D using Box2D sensor fixtures
 - Run Box2D on a separate thread
 - Look into a [multithreaded implementation of Box2D](https://github.com/jhoffman0x/Box2D-MT)
 
