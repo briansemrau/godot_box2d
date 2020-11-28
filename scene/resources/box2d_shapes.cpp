@@ -200,8 +200,8 @@ Vector2 Box2DSegmentShape::get_b() const {
 }
 
 void Box2DSegmentShape::set_a_adjacent(const Vector2 &p_a_adj) {
-	if (!is_one_sided())
-		WARN_PRINT("Modifying adjacent vertices on a two-sided segment shape has no effect.")
+	//if (!is_one_sided())
+	//	WARN_PRINT("Modifying adjacent vertices on a two-sided segment shape has no effect.")
 	shape.m_vertex0 = gd_to_b2(p_a_adj);
 	emit_changed();
 }
@@ -211,8 +211,8 @@ Vector2 Box2DSegmentShape::get_a_adjacent() const {
 }
 
 void Box2DSegmentShape::set_b_adjacent(const Vector2 &p_b_adj) {
-	if (!is_one_sided())
-		WARN_PRINT("Modifying adjacent vertices on a two-sided segment shape has no effect.")
+	//if (!is_one_sided())
+	//	WARN_PRINT("Modifying adjacent vertices on a two-sided segment shape has no effect.")
 	shape.m_vertex3 = gd_to_b2(p_b_adj);
 	emit_changed();
 }
