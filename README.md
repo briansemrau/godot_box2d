@@ -14,29 +14,28 @@ This should work with 4.0, but is untested.
 
 ## Purpose
 
-This module aims to provide the awesome features of the Box2D physics library to the Godot Engine in an easy to use way, similar to the existing 2D physics engine in Godot.
+This module aims to provide the awesome features of the Box2D physics library to the Godot Engine in a form very familiar to Godot users.
 
-Hopefully the usage of this module is clear whether you're experienced using just Box2D or just Godot.
+This module also bridges the gap between Box2D features and Godot 2D physics features where Box2D is lacking. The goal is for every 2D physics feature in Godot to be supported, with as few compromises as possible.
 
 # Roadmap:
 
 This is a list of unimplemented features that are planned:
 
 - All remaining Box2D joints not yet implemented
-- Godot-style contact monitoring
-- Area2D using Box2D sensor fixtures
-- Run Box2D on a separate thread
+- Area2D node equivalent (using Box2D sensor fixtures)
+- Run Box2D computation on a separate thread
 - Look into a [multithreaded implementation of Box2D](https://github.com/jhoffman0x/Box2D-MT)
 
-If this list is missing anything important, feel free to submit an issue so that it can be discussed.
+If this list is missing anything important or desirable, feel free to submit an issue so that it can be discussed.
 
 # Documentation
 
-There is currently no real documentation for this module. However, most features are meant to align with the Box2D API, so the [Box2D documentation](https://box2d.org/documentation/) should provide a strong conceptual guide.
+There is currently no real documentation for this module. However, most features align with the Box2D API, so the [Box2D documentation](https://box2d.org/documentation/) should provide a strong conceptual guide.
 
 ## Basic Usage
 
-Unlike Godot 2D physics, this module does not add a physics server. Instead, everything must be done in the scene tree. The `Box2DWorld` node controls all the physics processing. (This may change in the far future)
+Unlike Godot 2D physics, this module does not add a physics server (..yet). Instead, everything must be done in the scene tree. The `Box2DWorld` node currently controls all the physics processing.
 
 To use this module, first add a `Box2DWorld` node to the scene. This node must be the "ancestor" to any and all `Box2D` nodes you use within this world. (It's okay to have multiple `Box2DWorld` nodes in one scene, but they will not interact, nor their bodies nor joints.)
 
@@ -120,15 +119,14 @@ Box2D has...
 
 Many features of Box2D have very clear parallels to Godot physics. Here are a few, just to help get started:
 
-| Godot Physics | Godot Box2D module |
+| Godot Physics feature | Godot Box2D module equivalent |
 |-|-|
-| `PhysicsBody2D` (Rigid, Static, Kinematic) | Use `Box2DPhysicsBody`. Use `type` property to change body type. Material properties are set using fixtures. |
-| `Area2D` | *Not yet implemented.* |
-| `CollisionShape2D`/`CollisionPolygon2D` | Use `Box2DFixture` and set the `shape` property. |
-| `Joint2D` (Pin, Groove, Spring) | Use variants of `Box2DJoint`. |
+| `PhysicsBody2D` nodes (Rigid, Static, Kinematic) | Use `Box2DPhysicsBody`. Use `type` property to change body type. Material properties are set using fixtures. |
+| `Area2D` node | *Not yet implemented.* |
+| `CollisionShape2D`/`CollisionPolygon2D` nodes | Use `Box2DFixture` and set the `shape` property. |
+| `Joint2D` nodes (Pin, Groove, Spring) | Use variants of `Box2DJoint`. |
 
 ## Additional features this module provides:
-(Features not provided by the Box2D library)
 
 ### Breakable joints
 Gives joints new properties:
@@ -136,9 +134,6 @@ Gives joints new properties:
 - `breaking_enabled`: Lets the joint break when `max_force` and/or `max_torque` are exceeded
 - `free_on_break`: Whether the joint frees itself when broken. (This feature may be removed)
 - `max_force` and `max_torque`: Maximum linear force and torque. Either can be disabled by setting the property to 0.
-
-### Concave polygons
-Godot physics provides this, but the Box2D library doesn't. This module bridges the gap so you don't have to think about polygon concavity or vertex count.
 
 # Contributing
 
