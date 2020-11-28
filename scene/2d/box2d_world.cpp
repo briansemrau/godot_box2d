@@ -3,9 +3,12 @@
 #include <core/engine.h>
 #include <core/os/os.h>
 
+#include <box2d/b2_collision.h>
+
 #include "box2d_fixtures.h"
 #include "box2d_joints.h"
 
+#include <chrono>
 #include <string>
 
 /**
@@ -56,6 +59,164 @@ bool Box2DWorld::ShouldCollide(b2Fixture *fixtureA, b2Fixture *fixtureB) {
 	}
 }
 
+void Box2DWorld::BeginContact(b2Contact *contact) {
+	// TODO body enter signal
+
+	Box2DFixture *fnode_a = contact->GetFixtureA()->GetUserData().owner;
+	Box2DFixture *fnode_b = contact->GetFixtureB()->GetUserData().owner;
+
+	// Only buffer contacts that are being monitored
+	const bool monitoringA = fnode_a->body_node->is_contact_monitor_enabled();
+	const bool monitoringB = fnode_b->body_node->is_contact_monitor_enabled();
+
+	if (monitoringA || monitoringB) {
+		// Init contact
+		Box2DContact c;
+		c.id = next_contact_id++;
+		c.fixture_a = fnode_a;
+		c.fixture_b = fnode_b;
+		// The contact pointer address seems to be the only way to create a unique key. Please prove me wrong.
+		contact_buffer.set(reinterpret_cast<int64_t>(contact), c);
+		// Buffer again into monitoring node
+		if (monitoringA) {
+			auto contacts = &fnode_a->body_node->contact_monitor->contacts;
+			contacts->insert(c);
+		}
+		if (monitoringB) {
+			auto contacts = &fnode_b->body_node->contact_monitor->contacts;
+			contacts->insert(c);
+		}
+	}
+}
+
+void Box2DWorld::EndContact(b2Contact *contact) {
+	// TODO body exit signal
+
+	Box2DContact *c_ptr = contact_buffer.getptr(reinterpret_cast<int64_t>(contact));
+	if (c_ptr) {
+		if (c_ptr->fixture_a->body_node->is_contact_monitor_enabled()) {
+			// TODO lock/unlock
+			c_ptr->fixture_a->body_node->contact_monitor->contacts.erase(*c_ptr);
+		}
+		if (c_ptr->fixture_b->body_node->is_contact_monitor_enabled()) {
+			// TODO lock/unlock
+			c_ptr->fixture_b->body_node->contact_monitor->contacts.erase(*c_ptr);
+		}
+		ERR_FAIL_COND(!contact_buffer.erase(reinterpret_cast<int64_t>(contact)));
+	}
+}
+
+void Box2DWorld::PreSolve(b2Contact *contact, const b2Manifold *oldManifold) {
+	// Box2D point states are confusing... need to inspect how they work further
+	//b2PointState state1[2], state2[2];
+	//b2GetPointStates(state1, state2, oldManifold, contact->GetManifold());
+
+	// TODO using point state transitions, create/destroy Box2DContacts
+
+	Box2DFixture *fnode_a = contact->GetFixtureA()->GetUserData().owner;
+	Box2DFixture *fnode_b = contact->GetFixtureB()->GetUserData().owner;
+
+	Box2DContact *c_ptr = contact_buffer.getptr(reinterpret_cast<int64_t>(contact));
+
+	if (unlikely(flag_rescan_contacts_monitored) && !c_ptr) {
+		// Buffer a contact that only started being monitored after BeginContact
+		const bool monitoringA = fnode_a->body_node->is_contact_monitor_enabled();
+		const bool monitoringB = fnode_b->body_node->is_contact_monitor_enabled();
+		if (monitoringA || monitoringB) {
+			// Init contact
+			Box2DContact c;
+			c.id = next_contact_id++;
+			c.fixture_a = fnode_a;
+			c.fixture_b = fnode_b;
+			contact_buffer.set(reinterpret_cast<int64_t>(contact), c);
+			// Buffer again into monitoring node
+			if (monitoringA) {
+				auto contacts = &fnode_a->body_node->contact_monitor->contacts;
+				contacts->insert(c);
+			}
+			if (monitoringB) {
+				auto contacts = &fnode_b->body_node->contact_monitor->contacts;
+				contacts->insert(c);
+			}
+			c_ptr = contact_buffer.getptr(reinterpret_cast<int64_t>(contact));
+		}
+	}
+
+	// Only handle the first PreSolve for this contact this step (don't overwrite first impact_velocity)
+	if (c_ptr && c_ptr->solves == 0) {
+		c_ptr->solves += 1;
+
+		b2WorldManifold worldManifold;
+		contact->GetWorldManifold(&worldManifold);
+
+		Vector2 manifold_norm = Vector2(worldManifold.normal.x, worldManifold.normal.y);
+		c_ptr->normal = manifold_norm;
+		c_ptr->normal_impulse = 0.0f;
+		c_ptr->tangent_impulse = Vector2();
+		c_ptr->world_pos = Vector2();
+		const int manPtCount = contact->GetManifold()->pointCount;
+		b2Vec2 manifold_center = b2Vec2_zero; // TODO remove when making separate contacts for each point
+		for (int i = 0; i < manPtCount; ++i) {
+			manifold_center += worldManifold.points[i];
+		}
+		manifold_center *= 1.0f / manPtCount;
+		c_ptr->world_pos = b2_to_gd(manifold_center);
+
+		b2Vec2 point = manifold_center; //worldManifold.points[0];
+		b2Vec2 relV = contact->GetFixtureB()->GetBody()->GetLinearVelocityFromWorldPoint(point);
+		relV -= contact->GetFixtureA()->GetBody()->GetLinearVelocityFromWorldPoint(point);
+
+		c_ptr->impact_velocity = b2_to_gd(relV);
+	}
+}
+
+void Box2DWorld::PostSolve(b2Contact *contact, const b2ContactImpulse *impulse) {
+	const Box2DFixture *fnode_a = contact->GetFixtureA()->GetUserData().owner;
+	const Box2DFixture *fnode_b = contact->GetFixtureB()->GetUserData().owner;
+
+	const bool monitoringA = fnode_a->body_node->is_contact_monitor_enabled();
+	const bool monitoringB = fnode_b->body_node->is_contact_monitor_enabled();
+	if (monitoringA || monitoringB) {
+		b2WorldManifold worldManifold;
+		contact->GetWorldManifold(&worldManifold);
+
+		// TODO report bug to Box2D: polygon/edge collision creates manifold with pt count = 2 but impulse with count 1
+		//    * needs testing to confirm
+		// actually this is probably because the second point is in the removed state
+		//if (contact->GetManifold()->pointCount != impulse->count) {
+		//	WARN_PRINT(("Point counts not equal! manifold: " + std::to_string(contact->GetManifold()->pointCount) + ", impulse: " + std::to_string(impulse->count)).c_str());
+		//}
+
+		Box2DContact *c_ptr = contact_buffer.getptr(reinterpret_cast<int64_t>(contact));
+
+		Vector2 manifold_tan = c_ptr->normal.rotated(Math_PI * 0.5);
+		// TODO test: should impulse be accumulated (relevant to TOI solve), or does Box2D accumulate them itself?
+		int pointCount = impulse->count;
+		for (int i = 0; i < pointCount; ++i) {
+			c_ptr->normal_impulse += impulse->normalImpulses[i];
+			c_ptr->tangent_impulse += manifold_tan * impulse->tangentImpulses[i];
+		}
+
+		if (monitoringA) {
+			//fnode_a->body_node->contact_monitor.locked = true; TODO
+			auto contacts = &fnode_a->body_node->contact_monitor->contacts;
+			int idx = contacts->find(*c_ptr);
+			(*contacts)[idx] = (*c_ptr);
+			//fnode_a->body_node->contact_monitor.locked = false;
+		}
+		if (monitoringB) {
+			// Invert contact so A is always owned by the monitor
+			Box2DContact cB = c_ptr->flipped_a_b();
+
+			//fnode_b->body_node->contact_monitor.locked = true; TODO
+			auto contacts = &fnode_b->body_node->contact_monitor->contacts;
+			int idx = contacts->find(cB);
+			(*contacts)[idx] = (cB);
+			//fnode_b->body_node->contact_monitor.locked = false;
+		}
+	}
+}
+
 void Box2DWorld::create_b2World() {
 	if (!world) {
 		world = memnew(b2World(gd_to_b2(gravity)));
@@ -73,6 +234,7 @@ void Box2DWorld::create_b2World() {
 
 		world->SetDestructionListener(this);
 		world->SetContactFilter(this);
+		world->SetContactListener(this);
 
 		if (!Engine::get_singleton()->is_editor_hint()) {
 			set_physics_process_internal(true);
@@ -154,7 +316,15 @@ void Box2DWorld::step(real_t p_step) {
 	//		+ std::to_string(world->GetGravity().x) + ", "
 	//		+ std::to_string(world->GetGravity().y) + ")")
 	//	.c_str());
+
+	// Reset contact "solves" counter to 0
+	const int64_t *k = NULL;
+	while ((k = contact_buffer.next(k))) {
+		contact_buffer.getptr(*k)->reset_accum();
+	}
+
 	world->Step(p_step, 8, 8);
+	flag_rescan_contacts_monitored = false;
 }
 
 void Box2DWorld::set_gravity(const Vector2 &p_gravity) {

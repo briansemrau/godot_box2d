@@ -1,8 +1,9 @@
 #include "box2d_physics_body.h"
 
+#include <core/engine.h>
+
 #include "box2d_fixtures.h"
 #include "box2d_joints.h"
-#include "box2d_world.h"
 
 /**
 * @author Brian Semrau
@@ -85,6 +86,19 @@ void Box2DPhysicsBody::update_filterdata() {
 	}
 }
 
+void Box2DPhysicsBody::state_changed() {
+	set_block_transform_notify(true);
+	set_transform(b2_to_gd(body->GetTransform()));
+	//if (get_script_instance())
+	//	get_script_instance()->call("_integrate_forces");
+	set_block_transform_notify(false);
+
+	// TODO something? check rigidbody2d impl
+	//if (contact_monitoring) {
+	//	world_node->world.contac
+	//}
+}
+
 void Box2DPhysicsBody::_notification(int p_what) {
 	// TODO finalize implementation to imitate behavior from RigidBody2D and Kinematic (static too?)
 	switch (p_what) {
@@ -134,6 +148,10 @@ void Box2DPhysicsBody::_notification(int p_what) {
 					}
 				}
 			}
+
+			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
+				set_process_internal(true);
+			}
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
@@ -143,6 +161,8 @@ void Box2DPhysicsBody::_notification(int p_what) {
 			// TODO What do we do if it exits the tree, the ref is kept (in a script), and it's never destroyed?
 			//      Exiting w/o reentering should destroy body.
 			//      This applies to Box2DFixture and Box2DJoint as well.
+
+			set_process_internal(false);
 		} break;
 
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
@@ -166,14 +186,43 @@ void Box2DPhysicsBody::_notification(int p_what) {
 		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
 			// TODO figure out if this can instead be a callback from Box2D.
 			//		I don't think it can.
-			if (body && body->IsAwake()) {
-				set_block_transform_notify(true);
-				set_transform(b2_to_gd(body->GetTransform()));
-				set_block_transform_notify(false);
+			const bool awake = body->IsAwake();
+			if (awake != prev_sleeping_state) {
+				emit_signal("sleeping_state_changed");
+				prev_sleeping_state = awake;
+			}
 
-				// handle contact monitoring or something? (see RigidBody2D::_direct_state_changed)
+			if (body && awake) {
+				state_changed();
 			}
 		} break;
+
+		case NOTIFICATION_INTERNAL_PROCESS: {
+			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
+				update();
+			}
+		} break;
+
+		case NOTIFICATION_DRAW: {
+			if (!Engine::get_singleton()->is_editor_hint() && !get_tree()->is_debugging_collisions_hint()) {
+				break;
+			}
+
+			if (body) {
+				b2ContactEdge *ce = body->GetContactList();
+				while (ce) {
+					int count = ce->contact->GetManifold()->pointCount;
+
+					b2WorldManifold worldManifold;
+					ce->contact->GetWorldManifold(&worldManifold);
+					for (int i = 0; i < count; i++) {
+						draw_circle(get_global_transform().xform_inv(b2_to_gd(worldManifold.points[i])), 1.0f, Color(1.0f, 1.0f, 0.0f));
+					}
+
+					ce = ce->next;
+				}
+			}
+		}
 	}
 }
 
@@ -225,6 +274,22 @@ void Box2DPhysicsBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_collision_exception_with", "body"), &Box2DPhysicsBody::add_collision_exception_with);
 	ClassDB::bind_method(D_METHOD("remove_collision_exception_with", "body"), &Box2DPhysicsBody::remove_collision_exception_with);
 
+	ClassDB::bind_method(D_METHOD("set_contact_monitor", "enabled"), &Box2DPhysicsBody::set_contact_monitor);
+	ClassDB::bind_method(D_METHOD("is_contact_monitor_enabled"), &Box2DPhysicsBody::is_contact_monitor_enabled);
+	ClassDB::bind_method(D_METHOD("set_max_contacts_reported", "amount"), &Box2DPhysicsBody::set_max_contacts_reported);
+	ClassDB::bind_method(D_METHOD("get_max_contacts_reported"), &Box2DPhysicsBody::get_max_contacts_reported);
+
+	ClassDB::bind_method(D_METHOD("get_colliding_bodies"), &Box2DPhysicsBody::get_colliding_bodies);
+
+	ClassDB::bind_method(D_METHOD("get_contact_count"), &Box2DPhysicsBody::get_contact_count);
+	ClassDB::bind_method(D_METHOD("get_contact_fixture_a", "idx"), &Box2DPhysicsBody::get_contact_fixture_a);
+	ClassDB::bind_method(D_METHOD("get_contact_fixture_b", "idx"), &Box2DPhysicsBody::get_contact_fixture_b);
+	ClassDB::bind_method(D_METHOD("get_contact_world_pos", "idx"), &Box2DPhysicsBody::get_contact_world_pos);
+	ClassDB::bind_method(D_METHOD("get_contact_impact_velocity", "idx"), &Box2DPhysicsBody::get_contact_impact_velocity);
+	ClassDB::bind_method(D_METHOD("get_contact_normal", "idx"), &Box2DPhysicsBody::get_contact_normal);
+	ClassDB::bind_method(D_METHOD("get_contact_normal_impulse", "idx"), &Box2DPhysicsBody::get_contact_normal_impulse);
+	ClassDB::bind_method(D_METHOD("get_contact_tangent_impulse", "idx"), &Box2DPhysicsBody::get_contact_tangent_impulse);
+
 	ClassDB::bind_method(D_METHOD("apply_force", "force", "point"), &Box2DPhysicsBody::apply_force, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("apply_central_force", "force"), &Box2DPhysicsBody::apply_central_force, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("apply_torque", "torque"), &Box2DPhysicsBody::apply_torque, DEFVAL(true));
@@ -235,10 +300,12 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "gravity_scale", PROPERTY_HINT_RANGE, "-128,128,0.01"), "set_gravity_scale", "get_gravity_scale");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM, "Static,Kinematic,Rigid"), "set_type", "get_type");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bullet"), "set_bullet", "is_bullet");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "awake"), "set_awake", "is_awake");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "can_sleep"), "set_can_sleep", "get_can_sleep");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "enabled"), "set_enabled", "is_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "fixed_rotation"), "set_fixed_rotation", "is_fixed_rotation");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "contacts_reported", PROPERTY_HINT_RANGE, "0,64,1,or_greater"), "set_max_contacts_reported", "get_max_contacts_reported");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "contact_monitor"), "set_contact_monitor", "is_contact_monitor_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "awake"), "set_awake", "is_awake"); // TODO rename to sleeping, or keep and add sleeping property
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "can_sleep"), "set_can_sleep", "get_can_sleep");
 	ADD_GROUP("Linear", "linear_");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "linear_velocity"), "set_linear_velocity", "get_linear_velocity");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "linear_damping", PROPERTY_HINT_RANGE, "-1,1,0.001"), "set_linear_damping", "get_linear_damping");
@@ -255,6 +322,13 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_layer", "get_collision_layer");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_mask", "get_collision_mask");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "group_index"), "set_group_index", "get_group_index");
+
+	// TODO
+	//ADD_SIGNAL(MethodInfo("body_shape_entered", PropertyInfo(Variant::INT, "body_id"), PropertyInfo(Variant::OBJECT, "body", PROPERTY_HINT_RESOURCE_TYPE, "Node"), PropertyInfo(Variant::INT, "body_shape"), PropertyInfo(Variant::INT, "local_shape")));
+	//ADD_SIGNAL(MethodInfo("body_shape_exited", PropertyInfo(Variant::INT, "body_id"), PropertyInfo(Variant::OBJECT, "body", PROPERTY_HINT_RESOURCE_TYPE, "Node"), PropertyInfo(Variant::INT, "body_shape"), PropertyInfo(Variant::INT, "local_shape")));
+	//ADD_SIGNAL(MethodInfo("body_entered", PropertyInfo(Variant::OBJECT, "body", PROPERTY_HINT_RESOURCE_TYPE, "Node")));
+	//ADD_SIGNAL(MethodInfo("body_exited", PropertyInfo(Variant::OBJECT, "body", PROPERTY_HINT_RESOURCE_TYPE, "Node")));
+	ADD_SIGNAL(MethodInfo("sleeping_state_changed"));
 
 	BIND_ENUM_CONSTANT(MODE_RIGID);
 	BIND_ENUM_CONSTANT(MODE_STATIC);
@@ -453,6 +527,7 @@ void Box2DPhysicsBody::set_awake(bool p_awake) {
 	if (body)
 		body->SetAwake(p_awake);
 	bodyDef.awake = p_awake;
+	prev_sleeping_state = p_awake;
 }
 
 bool Box2DPhysicsBody::is_awake() const {
@@ -557,6 +632,92 @@ void Box2DPhysicsBody::remove_collision_exception_with(Node *p_node) {
 	body->filtering_me.erase(this);
 }
 
+void Box2DPhysicsBody::set_contact_monitor(bool p_enabled) {
+	if (p_enabled == is_contact_monitor_enabled()) {
+		return;
+	}
+
+	if (!p_enabled) {
+		memdelete(contact_monitor);
+		contact_monitor = NULL;
+	} else {
+		contact_monitor = memnew(ContactMonitor);
+		//contact_monitor->locked = false;
+
+		if (body) {
+			world_node->flag_rescan_contacts_monitored = true;
+		}
+	}
+}
+
+bool Box2DPhysicsBody::is_contact_monitor_enabled() const {
+	return contact_monitor != NULL;
+}
+
+void Box2DPhysicsBody::set_max_contacts_reported(int p_amount) {
+	max_contacts_reported = p_amount;
+}
+
+int Box2DPhysicsBody::get_max_contacts_reported() const {
+	return max_contacts_reported;
+}
+
+Array Box2DPhysicsBody::get_colliding_bodies() const {
+	ERR_FAIL_COND_V(!contact_monitor, Array());
+	Array ret;
+
+	// TODO
+	//ret.resize(contact_monitor->contacts.size()); no! wrong! body count is way lower
+
+	return ret;
+}
+
+int Box2DPhysicsBody::get_contact_count() const {
+	ERR_FAIL_COND_V_MSG(!contact_monitor, int(), "Contact monitoring is disabled.");
+	// TODO locking
+	return contact_monitor->contacts.size();
+}
+
+Box2DFixture *Box2DPhysicsBody::get_contact_fixture_a(int p_idx) const {
+	ERR_FAIL_COND_V_MSG(!contact_monitor, NULL, "Contact monitoring is disabled.");
+	return contact_monitor->contacts[p_idx].fixture_a;
+}
+
+Box2DFixture *Box2DPhysicsBody::get_contact_fixture_b(int p_idx) const {
+	ERR_FAIL_COND_V_MSG(!contact_monitor, NULL, "Contact monitoring is disabled.");
+	return contact_monitor->contacts[p_idx].fixture_b;
+}
+
+Vector2 Box2DPhysicsBody::get_contact_world_pos(int p_idx) const {
+	ERR_FAIL_COND_V_MSG(!contact_monitor, Vector2(), "Contact monitoring is disabled.");
+	return contact_monitor->contacts[p_idx].world_pos;
+}
+
+Vector2 Box2DPhysicsBody::get_contact_impact_velocity(int p_idx) const {
+	ERR_FAIL_COND_V_MSG(!contact_monitor, Vector2(), "Contact monitoring is disabled.");
+	return contact_monitor->contacts[p_idx].impact_velocity;
+}
+
+Vector2 Box2DPhysicsBody::get_contact_normal(int p_idx) const {
+	ERR_FAIL_COND_V_MSG(!contact_monitor, Vector2(), "Contact monitoring is disabled.");
+	return contact_monitor->contacts[p_idx].normal;
+}
+
+float Box2DPhysicsBody::get_contact_normal_impulse(int p_idx) const {
+	ERR_FAIL_COND_V_MSG(!contact_monitor, float(), "Contact monitoring is disabled.");
+	return contact_monitor->contacts[p_idx].normal_impulse;
+}
+
+Vector2 Box2DPhysicsBody::get_contact_tangent_impulse(int p_idx) const {
+	ERR_FAIL_COND_V_MSG(!contact_monitor, Vector2(), "Contact monitoring is disabled.");
+	return contact_monitor->contacts[p_idx].tangent_impulse;
+}
+
+//Vector2 Box2DPhysicsBody::get_contact_(int p_idx) const {
+//	ERR_FAIL_COND_V_MSG(!contact_monitor, Vector2(), "Contact monitoring is disabled.");
+//	return contact_monitor->contacts[p_idx].;
+//}
+
 void Box2DPhysicsBody::apply_force(const Vector2 &force, const Vector2 &point, bool wake) {
 	ERR_FAIL_COND_MSG(!body, "b2Body is null.");
 	body->ApplyForce(gd_to_b2(force), gd_to_b2(point), wake);
@@ -591,8 +752,11 @@ Box2DPhysicsBody::Box2DPhysicsBody() :
 		use_custom_massdata(false),
 		linear_damping(0.0f),
 		angular_damping(0.0f),
+		contact_monitor(NULL),
+		max_contacts_reported(0),
 		body(NULL),
-		world_node(NULL) {
+		world_node(NULL),
+		prev_sleeping_state(bodyDef.awake) {
 
 	massDataDef.mass = 1.0f;
 	massDataDef.center = b2Vec2_zero;

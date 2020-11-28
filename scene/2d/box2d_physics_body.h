@@ -46,13 +46,21 @@ private:
 	VSet<Box2DPhysicsBody *> filtering_me;
 	// TODO i don't care enough right now to let bodies exclude specific fixtures
 
+	struct ContactMonitor {
+		// bool locked; // TODO when physics moved to separate thread
+		VSet<Box2DContact> contacts;
+	};
+
+	ContactMonitor *contact_monitor;
+	int max_contacts_reported;
+
 	b2Body *body;
 
 	Box2DWorld *world_node;
-
 	Set<Box2DJoint *> joints;
 
 	Transform2D last_valid_xform;
+	bool prev_sleeping_state;
 
 	void on_parent_created(Node *);
 
@@ -61,6 +69,8 @@ private:
 
 	void update_mass(bool p_calc_reset = true);
 	void update_filterdata();
+
+	void state_changed();
 
 protected:
 	void _notification(int p_what);
@@ -131,6 +141,28 @@ public:
 	void add_collision_exception_with(Node *p_node);
 	void remove_collision_exception_with(Node *p_node);
 
+	void set_contact_monitor(bool p_enabled);
+	bool is_contact_monitor_enabled() const;
+
+	void set_max_contacts_reported(int p_amount);
+	int get_max_contacts_reported() const;
+
+	Array get_colliding_bodies() const; // Function exists for Godot feature congruency
+
+	// TODO for documentation: all contact info is in world space
+	int get_contact_count() const;
+	// get contact ID (for lifecycle tracking purposes)
+	Box2DFixture *get_contact_fixture_a(int p_idx) const;
+	Box2DFixture *get_contact_fixture_b(int p_idx) const;
+	Vector2 get_contact_world_pos(int p_idx) const;
+	//Vector2 get_contact_local_pos(int p_idx) const;
+	Vector2 get_contact_impact_velocity(int p_idx) const;
+	Vector2 get_contact_normal(int p_idx) const;
+	float get_contact_normal_impulse(int p_idx) const;
+	Vector2 get_contact_tangent_impulse(int p_idx) const;
+	//Vector2 get_contact_total_impulse(int p_idx) const;
+	//bool get_contact_is_new(int p_idx) const;
+	
 	void apply_force(const Vector2 &p_force, const Vector2 &p_point, bool p_wake = true);
 	void apply_central_force(const Vector2 &p_force, bool p_wake = true);
 	void apply_torque(real_t p_torque, bool p_wake = true);
