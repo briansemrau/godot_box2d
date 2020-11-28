@@ -49,7 +49,7 @@ void Box2DJoint::update_joint_bodies(bool p_recalc_if_unchanged) {
 	b2Body *joint_body_b = joint ? joint->GetBodyB() : NULL;
 	const bool bodies_unchanged = (body_a_body == joint_body_a) && (body_b_body == joint_body_b);
 
-	const bool recalc = joint_invalid || (p_recalc_if_unchanged && bodies_unchanged);
+	const bool recalc = joint_invalid || (!bodies_unchanged) || (bodies_unchanged && p_recalc_if_unchanged);
 
 	if (recalc) {
 		// Clear preexisting state
@@ -165,6 +165,8 @@ void Box2DJoint::on_node_predelete(Box2DPhysicsBody *node) {
 	} else {
 		ERR_FAIL_MSG("A joint's callback was triggered from a node it does not recognize.");
 	}
+	// stop drawing every frame
+	set_process_internal(false);
 }
 
 void Box2DJoint::_node_a_tree_entered() {
@@ -216,7 +218,9 @@ void Box2DJoint::_notification(int p_what) {
 			}
 
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
+				// start drawing every frame for debug draw
 				set_process_internal(true);
+				set_notify_transform(true);
 			}
 		} break;
 
@@ -237,12 +241,22 @@ void Box2DJoint::_notification(int p_what) {
 
 			destroy_b2Joint();
 			set_process_internal(false);
+			set_notify_transform(false);
 		} break;
 
 		case NOTIFICATION_POST_ENTER_TREE: {
 			// After all bodies created in ENTER_TREE, create joint if valid.
 			// If just exiting/entering tree, joint isn't at risk for reinitialization.
 			update_joint_bodies(true);
+		} break;
+
+		case NOTIFICATION_TRANSFORM_CHANGED: {
+			// Changing transform only does anything if reinitialize_joint() is called
+
+			// Update in editor to represent what initialized state will look like
+			if (Engine::get_singleton()->is_editor_hint()) {
+				update_joint_bodies(true);
+			}
 		} break;
 
 		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
@@ -274,7 +288,7 @@ void Box2DJoint::_notification(int p_what) {
 			Color debug_col = Color(0.5f, 0.8f, 0.8f);
 			if (broken) {
 				debug_col = Color(0.5f, 0.25f, 0.0f);
-			} else { //if (breaking_enabled && joint) {
+			} else if (joint) {
 				// TODO redo this maybe, meh
 				if (max_force > 0) {
 					real_t stress = get_reaction_force().length() / max_force;
@@ -294,8 +308,12 @@ void Box2DJoint::_notification(int p_what) {
 					// color UNCHANGED
 				}
 			}
-
+			if (!jointDef->bodyA || !jointDef->bodyB) {
+				// joint invalid
+				debug_col = Color(1.0f, 0.0f, 0.0f);
+			}
 			debug_draw(get_canvas_item(), debug_col);
+
 		} break;
 	}
 }
@@ -541,38 +559,28 @@ void Box2DRevoluteJoint::init_b2JointDef(const b2Vec2 &p_joint_pos) {
 
 void Box2DRevoluteJoint::debug_draw(RID p_to_rid, Color p_color) {
 	b2RevoluteJoint *j = static_cast<b2RevoluteJoint *>(get_b2Joint());
-	b2Vec2 anchorA;
-	b2Vec2 anchorB;
-	if (j) {
-		anchorA = j->GetAnchorA();
-		anchorB = j->GetAnchorB();
-		anchorA -= get_b2_pos();
-		anchorB -= get_b2_pos();
-	} else {
-		if (jointDef.bodyA) {
-			anchorA = jointDef.bodyA->GetWorldPoint(jointDef.localAnchorA);
-			anchorA -= get_b2_pos();
-		}
-		if (jointDef.bodyB) {
-			anchorB = jointDef.bodyB->GetWorldPoint(jointDef.localAnchorB);
-			anchorB -= get_b2_pos();
-		}
-	}
-	b2Vec2 posA;
-	b2Vec2 posB;
+	b2Vec2 anchorA = gd_to_b2(get_global_position());
+	b2Vec2 anchorB = anchorA;
 	if (jointDef.bodyA) {
-		posA = jointDef.bodyA->GetTransform().p;
-		posA -= get_b2_pos();
+		anchorA = jointDef.bodyA->GetWorldPoint(jointDef.localAnchorA);
 	}
 	if (jointDef.bodyB) {
-		posB = jointDef.bodyB->GetTransform().p;
-		posB -= get_b2_pos();
+		anchorB = jointDef.bodyB->GetWorldPoint(jointDef.localAnchorB);
 	}
 
-	Point2 p1 = b2_to_gd(anchorA);
-	Point2 p2 = b2_to_gd(anchorB);
-	Point2 x1 = b2_to_gd(posA);
-	Point2 x2 = b2_to_gd(posB);
+	b2Vec2 posA = anchorA;
+	b2Vec2 posB = anchorB;
+	if (jointDef.bodyA) {
+		posA = jointDef.bodyA->GetWorldCenter();
+	}
+	if (jointDef.bodyB) {
+		posB = jointDef.bodyB->GetWorldCenter();
+	}
+
+	Point2 p1 = to_local(b2_to_gd(anchorA));
+	Point2 p2 = to_local(b2_to_gd(anchorB));
+	Point2 x1 = to_local(b2_to_gd(posA));
+	Point2 x2 = to_local(b2_to_gd(posB));
 
 	draw_arc(p1, 5, 0, Math_PI * 2.0f, 12, p_color, 2.0f);
 	draw_circle(p2, 2, p_color);
@@ -697,26 +705,22 @@ void Box2DWeldJoint::init_b2JointDef(const b2Vec2 &p_joint_pos) {
 
 void Box2DWeldJoint::debug_draw(RID p_to_rid, Color p_color) {
 	//b2WeldJoint *j = static_cast<b2WeldJoint *>(get_b2Joint());
-	b2Vec2 anchorA;
-	b2Vec2 anchorB;
+	b2Vec2 anchorA = gd_to_b2(get_global_position());
+	b2Vec2 anchorB = anchorA;
 	if (jointDef.bodyA) {
 		anchorA = jointDef.bodyA->GetWorldPoint(jointDef.localAnchorA);
-		//anchorA -= get_b2_pos();
 	}
 	if (jointDef.bodyB) {
 		anchorB = jointDef.bodyB->GetWorldPoint(jointDef.localAnchorB);
-		//anchorB -= get_b2_pos();
 	}
 
-	b2Vec2 posA;
-	b2Vec2 posB;
+	b2Vec2 posA = anchorA;
+	b2Vec2 posB = anchorB;
 	if (jointDef.bodyA) {
 		posA = jointDef.bodyA->GetWorldCenter();
-		//posA -= get_b2_pos();
 	}
 	if (jointDef.bodyB) {
 		posB = jointDef.bodyB->GetWorldCenter();
-		//posB -= get_b2_pos();
 	}
 
 	Point2 p1 = to_local(b2_to_gd(anchorA));
