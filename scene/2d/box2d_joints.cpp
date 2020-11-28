@@ -301,15 +301,12 @@ void Box2DJoint::_notification(int p_what) {
 }
 
 void Box2DJoint::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_node_a", "node_a", "force_reinit"), &Box2DJoint::set_nodepath_a), DEFVAL(false);
+	ClassDB::bind_method(D_METHOD("set_node_a", "node_a"), &Box2DJoint::set_nodepath_a);
 	ClassDB::bind_method(D_METHOD("get_node_a"), &Box2DJoint::get_nodepath_a);
-	ClassDB::bind_method(D_METHOD("set_node_b", "node_b", "force_reinit"), &Box2DJoint::set_nodepath_b), DEFVAL(false);
+	ClassDB::bind_method(D_METHOD("set_node_b", "node_b"), &Box2DJoint::set_nodepath_b);
 	ClassDB::bind_method(D_METHOD("get_node_b"), &Box2DJoint::get_nodepath_b);
 
-	// TODO temporary until resolved: https://github.com/godotengine/godot/issues/43821
-	// remember to update ADD_PROPERTY set functions when this is removed
-	ClassDB::bind_method(D_METHOD("_set_node_a", "node_a"), &Box2DJoint::_set_nodepath_a);
-	ClassDB::bind_method(D_METHOD("_set_node_b", "node_b"), &Box2DJoint::_set_nodepath_b);
+	ClassDB::bind_method(D_METHOD("reconstruct_joint"), &Box2DJoint::reinitialize_joint);
 
 	ClassDB::bind_method(D_METHOD("set_collide_connected", "collide_connected"), &Box2DJoint::set_collide_connected);
 	ClassDB::bind_method(D_METHOD("get_collide_connected"), &Box2DJoint::get_collide_connected);
@@ -330,8 +327,8 @@ void Box2DJoint::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_node_a_tree_entered"), &Box2DJoint::_node_a_tree_entered);
 	ClassDB::bind_method(D_METHOD("_node_b_tree_entered"), &Box2DJoint::_node_b_tree_entered);
 
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_a"), "_set_node_a", "get_node_a");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_b"), "_set_node_b", "get_node_b");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_a"), "set_node_a", "get_node_a");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_b"), "set_node_b", "get_node_b");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collide_connected"), "set_collide_connected", "get_collide_connected");
 	ADD_GROUP("Breaking", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "broken"), "set_broken", "is_broken");
@@ -370,7 +367,7 @@ String Box2DJoint::get_configuration_warning() const {
 	return warning;
 }
 
-void Box2DJoint::set_nodepath_a(const NodePath &p_node_a, bool p_force_reinit) {
+void Box2DJoint::set_nodepath_a(const NodePath &p_node_a) {
 	if (a == p_node_a)
 		return;
 	a = p_node_a;
@@ -378,7 +375,7 @@ void Box2DJoint::set_nodepath_a(const NodePath &p_node_a, bool p_force_reinit) {
 		update_configuration_warning();
 	}
 	if (is_inside_tree()) {
-		update_joint_bodies(p_force_reinit);
+		update_joint_bodies(false);
 	}
 }
 
@@ -386,7 +383,7 @@ NodePath Box2DJoint::get_nodepath_a() const {
 	return a;
 }
 
-void Box2DJoint::set_nodepath_b(const NodePath &p_node_b, bool p_force_reinit) {
+void Box2DJoint::set_nodepath_b(const NodePath &p_node_b) {
 	if (b == p_node_b)
 		return;
 	b = p_node_b;
@@ -394,12 +391,17 @@ void Box2DJoint::set_nodepath_b(const NodePath &p_node_b, bool p_force_reinit) {
 		update_configuration_warning();
 	}
 	if (is_inside_tree()) {
-		update_joint_bodies(p_force_reinit);
+		update_joint_bodies(false);
 	}
 }
 
 NodePath Box2DJoint::get_nodepath_b() const {
 	return b;
+}
+
+void Box2DJoint::reinitialize_joint() {
+	ERR_FAIL_COND_MSG(!is_inside_tree(), "Can't reinitialize a joint outside of the SceneTree. It requires relative locations of bodies to initialize.");
+	update_joint_bodies(true);
 }
 
 void Box2DJoint::set_collide_connected(bool p_collide) {

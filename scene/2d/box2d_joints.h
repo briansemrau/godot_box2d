@@ -80,19 +80,15 @@ protected:
 public:
 	virtual String get_configuration_warning() const override;
 
-	// TODO enabled property
-	// Breaking should set enabled -> false
-
-	// TODO IMPORTANT for (future) documentation:
-	//      `p_force_reinit = true` allows you to reconstruct the joint even if the assigned
-	//      node is unchanged. This lets you re-place the joint on the same bodies.
-	void set_nodepath_a(const NodePath &p_node_a, bool p_force_reinit = false);
-	void _set_nodepath_a(const NodePath &p_node_a) { set_nodepath_a(p_node_a, false); } // TODO temporary until resolved: https://github.com/godotengine/godot/issues/43821
+	void set_nodepath_a(const NodePath &p_node_a);
 	NodePath get_nodepath_a() const;
 
-	void set_nodepath_b(const NodePath &p_node_b, bool p_force_reinit = false);
-	void _set_nodepath_b(const NodePath &p_node_b) { set_nodepath_b(p_node_b, false); } // TODO temporary until resolved: https://github.com/godotengine/godot/issues/43821
+	void set_nodepath_b(const NodePath &p_node_b);
 	NodePath get_nodepath_b() const;
+
+	// TODO IMPORTANT for (future) documentation:
+	//      reconstruct_joint lets you re-place the joint on the same bodies with the joint's current pos and current body relative positions
+	void reinitialize_joint();
 
 	void set_collide_connected(bool p_collide);
 	bool get_collide_connected() const;
