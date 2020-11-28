@@ -97,7 +97,9 @@ void Box2DJoint::update_joint_bodies(bool p_recalc_if_unchanged) {
 		if (jointDef->bodyA && jointDef->bodyB) {
 			// Allow subtypes to do final initialization
 			b2Vec2 joint_pos = get_b2_pos();
-			init_b2JointDef(joint_pos);
+			b2Vec2 anc_a = gd_to_b2(get_global_transform().xform(anchor_a));
+			b2Vec2 anc_b = gd_to_b2(get_global_transform().xform(anchor_b));
+			init_b2JointDef(joint_pos, anc_a, anc_b);
 
 			if (!broken)
 				create_b2Joint();
@@ -254,8 +256,9 @@ void Box2DJoint::_notification(int p_what) {
 			// Changing transform only does anything if reinitialize_joint() is called
 
 			// Update in editor to represent what initialized state will look like
-			if (Engine::get_singleton()->is_editor_hint()) {
-				update_joint_bodies(true);
+			if (Engine::get_singleton()->is_editor_hint()) {// && editor_update_anchors) {
+				reset_joint_anchors();
+				//update_joint_bodies(true);
 			}
 		} break;
 
@@ -286,7 +289,9 @@ void Box2DJoint::_notification(int p_what) {
 			}
 
 			Color debug_col = Color(0.5f, 0.8f, 0.8f);
-			if (broken) {
+			if (!is_enabled()) {
+				debug_col = Color(0.5f, 0.5f, 0.3f);
+			} else if (broken) {
 				debug_col = Color(0.5f, 0.25f, 0.0f);
 			} else if (joint) {
 				// TODO redo this maybe, meh
@@ -324,7 +329,17 @@ void Box2DJoint::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_node_b", "node_b"), &Box2DJoint::set_nodepath_b);
 	ClassDB::bind_method(D_METHOD("get_node_b"), &Box2DJoint::get_nodepath_b);
 
-	ClassDB::bind_method(D_METHOD("reconstruct_joint"), &Box2DJoint::reinitialize_joint);
+	//ClassDB::bind_method(D_METHOD("set_editor_update_anchors", "editor_update_anchors"), &Box2DJoint::set_editor_update_anchors);
+	//ClassDB::bind_method(D_METHOD("get_editor_update_anchors"), &Box2DJoint::get_editor_update_anchors);
+	ClassDB::bind_method(D_METHOD("set_use_custom_anchor_a", "enable"), &Box2DJoint::set_use_custom_anchor_a);
+	ClassDB::bind_method(D_METHOD("get_use_custom_anchor_a"), &Box2DJoint::get_use_custom_anchor_a);
+	ClassDB::bind_method(D_METHOD("set_custom_anchor_a", "anchor_a"), &Box2DJoint::set_anchor_a);
+	ClassDB::bind_method(D_METHOD("get_custom_anchor_a"), &Box2DJoint::get_anchor_a);
+	ClassDB::bind_method(D_METHOD("get_use_custom_anchor_b"), &Box2DJoint::get_use_custom_anchor_b);
+	ClassDB::bind_method(D_METHOD("set_use_custom_anchor_b", "enable"), &Box2DJoint::set_use_custom_anchor_b);
+	ClassDB::bind_method(D_METHOD("set_custom_anchor_b", "anchor_b"), &Box2DJoint::set_anchor_b);
+	ClassDB::bind_method(D_METHOD("get_custom_anchor_b"), &Box2DJoint::get_anchor_b);
+	ClassDB::bind_method(D_METHOD("reset_joint_anchors"), &Box2DJoint::reset_joint_anchors);
 
 	ClassDB::bind_method(D_METHOD("set_collide_connected", "collide_connected"), &Box2DJoint::set_collide_connected);
 	ClassDB::bind_method(D_METHOD("get_collide_connected"), &Box2DJoint::get_collide_connected);
@@ -348,6 +363,12 @@ void Box2DJoint::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_a"), "set_node_a", "get_node_a");
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_b"), "set_node_b", "get_node_b");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collide_connected"), "set_collide_connected", "get_collide_connected");
+	ADD_GROUP("Custom Anchors", "");
+	//ADD_PROPERTY(PropertyInfo(Variant::BOOL, "editor_update_anchors"), "set_editor_update_anchors", "get_editor_update_anchors");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_custom_anchor_a"), "set_use_custom_anchor_a", "get_use_custom_anchor_a");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "custom_anchor_a"), "set_custom_anchor_a", "get_custom_anchor_a");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_custom_anchor_b"), "set_use_custom_anchor_b", "get_use_custom_anchor_b");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "custom_anchor_b"), "set_custom_anchor_b", "get_custom_anchor_b");
 	ADD_GROUP("Breaking", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "broken"), "set_broken", "is_broken");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "breaking_enabled"), "set_breaking_enabled", "is_breaking_enabled");
@@ -417,7 +438,55 @@ NodePath Box2DJoint::get_nodepath_b() const {
 	return b;
 }
 
-void Box2DJoint::reinitialize_joint() {
+//void Box2DJoint::set_editor_update_anchors(bool p_update) {
+//	editor_update_anchors = p_update;
+//}
+//
+//bool Box2DJoint::get_editor_update_anchors() const {
+//	return editor_update_anchors;
+//}
+
+void Box2DJoint::set_use_custom_anchor_a(bool p_enable) {
+	use_anchor_a = p_enable;
+	if (is_inside_tree())
+		reset_joint_anchors();
+}
+
+bool Box2DJoint::get_use_custom_anchor_a() const {
+	return use_anchor_a;
+}
+
+void Box2DJoint::set_anchor_a(const Vector2 &p_anchor) {
+	anchor_a = p_anchor;
+	if (is_inside_tree())
+		reset_joint_anchors();
+}
+
+Vector2 Box2DJoint::get_anchor_a() const {
+	return anchor_a;
+}
+
+void Box2DJoint::set_use_custom_anchor_b(bool p_enable) {
+	use_anchor_b = p_enable;
+	if (is_inside_tree())
+		reset_joint_anchors();
+}
+
+bool Box2DJoint::get_use_custom_anchor_b() const {
+	return use_anchor_b;
+}
+
+void Box2DJoint::set_anchor_b(const Vector2 &p_anchor) {
+	anchor_b = p_anchor;
+	if (is_inside_tree())
+		reset_joint_anchors();
+}
+
+Vector2 Box2DJoint::get_anchor_b() const {
+	return anchor_b;
+}
+
+void Box2DJoint::reset_joint_anchors() {
 	ERR_FAIL_COND_MSG(!is_inside_tree(), "Can't reinitialize a joint outside of the SceneTree. It requires relative locations of bodies to initialize.");
 	update_joint_bodies(true);
 }
@@ -504,6 +573,13 @@ real_t Box2DJoint::get_reaction_torque() const {
 	return joint->GetReactionTorque(1.0f / get_physics_process_delta_time());
 }
 
+bool Box2DJoint::is_enabled() const {
+	// This impl might not be what we want
+	if (joint)
+		return joint->IsEnabled();
+	return jointDef->bodyA && jointDef->bodyA->IsEnabled() && jointDef->bodyB && jointDef->bodyB->IsEnabled();
+}
+
 Box2DJoint::Box2DJoint() :
 		jointDef(NULL),
 		joint(NULL),
@@ -544,6 +620,7 @@ void Box2DRevoluteJoint::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_motor_speed"), &Box2DRevoluteJoint::get_motor_speed);
 	ClassDB::bind_method(D_METHOD("set_max_motor_torque", "max_motor_torque"), &Box2DRevoluteJoint::set_max_motor_torque);
 	ClassDB::bind_method(D_METHOD("get_max_motor_torque"), &Box2DRevoluteJoint::get_max_motor_torque);
+	ClassDB::bind_method(D_METHOD("get_motor_torque"), &Box2DRevoluteJoint::get_motor_torque);
 
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "limit_enabled"), "set_limit_enabled", "is_limit_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "upper_limit"), "set_upper_limit", "get_upper_limit");
@@ -553,8 +630,12 @@ void Box2DRevoluteJoint::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "max_motor_torque"), "set_max_motor_torque", "get_max_motor_torque");
 }
 
-void Box2DRevoluteJoint::init_b2JointDef(const b2Vec2 &p_joint_pos) {
+void Box2DRevoluteJoint::init_b2JointDef(const b2Vec2 &p_joint_pos, const b2Vec2 &p_world_anchor_a, const b2Vec2 &p_world_anchor_b) {
 	jointDef.Initialize(jointDef.bodyA, jointDef.bodyB, p_joint_pos);
+	if (get_use_custom_anchor_a())
+		jointDef.localAnchorA = jointDef.bodyA->GetLocalPoint(p_world_anchor_a);
+	if (get_use_custom_anchor_b())
+		jointDef.localAnchorB = jointDef.bodyB->GetLocalPoint(p_world_anchor_b);
 }
 
 void Box2DRevoluteJoint::debug_draw(RID p_to_rid, Color p_color) {
@@ -596,12 +677,17 @@ void Box2DRevoluteJoint::debug_draw(RID p_to_rid, Color p_color) {
 		float arclen = jointDef.motorSpeed;
 		draw_arc(p1, 7, a, a + arclen, MAX(static_cast<int>(5.0f * arclen), 2), c, 2.0f);
 		if (j) {
-			float torqueUsage = j->GetReactionTorque(1.0f / get_physics_process_delta_time()) / j->GetMaxMotorTorque();
+			float torqueUsage = get_motor_torque() / get_max_motor_torque();
 			arclen *= torqueUsage;
 			c = Color(1.0, 1.0, 0.0, 0.5);
 			draw_arc(p1, 9, a, a + arclen, MAX(static_cast<int>(5.0f * arclen), 2), c, 2.0f);
 		}
 	}
+
+	Color c(p_color);
+	c.set_hsv(c.get_h(), c.get_s() * 0.5f, c.get_v(), c.a * 0.5f);
+	draw_line(x1, p1, c, 1.0f);
+	draw_line(x2, p2, c, 1.0f);
 }
 
 real_t Box2DRevoluteJoint::get_reference_angle() const {
@@ -686,6 +772,218 @@ real_t Box2DRevoluteJoint::get_max_motor_torque() const {
 	return jointDef.maxMotorTorque;
 }
 
+real_t Box2DRevoluteJoint::get_motor_torque() const {
+	ERR_FAIL_COND_V_MSG(!get_b2Joint(), real_t(), "b2Joint is null.");
+	return static_cast<b2RevoluteJoint *>(get_b2Joint())->GetMotorTorque(1.0f / get_physics_process_delta_time());
+}
+
+void Box2DPrismaticJoint::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_reference_angle"), &Box2DPrismaticJoint::get_reference_angle);
+	ClassDB::bind_method(D_METHOD("get_local_axis"), &Box2DPrismaticJoint::get_local_axis);
+	ClassDB::bind_method(D_METHOD("get_joint_translation"), &Box2DPrismaticJoint::get_joint_translation);
+	ClassDB::bind_method(D_METHOD("get_joint_speed"), &Box2DPrismaticJoint::get_joint_speed);
+
+	ClassDB::bind_method(D_METHOD("set_limit_enabled", "limit_enabled"), &Box2DPrismaticJoint::set_limit_enabled);
+	ClassDB::bind_method(D_METHOD("is_limit_enabled"), &Box2DPrismaticJoint::is_limit_enabled);
+	ClassDB::bind_method(D_METHOD("set_upper_limit", "upper_limit"), &Box2DPrismaticJoint::set_upper_limit);
+	ClassDB::bind_method(D_METHOD("get_upper_limit"), &Box2DPrismaticJoint::get_upper_limit);
+	ClassDB::bind_method(D_METHOD("set_lower_limit", "lower_limit"), &Box2DPrismaticJoint::set_lower_limit);
+	ClassDB::bind_method(D_METHOD("get_lower_limit"), &Box2DPrismaticJoint::get_lower_limit);
+
+	ClassDB::bind_method(D_METHOD("set_limits", "lower", "upper"), &Box2DPrismaticJoint::set_limits);
+
+	ClassDB::bind_method(D_METHOD("set_motor_enabled", "motor_enabled"), &Box2DPrismaticJoint::set_motor_enabled);
+	ClassDB::bind_method(D_METHOD("is_motor_enabled"), &Box2DPrismaticJoint::is_motor_enabled);
+	ClassDB::bind_method(D_METHOD("set_motor_speed", "motor_speed"), &Box2DPrismaticJoint::set_motor_speed);
+	ClassDB::bind_method(D_METHOD("get_motor_speed"), &Box2DPrismaticJoint::get_motor_speed);
+	ClassDB::bind_method(D_METHOD("set_max_motor_force", "max_motor_force"), &Box2DPrismaticJoint::set_max_motor_force);
+	ClassDB::bind_method(D_METHOD("get_max_motor_force"), &Box2DPrismaticJoint::get_max_motor_force);
+	ClassDB::bind_method(D_METHOD("get_motor_force"), &Box2DPrismaticJoint::get_motor_force);
+
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "limit_enabled"), "set_limit_enabled", "is_limit_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "upper_limit"), "set_upper_limit", "get_upper_limit");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "lower_limit"), "set_lower_limit", "get_lower_limit");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "motor_enabled"), "set_motor_enabled", "is_motor_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "motor_speed"), "set_motor_speed", "get_motor_speed");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "max_motor_force"), "set_max_motor_force", "get_max_motor_force");
+}
+
+void Box2DPrismaticJoint::init_b2JointDef(const b2Vec2 &p_joint_pos, const b2Vec2 &p_world_anchor_a, const b2Vec2 &p_world_anchor_b) {
+	b2Vec2 worldAxis = jointDef.bodyB->GetWorldCenter();
+	worldAxis -= jointDef.bodyA->GetWorldCenter();
+
+	jointDef.Initialize(jointDef.bodyA, jointDef.bodyB, p_joint_pos, worldAxis);
+
+	if (get_use_custom_anchor_a())
+		jointDef.localAnchorA = jointDef.bodyA->GetLocalPoint(p_world_anchor_a);
+	if (get_use_custom_anchor_b())
+		jointDef.localAnchorB = jointDef.bodyB->GetLocalPoint(p_world_anchor_b);
+}
+
+void Box2DPrismaticJoint::debug_draw(RID p_to_rid, Color p_color) {
+	b2PrismaticJoint *j = static_cast<b2PrismaticJoint *>(get_b2Joint());
+	b2Vec2 anchorA = gd_to_b2(get_global_position());
+	b2Vec2 anchorB = anchorA;
+	if (jointDef.bodyA) {
+		anchorA = jointDef.bodyA->GetWorldPoint(jointDef.localAnchorA);
+	}
+	if (jointDef.bodyB) {
+		anchorB = jointDef.bodyB->GetWorldPoint(jointDef.localAnchorB);
+	}
+
+	b2Vec2 posA = anchorA;
+	b2Vec2 posB = anchorB;
+	if (jointDef.bodyA) {
+		posA = jointDef.bodyA->GetWorldCenter();
+	}
+	if (jointDef.bodyB) {
+		posB = jointDef.bodyB->GetWorldCenter();
+	}
+
+	Point2 p1 = to_local(b2_to_gd(anchorA));
+	Point2 p2 = to_local(b2_to_gd(anchorB));
+	Point2 x1 = to_local(b2_to_gd(posA));
+	Point2 x2 = to_local(b2_to_gd(posB));
+
+	draw_rect(Rect2(p1 - Vector2(5, 5), Vector2(10, 10)), p_color, false, 2.0f);
+	draw_rect(Rect2(p2 - Vector2(1, 1), Vector2(2, 2)), p_color);
+
+	if (jointDef.enableLimit) {
+		//draw_line(p1, p1 + Point2(8, 0).rotated(jointDef.referenceAngle), p_color);
+		//draw_line(p1, p1 + Point2(8, 0).rotated(jointDef.lowerAngle), p_color);
+		//draw_line(p1, p1 + Point2(8, 0).rotated(jointDef.upperAngle), p_color);
+		Vector2 start = p1 + get_local_axis() * get_lower_limit();
+		Vector2 end = p1 + get_local_axis() * get_upper_limit();
+		draw_line(start, end, p_color, 1.5f);
+		Vector2 tan = get_local_axis().rotated(Math_PI * 0.5f) * 5.0f;
+		draw_line(start + tan, start - tan, p_color, 1.0f);
+		draw_line(end + tan, end - tan, p_color, 1.0f);
+	} else {
+		draw_line(p1, p1 + get_local_axis() * 25.0, p_color);
+	}
+	if (jointDef.enableMotor) {
+		float a = jointDef.referenceAngle;
+		Color c = jointDef.motorSpeed > 0 ? Color(0.0, 1.0, 0.0, 0.5) : Color(1.0, 0.0, 0.0, 0.5);
+
+		//float arclen = jointDef.motorSpeed;
+		//draw_arc(p1, 7, a, a + arclen, MAX(static_cast<int>(5.0f * arclen), 2), c, 2.0f);
+		//if (j) {
+		//	float forceUsage = get_motor_force() / get_max_motor_force();
+		//	arclen *= forceUsage;
+		//	c = Color(1.0, 1.0, 0.0, 0.5);
+		//	draw_arc(p1, 9, a, a + arclen, MAX(static_cast<int>(5.0f * arclen), 2), c, 2.0f);
+		//}
+
+		Vector2 start_p = p1;
+		if (j)
+			p1 += get_local_axis() * get_joint_translation();
+		Vector2 tan = get_local_axis().rotated(Math_PI * 0.5f);
+
+		draw_line(start_p, start_p + get_local_axis() * get_joint_speed(), c, 1.5f);
+		if (j) {
+			float forceUsage = get_motor_force() / get_max_motor_force();
+			c = Color(1.0, 1.0, 0.0, 0.5);
+			draw_line(start_p + tan, start_p + tan + get_local_axis() * get_joint_speed(), c, 1.5f);
+		}
+	}
+
+	Color c(p_color);
+	c.set_hsv(c.get_h(), c.get_s() * 0.5f, c.get_v(), c.a * 0.5f);
+	draw_line(x1, p1, c, 1.0f);
+	draw_line(x2, p2, c, 1.0f);
+}
+
+real_t Box2DPrismaticJoint::get_reference_angle() const {
+	ERR_FAIL_COND_V_MSG(!get_b2Joint(), real_t(), "b2Joint is null.");
+	return static_cast<b2PrismaticJoint *>(get_b2Joint())->GetReferenceAngle();
+}
+
+Vector2 Box2DPrismaticJoint::get_local_axis() const {
+	return Vector2(jointDef.localAxisA.x, jointDef.localAxisA.y);
+}
+
+real_t Box2DPrismaticJoint::get_joint_translation() const {
+	ERR_FAIL_COND_V_MSG(!get_b2Joint(), real_t(), "b2Joint is null.");
+	return static_cast<b2PrismaticJoint *>(get_b2Joint())->GetJointTranslation();
+}
+
+real_t Box2DPrismaticJoint::get_joint_speed() const {
+	ERR_FAIL_COND_V_MSG(!get_b2Joint(), real_t(), "b2Joint is null.");
+	return static_cast<b2PrismaticJoint *>(get_b2Joint())->GetJointSpeed();
+}
+
+void Box2DPrismaticJoint::set_limit_enabled(bool p_enabled) {
+	if (get_b2Joint())
+		static_cast<b2PrismaticJoint *>(get_b2Joint())->EnableLimit(p_enabled);
+	jointDef.enableLimit = p_enabled;
+}
+
+bool Box2DPrismaticJoint::is_limit_enabled() const {
+	return jointDef.enableLimit;
+}
+
+void Box2DPrismaticJoint::set_upper_limit(real_t p_distance) {
+	if (get_b2Joint())
+		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetLimits(get_lower_limit(), p_distance);
+	jointDef.upperTranslation = p_distance;
+}
+
+real_t Box2DPrismaticJoint::get_upper_limit() const {
+	return jointDef.upperTranslation;
+}
+
+void Box2DPrismaticJoint::set_lower_limit(real_t p_distance) {
+	if (get_b2Joint())
+		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetLimits(p_distance, get_upper_limit());
+	jointDef.lowerTranslation = p_distance;
+}
+
+real_t Box2DPrismaticJoint::get_lower_limit() const {
+	return jointDef.lowerTranslation;
+}
+
+void Box2DPrismaticJoint::set_limits(real_t p_lower, real_t p_upper) {
+	if (get_b2Joint())
+		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetLimits(p_lower, p_upper);
+	jointDef.lowerTranslation = p_lower;
+	jointDef.upperTranslation = p_upper;
+}
+
+void Box2DPrismaticJoint::set_motor_enabled(bool p_enabled) {
+	if (get_b2Joint())
+		static_cast<b2PrismaticJoint *>(get_b2Joint())->EnableMotor(p_enabled);
+	jointDef.enableMotor = p_enabled;
+}
+
+bool Box2DPrismaticJoint::is_motor_enabled() const {
+	return jointDef.enableMotor;
+}
+
+void Box2DPrismaticJoint::set_motor_speed(real_t p_speed) {
+	if (get_b2Joint())
+		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetMotorSpeed(p_speed);
+	jointDef.motorSpeed = p_speed;
+}
+
+real_t Box2DPrismaticJoint::get_motor_speed() const {
+	return jointDef.motorSpeed;
+}
+
+void Box2DPrismaticJoint::set_max_motor_force(real_t p_force) {
+	if (get_b2Joint())
+		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetMaxMotorForce(p_force);
+	jointDef.maxMotorForce = p_force;
+}
+
+real_t Box2DPrismaticJoint::get_max_motor_force() const {
+	return jointDef.maxMotorForce;
+}
+
+real_t Box2DPrismaticJoint::get_motor_force() const {
+	ERR_FAIL_COND_V_MSG(!get_b2Joint(), real_t(), "b2Joint is null.");
+	return static_cast<b2PrismaticJoint *>(get_b2Joint())->GetMotorForce(1.0f / get_physics_process_delta_time());
+}
+
 void Box2DWeldJoint::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_stiffness", "stiffness"), &Box2DWeldJoint::set_stiffness);
 	ClassDB::bind_method(D_METHOD("get_stiffness"), &Box2DWeldJoint::get_stiffness);
@@ -699,8 +997,13 @@ void Box2DWeldJoint::_bind_methods() {
 	//ADD_PROPERTY(PropertyInfo(Variant::BOOL, ""), "set_", "get_");
 }
 
-void Box2DWeldJoint::init_b2JointDef(const b2Vec2 &p_joint_pos) {
+void Box2DWeldJoint::init_b2JointDef(const b2Vec2 &p_joint_pos, const b2Vec2 &p_world_anchor_a, const b2Vec2 &p_world_anchor_b) {
 	jointDef.Initialize(jointDef.bodyA, jointDef.bodyB, p_joint_pos);
+
+	if (get_use_custom_anchor_a())
+		jointDef.localAnchorA = jointDef.bodyA->GetLocalPoint(p_world_anchor_a);
+	if (get_use_custom_anchor_b())
+		jointDef.localAnchorB = jointDef.bodyB->GetLocalPoint(p_world_anchor_b);
 }
 
 void Box2DWeldJoint::debug_draw(RID p_to_rid, Color p_color) {
@@ -731,8 +1034,10 @@ void Box2DWeldJoint::debug_draw(RID p_to_rid, Color p_color) {
 	draw_line(p1 + Point2(-5, 0), p1 + Point2(+5, 0), p_color, 2.0f);
 	draw_line(p1 + Point2(0, -5), p1 + Point2(0, +5), p_color, 2.0f);
 
-	draw_line(x1, p1, p_color, 1.0f);
-	draw_line(x2, p2, p_color, 1.0f);
+	Color c(p_color);
+	c.set_hsv(c.get_h(), c.get_s() * 0.5f, c.get_v(), c.a * 0.5f);
+	draw_line(x1, p1, c, 1.0f);
+	draw_line(x2, p2, c, 1.0f);
 }
 
 void Box2DWeldJoint::set_stiffness(real_t p_hz) {

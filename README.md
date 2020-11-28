@@ -99,7 +99,7 @@ Box2D has...
 -  A _lot_ of new joints:
     - [Distance joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md85) (Equivalent to `DampedSpringJoint2D`) (⚠ unimplemented)
     - [Revolute joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md86) (`PinJoint2D`, but with limits and a motor)
-    - [Prismatic joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md87) (Similar to `GrooveJoint2D`, I think?) (⚠ unimplemented)
+    - [Prismatic joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md87) (Equivalent to `GrooveJoint2D`) (⚠ unimplemented)
     - [Pulley joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md88) (⚠ unimplemented)
     - [Gear joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md89) (⚠ unimplemented)
     - [Wheel joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md91) (⚠ unimplemented)

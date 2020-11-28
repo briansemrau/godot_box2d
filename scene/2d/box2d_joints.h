@@ -51,6 +51,12 @@ class Box2DJoint : public Node2D {
 	real_t max_force;
 	real_t max_torque;
 
+	bool use_anchor_a = false;
+	Vector2 anchor_a;
+	bool use_anchor_b = false;
+	Vector2 anchor_b;
+	//bool editor_update_anchors = true;
+
 	void on_b2Joint_destroyed();
 
 	void update_joint_bodies(bool p_recalc_if_unchanged = false);
@@ -73,7 +79,7 @@ protected:
 	void _notification(int p_what);
 	static void _bind_methods();
 
-	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) = 0;
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos, const b2Vec2 &p_world_anchor_a, const b2Vec2 &p_world_anchor_b) = 0;
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) = 0;
 
@@ -86,9 +92,25 @@ public:
 	void set_nodepath_b(const NodePath &p_node_b);
 	NodePath get_nodepath_b() const;
 
+	//void set_editor_update_anchors(bool p_update);
+	//bool get_editor_update_anchors() const;
+
+	// TODO documentation: Setting anchors is advanced behavior. These values are in world space.
+	void set_use_custom_anchor_a(bool p_enable);
+	bool get_use_custom_anchor_a() const;
+
+	void set_anchor_a(const Vector2 &p_anchor);
+	Vector2 get_anchor_a() const;
+
+	void set_use_custom_anchor_b(bool p_enable);
+	bool get_use_custom_anchor_b() const;
+
+	void set_anchor_b(const Vector2 &p_anchor);
+	Vector2 get_anchor_b() const;
+
 	// TODO IMPORTANT for (future) documentation:
-	//      reconstruct_joint lets you re-place the joint on the same bodies with the joint's current pos and current body relative positions
-	void reinitialize_joint();
+	//      this function lets you re-place the joint on the same bodies with the joint's current pos and current body relative positions
+	void reset_joint_anchors();
 
 	void set_collide_connected(bool p_collide);
 	bool get_collide_connected() const;
@@ -111,6 +133,8 @@ public:
 	Vector2 get_reaction_force() const;
 	real_t get_reaction_torque() const;
 
+	bool is_enabled() const;
+
 	Box2DJoint();
 	~Box2DJoint();
 
@@ -129,7 +153,7 @@ class Box2DRevoluteJoint : public Box2DJoint {
 protected:
 	static void _bind_methods();
 
-	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) override;
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos, const b2Vec2 &p_world_anchor_a, const b2Vec2 &p_world_anchor_b) override;
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) override;
 
@@ -157,13 +181,73 @@ public:
 	void set_max_motor_torque(real_t p_torque);
 	real_t get_max_motor_torque() const;
 
+	real_t get_motor_torque() const;
+
 	Box2DRevoluteJoint() :
 			Box2DJoint(&jointDef){};
 };
 
-// TODO prismatic
+class Box2DPrismaticJoint : public Box2DJoint {
+	GDCLASS(Box2DPrismaticJoint, Box2DJoint);
 
-// TODO distance
+	b2PrismaticJointDef jointDef;
+
+protected:
+	static void _bind_methods();
+
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos, const b2Vec2 &p_world_anchor_a, const b2Vec2 &p_world_anchor_b) override;
+
+	virtual void debug_draw(RID p_to_rid, Color p_color) override;
+
+public:
+	real_t get_reference_angle() const;
+	Vector2 get_local_axis() const;
+	real_t get_joint_translation() const;
+	real_t get_joint_speed() const;
+
+	void set_limit_enabled(bool p_enabled);
+	bool is_limit_enabled() const;
+
+	void set_upper_limit(real_t p_distance);
+	real_t get_upper_limit() const;
+	void set_lower_limit(real_t p_distance);
+	real_t get_lower_limit() const;
+
+	void set_limits(real_t p_lower, real_t p_upper);
+
+	void set_motor_enabled(bool p_enabled);
+	bool is_motor_enabled() const;
+
+	void set_motor_speed(real_t p_speed);
+	real_t get_motor_speed() const;
+
+	void set_max_motor_force(real_t p_force);
+	real_t get_max_motor_force() const;
+
+	real_t get_motor_force() const;
+
+	Box2DPrismaticJoint() :
+			Box2DJoint(&jointDef){};
+};
+
+//class Box2DDistanceJoint : public Box2DJoint {
+//	GDCLASS(Box2DDistanceJoint, Box2DJoint);
+//
+//	b2DistanceJointDef jointDef;
+//
+//protected:
+//	static void _bind_methods();
+//
+//	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos, const b2Vec2 &p_world_anchor_a, const b2Vec2 &p_world_anchor_b) override;
+//
+//	virtual void debug_draw(RID p_to_rid, Color p_color) override;
+//
+//public:
+//	// TODO set/get
+//
+//	Box2DDistanceJoint() :
+//			Box2DJoint(&jointDef){};
+//};
 
 // TODO pulley
 
@@ -181,7 +265,7 @@ class Box2DWeldJoint : public Box2DJoint {
 protected:
 	static void _bind_methods();
 
-	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) override;
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos, const b2Vec2 &p_world_anchor_a, const b2Vec2 &p_world_anchor_b) override;
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) override;
 

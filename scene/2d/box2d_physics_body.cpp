@@ -183,6 +183,15 @@ void Box2DPhysicsBody::_notification(int p_what) {
 					//set_notify_local_transform(true);
 				}
 			}
+
+			// Update joints in editor
+			if (Engine::get_singleton()->is_editor_hint()) {
+				auto joint = joints.front();
+				while (joint) {
+					joint->get()->reset_joint_anchors();
+					joint = joint->next();
+				}
+			}
 		} break;
 
 		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
