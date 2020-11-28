@@ -21,8 +21,8 @@ bool Box2DPhysicsBody::create_b2Body() {
 		ERR_FAIL_COND_V(!world_node->world, false);
 
 		// Create body
-		bodyDef.position = gd_to_b2(get_transform().get_origin());
-		bodyDef.angle = get_transform().get_rotation();
+		bodyDef.position = gd_to_b2(get_global_transform().get_origin());
+		bodyDef.angle = get_global_transform().get_rotation();
 
 		body = world_node->world->CreateBody(&bodyDef);
 		body->GetUserData().owner = this;
@@ -39,6 +39,7 @@ bool Box2DPhysicsBody::create_b2Body() {
 		}
 
 		set_physics_process_internal(true);
+		set_notify_local_transform(true);
 		return true;
 	}
 	return false;
@@ -59,6 +60,7 @@ bool Box2DPhysicsBody::destroy_b2Body() {
 		// b2Joint destruction is handled by Box2D
 
 		set_physics_process_internal(false);
+		set_notify_local_transform(false);
 		return true;
 	}
 	return false;
@@ -88,7 +90,7 @@ void Box2DPhysicsBody::update_filterdata() {
 
 void Box2DPhysicsBody::state_changed() {
 	set_block_transform_notify(true);
-	set_transform(b2_to_gd(body->GetTransform()));
+	set_global_transform(b2_to_gd(body->GetTransform()));
 	//if (get_script_instance())
 	//	get_script_instance()->call("_integrate_forces");
 	set_block_transform_notify(false);
@@ -167,7 +169,7 @@ void Box2DPhysicsBody::_notification(int p_what) {
 
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
 			// Send new transform to physics
-			Transform2D new_xform = get_transform();
+			Transform2D new_xform = get_global_transform();
 
 			bodyDef.position = gd_to_b2(new_xform.get_origin());
 			bodyDef.angle = new_xform.get_rotation();
@@ -763,7 +765,6 @@ Box2DPhysicsBody::Box2DPhysicsBody() :
 	massDataDef.I = 0.5f; // default for a disk of 1kg, 1m radius
 
 	filterDef.maskBits = 0x0001;
-	set_notify_local_transform(true);
 }
 
 Box2DPhysicsBody::~Box2DPhysicsBody() {
