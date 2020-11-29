@@ -47,17 +47,17 @@ class Box2DJoint : public Node2D {
 
 	bool broken;
 	bool breaking_enabled;
-	bool free_on_break; // TODO This feature may not be necessary. Perhaps this should be handled by a "on_broken" signal.
+	bool free_on_break; // TODO This feature may not be necessary. Perhaps this should be handled by the user in an "on_broken" signal.
 	real_t max_force;
 	real_t max_torque;
 
 	// Joint node local-space anchor points. These sync with jointDef's body-local anchor points.
 	// Allows configuring anchor points to be in different world positions when added to the scene.
+	// Modifying these is generally not recommended unless required for initializing a broken joint that starts separated.
 	Vector2 anchor_a = Vector2();
 	Vector2 anchor_b = Vector2();
 	// Controls whether moving the joint or linked bodies in the editor can modify the jointDef body-local anchor points.
-	// With this option off, joints anchors can be configured in different world locations.
-	// Useful for broken joints that start broken and separated.
+	// With this option off, joints anchors can be moved to different world locations without being reset.
 	bool editor_use_default_anchors = true;
 
 	void on_b2Joint_destroyed();
@@ -73,7 +73,7 @@ class Box2DJoint : public Node2D {
 	void _node_b_tree_entered();
 
 protected:
-	// Rescans the nodepaths to find b2Bodies and create our joint
+	// Rescans the nodepaths to find b2Bodies and create our b2joint
 	// Call this function with p_reinit_if_unchanged=true if you need to recreate the b2Joint
 	//    from an updated jointDef whether the bodies have changed or not
 	void update_joint_bodies(bool p_force_reinit = false);
@@ -204,9 +204,11 @@ class Box2DPrismaticJoint : public Box2DJoint {
 
 	b2PrismaticJointDef jointDef;
 
-	// TODO the way this is managed is far from final
-	// there are some issues I have with it
+	// The relative angle between node A and this joint node. Used for debug drawing.
+	float axis_body_ref_angle = 0.0f;
+	// The prismatic axis to initialize the joint with. In joint-node-local coordinates.
 	Vector2 local_axis = Vector2(1.0f, 0);
+
 	bool editor_use_default_axis = false;
 
 protected:

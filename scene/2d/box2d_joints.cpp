@@ -869,15 +869,20 @@ void Box2DPrismaticJoint::init_b2JointDef(const b2Vec2 &p_joint_pos) {
 	if (editor_use_default_axis) {
 		b2Vec2 defaultWorldAxis = jointDef.bodyB->GetWorldCenter();
 		defaultWorldAxis -= jointDef.bodyA->GetWorldCenter();
-		defaultWorldAxis.Normalize();
+		if (defaultWorldAxis.Normalize() == 0.0) {
+			defaultWorldAxis = b2Vec2(1.0f, 0.0f);
+		}
 
 		local_axis = get_global_transform().basis_xform_inv(Vector2(defaultWorldAxis.x, defaultWorldAxis.y));
 		_change_notify();
+		axis_to_init = defaultWorldAxis;
 	} else {
 		// Make jointDef use our configured axis
 		Vector2 global_axis = get_global_transform().basis_xform(local_axis);
 		axis_to_init = b2Vec2(global_axis.x, global_axis.y);
 	}
+
+	axis_body_ref_angle = jointDef.bodyA->GetAngle();
 
 	jointDef.Initialize(jointDef.bodyA, jointDef.bodyB, p_joint_pos, axis_to_init);
 }
@@ -907,31 +912,33 @@ void Box2DPrismaticJoint::debug_draw(RID p_to_rid, Color p_color) {
 	Point2 x1 = to_local(b2_to_gd(posA));
 	Point2 x2 = to_local(b2_to_gd(posB));
 
-	draw_rect(Rect2(p1 - Vector2(5, 5), Vector2(10, 10)), p_color, false, 2.0f);
-	draw_rect(Rect2(p2 - Vector2(1, 1), Vector2(2, 2)), p_color);
-
-	// TODO this does not respect bodyA initial rotation
-	Vector2 axis = get_local_axis();
 	if (jointDef.bodyA)
-		axis = axis.rotated(jointDef.bodyA->GetUserData().owner->get_global_rotation());
+		draw_set_transform(p1, jointDef.bodyA->GetUserData().owner->get_global_rotation() - axis_body_ref_angle, Vector2(1, 1));
+	else
+		draw_set_transform(p1, -axis_body_ref_angle, Vector2(1, 1));
+
+	draw_rect(Rect2(-Vector2(5, 5), Vector2(10, 10)), p_color, false, 2.0f);
+	draw_rect(Rect2(-Vector2(1, 1), Vector2(2, 2)), p_color);
+
+	Vector2 axis = get_local_axis();
+	/*if (jointDef.bodyA)
+		axis = axis.rotated();*/
 
 	if (jointDef.enableLimit) {
-		Vector2 start = p1 + axis * get_lower_limit();
-		Vector2 end = p1 + axis * get_upper_limit();
+		Vector2 start = axis * get_lower_limit();
+		Vector2 end = axis * get_upper_limit();
 		draw_line(start, end, p_color, 1.0f);
 		Vector2 tan = axis.rotated(Math_PI * 0.5f) * 5.0f;
 		draw_line(start + tan, start - tan, p_color, 1.0f);
 		draw_line(end + tan, end - tan, p_color, 1.0f);
 	} else {
-		draw_line(p1, p1 + axis * 25.0, p_color);
+		draw_line(Vector2(0, 0), axis * 25.0, p_color);
 	}
 	if (jointDef.enableMotor) {
 		float a = jointDef.referenceAngle;
 		Color c = jointDef.motorSpeed > 0 ? Color(0.0, 1.0, 0.0, 0.5) : Color(1.0, 0.0, 0.0, 0.5);
 
-		Vector2 start_p = p1;
-		if (j)
-			p1 += axis * get_joint_translation();
+		Vector2 start_p = axis * get_joint_translation();
 		Vector2 tan = axis.rotated(Math_PI * 0.5f);
 
 		draw_line(start_p, start_p + axis * get_joint_speed(), c, 1.5f);
@@ -942,6 +949,7 @@ void Box2DPrismaticJoint::debug_draw(RID p_to_rid, Color p_color) {
 		}
 	}
 
+	draw_set_transform(Vector2(0, 0), 0, Vector2(1, 1));
 	Color c(p_color);
 	c.set_hsv(c.get_h(), c.get_s() * 0.5f, c.get_v(), c.a * 0.5f);
 	draw_line(x1, p1, c, 1.0f);

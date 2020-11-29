@@ -191,6 +191,10 @@ void Box2DPhysicsBody::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
+			if (Engine::get_singleton()->is_editor_hint()) {
+				break;
+			}
+
 			// TODO figure out if this can instead be a callback from Box2D.
 			//		I don't think it can.
 			const bool awake = body->IsAwake();
