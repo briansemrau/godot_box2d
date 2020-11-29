@@ -51,26 +51,33 @@ class Box2DJoint : public Node2D {
 	real_t max_force;
 	real_t max_torque;
 
-	bool use_anchor_a = false;
-	Vector2 anchor_a;
-	bool use_anchor_b = false;
-	Vector2 anchor_b;
-	//bool editor_update_anchors = true;
+	// Joint node local-space anchor points. These sync with jointDef's body-local anchor points.
+	// Allows configuring anchor points to be in different world positions when added to the scene.
+	Vector2 anchor_a = Vector2();
+	Vector2 anchor_b = Vector2();
+	// Controls whether moving the joint or linked bodies in the editor can modify the jointDef body-local anchor points.
+	// With this option off, joints anchors can be configured in different world locations.
+	// Useful for broken joints that start broken and separated.
+	bool editor_use_default_anchors = true;
 
 	void on_b2Joint_destroyed();
-
-	void update_joint_bodies(bool p_recalc_if_unchanged = false);
 
 	bool create_b2Joint();
 	bool destroy_b2Joint();
 
 	void on_parent_created(Node *p_parent);
 	void on_node_predelete(Box2DPhysicsBody *node);
+	void on_editor_transforms_changed();
 
 	void _node_a_tree_entered();
 	void _node_b_tree_entered();
 
 protected:
+	// Rescans the nodepaths to find b2Bodies and create our joint
+	// Call this function with p_reinit_if_unchanged=true if you need to recreate the b2Joint
+	//    from an updated jointDef whether the bodies have changed or not
+	void update_joint_bodies(bool p_force_reinit = false);
+
 	b2Joint *get_b2Joint() { return joint; }
 	b2Joint *get_b2Joint() const { return joint; }
 
@@ -79,7 +86,14 @@ protected:
 	void _notification(int p_what);
 	static void _bind_methods();
 
-	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos, const b2Vec2 &p_world_anchor_a, const b2Vec2 &p_world_anchor_b) = 0;
+	// Allows all joint types to perform their custom initializations.
+	void _init_b2JointDef(const b2Vec2 &p_joint_pos);
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) = 0;
+
+	virtual void set_b2_anchor_a(b2Vec2 &p_vec) = 0;
+	virtual b2Vec2 get_b2_anchor_a() const = 0;
+	virtual void set_b2_anchor_b(b2Vec2 &p_vec) = 0;
+	virtual b2Vec2 get_b2_anchor_b() const = 0;
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) = 0;
 
@@ -92,18 +106,12 @@ public:
 	void set_nodepath_b(const NodePath &p_node_b);
 	NodePath get_nodepath_b() const;
 
-	//void set_editor_update_anchors(bool p_update);
-	//bool get_editor_update_anchors() const;
+	void set_editor_use_default_anchors(bool p_update);
+	bool get_editor_use_default_anchors() const;
 
-	// TODO documentation: Setting anchors is advanced behavior. These values are in world space.
-	void set_use_custom_anchor_a(bool p_enable);
-	bool get_use_custom_anchor_a() const;
-
+	// TODO documentation: Setting anchors is advanced behavior. These values are in joint node local space.
 	void set_anchor_a(const Vector2 &p_anchor);
 	Vector2 get_anchor_a() const;
-
-	void set_use_custom_anchor_b(bool p_enable);
-	bool get_use_custom_anchor_b() const;
 
 	void set_anchor_b(const Vector2 &p_anchor);
 	Vector2 get_anchor_b() const;
@@ -153,7 +161,11 @@ class Box2DRevoluteJoint : public Box2DJoint {
 protected:
 	static void _bind_methods();
 
-	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos, const b2Vec2 &p_world_anchor_a, const b2Vec2 &p_world_anchor_b) override;
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) override;
+	virtual void set_b2_anchor_a(b2Vec2 &p_vec) override { jointDef.localAnchorA = p_vec; }
+	virtual b2Vec2 get_b2_anchor_a() const override { return jointDef.localAnchorA; }
+	virtual void set_b2_anchor_b(b2Vec2 &p_vec) override { jointDef.localAnchorB = p_vec; }
+	virtual b2Vec2 get_b2_anchor_b() const override { return jointDef.localAnchorB; }
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) override;
 
@@ -192,18 +204,32 @@ class Box2DPrismaticJoint : public Box2DJoint {
 
 	b2PrismaticJointDef jointDef;
 
+	// TODO the way this is managed is far from final
+	// there are some issues I have with it
+	Vector2 local_axis = Vector2(1.0f, 0);
+	bool editor_use_default_axis = false;
+
 protected:
 	static void _bind_methods();
 
-	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos, const b2Vec2 &p_world_anchor_a, const b2Vec2 &p_world_anchor_b) override;
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) override;
+	virtual void set_b2_anchor_a(b2Vec2 &p_vec) override { jointDef.localAnchorA = p_vec; }
+	virtual b2Vec2 get_b2_anchor_a() const override { return jointDef.localAnchorA; }
+	virtual void set_b2_anchor_b(b2Vec2 &p_vec) override { jointDef.localAnchorB = p_vec; }
+	virtual b2Vec2 get_b2_anchor_b() const override { return jointDef.localAnchorB; }
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) override;
 
 public:
 	real_t get_reference_angle() const;
-	Vector2 get_local_axis() const;
 	real_t get_joint_translation() const;
 	real_t get_joint_speed() const;
+
+	void set_editor_use_default_axis(bool p_default);
+	bool get_editor_use_default_axis() const;
+
+	void set_local_axis(Vector2 p_axis);
+	Vector2 get_local_axis() const;
 
 	void set_limit_enabled(bool p_enabled);
 	bool is_limit_enabled() const;
@@ -226,28 +252,10 @@ public:
 
 	real_t get_motor_force() const;
 
-	Box2DPrismaticJoint() :
-			Box2DJoint(&jointDef){};
+	Box2DPrismaticJoint();
 };
 
-//class Box2DDistanceJoint : public Box2DJoint {
-//	GDCLASS(Box2DDistanceJoint, Box2DJoint);
-//
-//	b2DistanceJointDef jointDef;
-//
-//protected:
-//	static void _bind_methods();
-//
-//	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos, const b2Vec2 &p_world_anchor_a, const b2Vec2 &p_world_anchor_b) override;
-//
-//	virtual void debug_draw(RID p_to_rid, Color p_color) override;
-//
-//public:
-//	// TODO set/get
-//
-//	Box2DDistanceJoint() :
-//			Box2DJoint(&jointDef){};
-//};
+// TODO distance
 
 // TODO pulley
 
@@ -265,7 +273,11 @@ class Box2DWeldJoint : public Box2DJoint {
 protected:
 	static void _bind_methods();
 
-	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos, const b2Vec2 &p_world_anchor_a, const b2Vec2 &p_world_anchor_b) override;
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) override;
+	virtual void set_b2_anchor_a(b2Vec2 &p_vec) override { jointDef.localAnchorA = p_vec; }
+	virtual b2Vec2 get_b2_anchor_a() const override { return jointDef.localAnchorA; }
+	virtual void set_b2_anchor_b(b2Vec2 &p_vec) override { jointDef.localAnchorB = p_vec; }
+	virtual b2Vec2 get_b2_anchor_b() const override { return jointDef.localAnchorB; }
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) override;
 

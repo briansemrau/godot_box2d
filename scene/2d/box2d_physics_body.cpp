@@ -38,8 +38,6 @@ bool Box2DPhysicsBody::create_b2Body() {
 			joint = joint->next();
 		}
 
-		set_physics_process_internal(true);
-		set_notify_local_transform(true);
 		return true;
 	}
 	return false;
@@ -59,8 +57,6 @@ bool Box2DPhysicsBody::destroy_b2Body() {
 
 		// b2Joint destruction is handled by Box2D
 
-		set_physics_process_internal(false);
-		set_notify_local_transform(false);
 		return true;
 	}
 	return false;
@@ -184,11 +180,11 @@ void Box2DPhysicsBody::_notification(int p_what) {
 				}
 			}
 
-			// Update joints in editor
+			// Inform joints in editor that we moved
 			if (Engine::get_singleton()->is_editor_hint()) {
 				auto joint = joints.front();
 				while (joint) {
-					joint->get()->reset_joint_anchors();
+					joint->get()->on_editor_transforms_changed();
 					joint = joint->next();
 				}
 			}
@@ -774,6 +770,9 @@ Box2DPhysicsBody::Box2DPhysicsBody() :
 	massDataDef.I = 0.5f; // default for a disk of 1kg, 1m radius
 
 	filterDef.maskBits = 0x0001;
+
+	set_physics_process_internal(true);
+	set_notify_local_transform(true);
 }
 
 Box2DPhysicsBody::~Box2DPhysicsBody() {
