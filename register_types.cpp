@@ -29,6 +29,7 @@ void register_godot_box2d_types() {
 	ClassDB::register_virtual_class<Box2DJoint>();
 	ClassDB::register_class<Box2DRevoluteJoint>();
 	ClassDB::register_class<Box2DPrismaticJoint>();
+	ClassDB::register_class<Box2DDistanceJoint>();
 	ClassDB::register_class<Box2DWeldJoint>();
 	// TODO more joints
 
