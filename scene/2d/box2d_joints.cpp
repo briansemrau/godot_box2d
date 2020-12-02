@@ -93,28 +93,10 @@ void Box2DJoint::on_node_predelete(Box2DPhysicsBody *node) {
 	set_process_internal(false);
 }
 
-void Box2DJoint::_node_a_tree_entered() {
-	// Update path in case node moved
-	// TODO figure out: is this weird to do? This is making the nodepath property "sticky"
-	Node *node = Object::cast_to<Node>(ObjectDB::get_instance(bodyA_cache));
-	if (node)
-		a = node->get_path();
-	// Don't update_joint_bodies because the body node hasn't changed
-}
-
-void Box2DJoint::_node_b_tree_entered() {
-	// Update path in case node moved
-	// TODO figure out: is this weird to do? This is making the nodepath property "sticky"
-	Node *node = Object::cast_to<Node>(ObjectDB::get_instance(bodyB_cache));
-	if (node)
-		b = node->get_path();
-	// Don't update_joint_bodies because the body node hasn't changed
-}
-
-void Box2DJoint::update_joint_bodies(bool p_force_reinit) {
+void Box2DJoint::update_joint_bodies() {
 	// This is called whenever the joint's body nodes are reassigned via set_node_a/b.
 	// If the bodies haven't actually changed, it is assumed that the joint should
-	// be unchanged, unless `p_force_reinit = true`
+	// be unchanged.
 
 	// Check if bodies have changed
 	Node *node_a = has_node(get_nodepath_a()) ? get_node(get_nodepath_a()) : (Node *)NULL;
@@ -130,13 +112,8 @@ void Box2DJoint::update_joint_bodies(bool p_force_reinit) {
 	b2Body *joint_body_b = joint ? joint->GetBodyB() : NULL;
 	const bool bodies_changed = (body_a_body != joint_body_a) || (body_b_body != joint_body_b);
 
-	// Recalc means joints must be destroyed/created
-	const bool recalc = joint_invalid || bodies_changed || p_force_reinit;
-
-	if (recalc) {
-		// Clear preexisting state
-		destroy_b2Joint();
-
+	// Only recreate the joint if it will do anything
+	if (joint_invalid || bodies_changed) {
 		// Clear previous cache
 		if (bodyA_cache) {
 			Box2DPhysicsBody *body_a = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyA_cache));
@@ -171,21 +148,42 @@ void Box2DJoint::update_joint_bodies(bool p_force_reinit) {
 		body_a->connect("tree_entered", this, "_node_a_tree_entered");
 		body_b->connect("tree_entered", this, "_node_b_tree_entered");
 
-		// Create joint if b2Bodys are already created
-
+		// Init and create joint
 		jointDef->bodyA = body_a->body;
 		jointDef->bodyB = body_b->body;
 
-		if (jointDef->bodyA && jointDef->bodyB) {
-			// Allow subtypes to do final initialization
-			if (jointDef->bodyA && jointDef->bodyB) {
-				b2Vec2 joint_pos = get_b2_pos();
-				init_b2JointDef(joint_pos);
-			}
+		recreate_joint();
+	}
+}
 
-			if (!broken)
-				create_b2Joint();
-		}
+void Box2DJoint::_node_a_tree_entered() {
+	// Update path in case node moved
+	// TODO figure out: is this weird to do? This is making the nodepath property "sticky"
+	Node *node = Object::cast_to<Node>(ObjectDB::get_instance(bodyA_cache));
+	if (node)
+		a = node->get_path();
+	// Don't update_joint_bodies because the body node hasn't changed
+}
+
+void Box2DJoint::_node_b_tree_entered() {
+	// Update path in case node moved
+	// TODO figure out: is this weird to do? This is making the nodepath property "sticky"
+	Node *node = Object::cast_to<Node>(ObjectDB::get_instance(bodyB_cache));
+	if (node)
+		b = node->get_path();
+	// Don't update_joint_bodies because the body node hasn't changed
+}
+
+void Box2DJoint::recreate_joint() {
+	destroy_b2Joint();
+
+	if (is_valid()) {
+		// Allow subtypes to do final initialization
+		b2Vec2 joint_pos = get_b2_pos();
+		init_b2JointDef(joint_pos);
+
+		if (!broken)
+			create_b2Joint();
 	}
 }
 
@@ -210,6 +208,7 @@ void Box2DJoint::_notification(int p_what) {
 			}
 
 			// If new world, destroy joint.
+			// Will attempt to recreate in POST_ENTER_TREE.
 			if (new_world != world_node) {
 				if (world_node) {
 					world_node->joints.erase(this);
@@ -242,6 +241,8 @@ void Box2DJoint::_notification(int p_what) {
 			}
 
 			destroy_b2Joint();
+
+			// stop debug drawing
 			set_process_internal(false);
 			set_notify_transform(false);
 		} break;
@@ -249,7 +250,7 @@ void Box2DJoint::_notification(int p_what) {
 		case NOTIFICATION_POST_ENTER_TREE: {
 			// After all bodies created in ENTER_TREE, create joint if valid.
 			// If just exiting/entering tree, joint isn't at risk for reinitialization.
-			update_joint_bodies(false);
+			update_joint_bodies();
 		} break;
 
 		case NOTIFICATION_TRANSFORM_CHANGED: {
@@ -312,7 +313,7 @@ void Box2DJoint::_notification(int p_what) {
 					// color UNCHANGED
 				}
 			}
-			if (!jointDef->bodyA || !jointDef->bodyB) {
+			if (!is_valid()) {
 				// joint invalid
 				debug_col = Color(1.0f, 0.0f, 0.0f);
 			}
@@ -395,7 +396,7 @@ void Box2DJoint::set_nodepath_a(const NodePath &p_node_a) {
 		update_configuration_warning();
 	}
 	if (is_inside_tree()) {
-		update_joint_bodies(false);
+		update_joint_bodies();
 	}
 }
 
@@ -411,7 +412,7 @@ void Box2DJoint::set_nodepath_b(const NodePath &p_node_b) {
 		update_configuration_warning();
 	}
 	if (is_inside_tree()) {
-		update_joint_bodies(false);
+		update_joint_bodies();
 	}
 }
 
@@ -443,7 +444,7 @@ void Box2DJoint::set_broken(bool p_broken) {
 			queue_delete();
 		}
 	} else if (!p_broken && broken) {
-		if (jointDef->bodyA && jointDef->bodyB) {
+		if (is_valid()) {
 			create_b2Joint();
 		}
 	}
@@ -505,7 +506,11 @@ bool Box2DJoint::is_enabled() const {
 	// This impl might not be what we want
 	if (joint)
 		return joint->IsEnabled();
-	return jointDef->bodyA && jointDef->bodyA->IsEnabled() && jointDef->bodyB && jointDef->bodyB->IsEnabled();
+	return is_valid() && jointDef->bodyA->IsEnabled() && jointDef->bodyB->IsEnabled();
+}
+
+bool Box2DJoint::is_valid() const {
+	return jointDef->bodyA && jointDef->bodyB;
 }
 
 Box2DJoint::Box2DJoint() :
@@ -675,7 +680,7 @@ bool Box2DRevoluteJoint::get_editor_use_default_anchors() const {
 void Box2DRevoluteJoint::set_anchor_a(const Vector2 &p_anchor) {
 	anchor_a = p_anchor;
 
-	update_joint_bodies(true);
+	recreate_joint();
 }
 
 Vector2 Box2DRevoluteJoint::get_anchor_a() const {
@@ -687,7 +692,7 @@ Vector2 Box2DRevoluteJoint::get_anchor_a() const {
 void Box2DRevoluteJoint::set_anchor_b(const Vector2 &p_anchor) {
 	anchor_b = p_anchor;
 
-	update_joint_bodies(true);
+	recreate_joint();
 }
 
 Vector2 Box2DRevoluteJoint::get_anchor_b() const {
@@ -700,7 +705,7 @@ void Box2DRevoluteJoint::reset_joint_anchors() {
 	ERR_FAIL_COND_MSG(!is_inside_tree(), "Can't reinitialize a joint outside of the SceneTree. It requires relative locations of bodies to initialize.");
 	anchor_a = Vector2();
 	anchor_b = Vector2();
-	update_joint_bodies(true);
+	recreate_joint();
 }
 
 void Box2DRevoluteJoint::set_limit_enabled(bool p_enabled) {
@@ -954,7 +959,7 @@ bool Box2DPrismaticJoint::get_editor_use_default_anchors() const {
 void Box2DPrismaticJoint::set_anchor_a(const Vector2 &p_anchor) {
 	anchor_a = p_anchor;
 
-	update_joint_bodies(true);
+	recreate_joint();
 }
 
 Vector2 Box2DPrismaticJoint::get_anchor_a() const {
@@ -966,7 +971,7 @@ Vector2 Box2DPrismaticJoint::get_anchor_a() const {
 void Box2DPrismaticJoint::set_anchor_b(const Vector2 &p_anchor) {
 	anchor_b = p_anchor;
 
-	update_joint_bodies(true);
+	recreate_joint();
 }
 
 Vector2 Box2DPrismaticJoint::get_anchor_b() const {
@@ -979,13 +984,13 @@ void Box2DPrismaticJoint::reset_joint_anchors() {
 	ERR_FAIL_COND_MSG(!is_inside_tree(), "Can't reinitialize a joint outside of the SceneTree. It requires relative locations of bodies to initialize.");
 	anchor_a = Vector2();
 	anchor_b = Vector2();
-	update_joint_bodies(true);
+	recreate_joint();
 }
 
 void Box2DPrismaticJoint::set_local_axis(Vector2 p_axis) {
 	local_axis = p_axis.normalized();
 	if (is_inside_tree())
-		update_joint_bodies(true);
+		recreate_joint();
 }
 
 Vector2 Box2DPrismaticJoint::get_local_axis() const {
@@ -1168,8 +1173,8 @@ void Box2DDistanceJoint::debug_draw(RID p_to_rid, Color p_color) {
 	Point2 x1 = to_local(b2_to_gd(posA));
 	Point2 x2 = to_local(b2_to_gd(posB));
 
-	draw_rect(Rect2(p1-Point2(1, 1), Size2(2, 2)), p_color, true);
-	draw_rect(Rect2(p2-Point2(1, 1), Size2(2, 2)), p_color, true);
+	draw_rect(Rect2(p1 - Point2(1, 1), Size2(2, 2)), p_color, true);
+	draw_rect(Rect2(p2 - Point2(1, 1), Size2(2, 2)), p_color, true);
 
 	Vector2 axis = (p2 - p1).normalized();
 	Vector2 tan = axis.rotated(Math_PI * 0.5f);
@@ -1204,7 +1209,7 @@ bool Box2DDistanceJoint::get_editor_use_default_rest_length() const {
 
 void Box2DDistanceJoint::set_anchor_a(const Vector2 &p_anchor) {
 	anchor_a = p_anchor;
-	update_joint_bodies(true);
+	recreate_joint();
 }
 
 Vector2 Box2DDistanceJoint::get_anchor_a() const {
@@ -1215,7 +1220,7 @@ Vector2 Box2DDistanceJoint::get_anchor_a() const {
 
 void Box2DDistanceJoint::set_anchor_b(const Vector2 &p_anchor) {
 	anchor_b = p_anchor;
-	update_joint_bodies(true);
+	recreate_joint();
 }
 
 Vector2 Box2DDistanceJoint::get_anchor_b() const {

@@ -60,14 +60,15 @@ class Box2DJoint : public Node2D {
 	void on_node_predelete(Box2DPhysicsBody *node);
 	virtual void on_editor_transforms_changed() {}
 
+	// Rescans the nodepaths to find b2Bodies and create our b2joint
+	void update_joint_bodies();
+
 	void _node_a_tree_entered();
 	void _node_b_tree_entered();
 
 protected:
-	// Rescans the nodepaths to find b2Bodies and create our b2joint
-	// Call this function with p_reinit_if_unchanged=true if you need to recreate the b2Joint
-	//    from an updated jointDef whether the bodies have changed or not
-	void update_joint_bodies(bool p_force_reinit = false);
+	// Destroys and recreates the b2Joint, if valid. Useful for updating constant parameters, such as bodies.
+	void recreate_joint();
 
 	b2Joint *get_b2Joint() { return joint; }
 	b2Joint *get_b2Joint() const { return joint; }
@@ -78,13 +79,7 @@ protected:
 	static void _bind_methods();
 
 	// Allows all joint types to perform their custom initializations.
-	//void _init_b2JointDef(const b2Vec2 &p_joint_pos);
 	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) = 0;
-
-	//virtual void set_b2_anchor_a(b2Vec2 &p_vec) = 0;
-	//virtual b2Vec2 get_b2_anchor_a() const = 0;
-	//virtual void set_b2_anchor_b(b2Vec2 &p_vec) = 0;
-	//virtual b2Vec2 get_b2_anchor_b() const = 0;
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) = 0;
 
@@ -119,6 +114,8 @@ public:
 	real_t get_reaction_torque() const;
 
 	bool is_enabled() const;
+
+	bool is_valid() const;
 
 	Box2DJoint();
 	~Box2DJoint();
