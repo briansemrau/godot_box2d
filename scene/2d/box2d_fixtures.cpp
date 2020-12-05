@@ -191,6 +191,10 @@ void Box2DFixture::_notification(int p_what) {
 				draw_col = Color(0.9f, 0.7f, 0.7f);
 			}
 
+			if (is_sensor()) {
+				draw_col = draw_col.linear_interpolate(Color(0.4f, 0.7f, 1.0f, 0.5f), 0.7f);
+			}
+
 			if (shape.is_valid()) {
 				shape->draw(get_canvas_item(), draw_col);
 			}
@@ -202,7 +206,8 @@ void Box2DFixture::_bind_methods() {
 	// TODO collision testing funcs
 	ClassDB::bind_method(D_METHOD("set_shape", "shape"), &Box2DFixture::set_shape);
 	ClassDB::bind_method(D_METHOD("get_shape"), &Box2DFixture::get_shape);
-	// TODO sensor
+	ClassDB::bind_method(D_METHOD("set_sensor", "sensor"), &Box2DFixture::set_sensor);
+	ClassDB::bind_method(D_METHOD("is_sensor"), &Box2DFixture::is_sensor);
 	ClassDB::bind_method(D_METHOD("set_override_body_collision", "override_body_collision"), &Box2DFixture::set_override_body_collision);
 	ClassDB::bind_method(D_METHOD("get_override_body_collision"), &Box2DFixture::get_override_body_collision);
 	ClassDB::bind_method(D_METHOD("set_collision_layer", "collision_layer"), &Box2DFixture::set_collision_layer);
@@ -229,6 +234,7 @@ void Box2DFixture::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_shape_changed"), &Box2DFixture::_shape_changed);
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shape", PROPERTY_HINT_RESOURCE_TYPE, "Box2DShape"), "set_shape", "get_shape");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sensor"), "set_sensor", "is_sensor");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "density"), "set_density", "get_density");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "friction"), "set_friction", "get_friction");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "restitution"), "set_restitution", "get_restitution");
@@ -303,6 +309,17 @@ void Box2DFixture::set_shape(const Ref<Box2DShape> &p_shape) {
 
 Ref<Box2DShape> Box2DFixture::get_shape() {
 	return shape;
+}
+
+void Box2DFixture::set_sensor(bool p_sensor) {
+	for (int i = 0; i < fixtures.size(); i++) {
+		fixtures[i]->SetSensor(p_sensor);
+	}
+	fixtureDef.isSensor = p_sensor;
+}
+
+bool Box2DFixture::is_sensor() const {
+	return fixtureDef.isSensor;
 }
 
 void Box2DFixture::set_override_body_collision(bool p_override) {

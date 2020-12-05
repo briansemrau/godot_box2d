@@ -59,17 +59,23 @@ bool Box2DWorld::ShouldCollide(b2Fixture *fixtureA, b2Fixture *fixtureB) {
 	}
 }
 
-void Box2DWorld::BeginContact(b2Contact *contact) {
-	// TODO body enter signal
+inline void Box2DWorld::buffer_contact(b2Contact *contact) {
+	if (contact->GetFixtureA()->IsSensor() || contact->GetFixtureB()->IsSensor()) {
+		return;
+	}
 
 	Box2DFixture *fnode_a = contact->GetFixtureA()->GetUserData().owner;
 	Box2DFixture *fnode_b = contact->GetFixtureB()->GetUserData().owner;
+	Box2DPhysicsBody *body_a = fnode_a->body_node;
+	Box2DPhysicsBody *body_b = fnode_b->body_node;
 
-	// Only buffer contacts that are being monitored
 	const bool monitoringA = fnode_a->body_node->is_contact_monitor_enabled();
 	const bool monitoringB = fnode_b->body_node->is_contact_monitor_enabled();
 
-	if (monitoringA || monitoringB) {
+	// Only buffer contacts that are being monitored, if contact report count isn't exceeded
+	const bool hasCapacityA = monitoringA && (body_a->contact_monitor->contacts.size() < body_a->max_contacts_reported);
+	const bool hasCapacityB = monitoringB && (body_b->contact_monitor->contacts.size() < body_b->max_contacts_reported);
+	if (hasCapacityA || hasCapacityB) {
 		// Init contact
 		Box2DContact c;
 		c.id = next_contact_id++;
@@ -78,20 +84,121 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 		// The contact pointer address seems to be the only way to create a unique key. Please prove me wrong.
 		contact_buffer.set(reinterpret_cast<int64_t>(contact), c);
 		// Buffer again into monitoring node
-		if (monitoringA) {
+		if (hasCapacityA) {
 			auto contacts = &fnode_a->body_node->contact_monitor->contacts;
 			contacts->insert(c);
 		}
-		if (monitoringB) {
+		if (hasCapacityB) {
 			auto contacts = &fnode_b->body_node->contact_monitor->contacts;
 			contacts->insert(c);
 		}
 	}
 }
 
-void Box2DWorld::EndContact(b2Contact *contact) {
-	// TODO body exit signal
+void Box2DWorld::BeginContact(b2Contact *contact) {
+	Box2DFixture *fnode_a = contact->GetFixtureA()->GetUserData().owner;
+	Box2DFixture *fnode_b = contact->GetFixtureB()->GetUserData().owner;
+	Box2DPhysicsBody *body_a = fnode_a->body_node;
+	Box2DPhysicsBody *body_b = fnode_b->body_node;
 
+	const bool monitoringA = fnode_a->body_node->is_contact_monitor_enabled();
+	const bool monitoringB = fnode_b->body_node->is_contact_monitor_enabled();
+
+	// Deliver signals to bodies with monitoring enabled
+	// Only emit body_entered once per body. Begin/EndContact are called for each *fixture*.
+	// Similar case for fixtures. One Box2DFixture may have several b2Fixtures.
+	if (monitoringA) {
+		int *body_count_ptr = body_a->contact_monitor->entered_objects.getptr(body_b->get_instance_id());
+		if (!body_count_ptr) {
+			body_count_ptr = &(body_a->contact_monitor->entered_objects.set(body_b->get_instance_id(), 0)->value());
+		}
+		++(*body_count_ptr);
+
+		if (*body_count_ptr == 1) {
+			body_a->emit_signal("body_entered", body_b);
+		}
+
+		int *fix_count_ptr = body_a->contact_monitor->entered_objects.getptr(fnode_b->get_instance_id());
+		if (!fix_count_ptr) {
+			fix_count_ptr = &(body_a->contact_monitor->entered_objects.set(fnode_b->get_instance_id(), 0)->value());
+		}
+		++(*fix_count_ptr);
+
+		if (*fix_count_ptr == 1) {
+			body_a->emit_signal("body_fixture_entered", fnode_b, fnode_a);
+		}
+	}
+	if (monitoringB) {
+		int *body_count_ptr = body_b->contact_monitor->entered_objects.getptr(body_a->get_instance_id());
+		if (!body_count_ptr) {
+			body_count_ptr = &(body_b->contact_monitor->entered_objects.set(body_a->get_instance_id(), 0)->value());
+		}
+		++(*body_count_ptr);
+
+		if (*body_count_ptr == 1) {
+			body_b->emit_signal("body_entered", body_a);
+		}
+
+		int *fix_count_ptr = body_b->contact_monitor->entered_objects.getptr(fnode_a->get_instance_id());
+		if (!fix_count_ptr) {
+			fix_count_ptr = &(body_b->contact_monitor->entered_objects.set(fnode_a->get_instance_id(), 0)->value());
+		}
+		++(*fix_count_ptr);
+
+		if (*fix_count_ptr == 1) {
+			body_b->emit_signal("body_fixture_entered", fnode_a, fnode_b);
+		}
+	}
+
+	buffer_contact(contact);
+}
+
+void Box2DWorld::EndContact(b2Contact *contact) {
+	Box2DFixture *fnode_a = contact->GetFixtureA()->GetUserData().owner;
+	Box2DFixture *fnode_b = contact->GetFixtureB()->GetUserData().owner;
+	Box2DPhysicsBody *body_a = fnode_a->body_node;
+	Box2DPhysicsBody *body_b = fnode_b->body_node;
+
+	const bool monitoringA = fnode_a->body_node->is_contact_monitor_enabled();
+	const bool monitoringB = fnode_b->body_node->is_contact_monitor_enabled();
+
+	// Deliver signals to bodies with contact monitoring enabled
+	if (monitoringA) {
+		int *body_count_ptr = body_a->contact_monitor->entered_objects.getptr(body_b->get_instance_id());
+		--(*body_count_ptr);
+
+		if ((*body_count_ptr) == 0) {
+			body_a->contact_monitor->entered_objects.erase(body_b->get_instance_id());
+			body_a->emit_signal("body_exited", body_b);
+		}
+
+		int *fix_count_ptr = body_a->contact_monitor->entered_objects.getptr(fnode_b->get_instance_id());
+		--(*fix_count_ptr);
+
+		if ((*fix_count_ptr) == 0) {
+			body_a->contact_monitor->entered_objects.erase(fnode_b->get_instance_id());
+			body_a->emit_signal("body_fixture_exited", fnode_b, fnode_a);
+		}
+	}
+	if (monitoringB) {
+		int *body_count_ptr = body_b->contact_monitor->entered_objects.getptr(body_a->get_instance_id());
+		--(*body_count_ptr);
+
+		if ((*body_count_ptr) == 0) {
+			body_b->contact_monitor->entered_objects.erase(body_a->get_instance_id());
+			body_b->emit_signal("body_exited", body_a);
+		}
+
+		int *fix_count_ptr = body_b->contact_monitor->entered_objects.getptr(fnode_a->get_instance_id());
+		--(*fix_count_ptr);
+
+		if ((*fix_count_ptr) == 0) {
+			body_b->contact_monitor->entered_objects.erase(fnode_a->get_instance_id());
+			body_b->emit_signal("body_fixture_exited", fnode_a, fnode_b);
+		}
+	}
+	
+	// Clean up buffered contacts
 	Box2DContact *c_ptr = contact_buffer.getptr(reinterpret_cast<int64_t>(contact));
 	if (c_ptr) {
 		if (c_ptr->fixture_a->body_node->is_contact_monitor_enabled()) {
@@ -120,29 +227,11 @@ void Box2DWorld::PreSolve(b2Contact *contact, const b2Manifold *oldManifold) {
 
 	if (unlikely(flag_rescan_contacts_monitored) && !c_ptr) {
 		// Buffer a contact that only started being monitored after BeginContact
-		const bool monitoringA = fnode_a->body_node->is_contact_monitor_enabled();
-		const bool monitoringB = fnode_b->body_node->is_contact_monitor_enabled();
-		if (monitoringA || monitoringB) {
-			// Init contact
-			Box2DContact c;
-			c.id = next_contact_id++;
-			c.fixture_a = fnode_a;
-			c.fixture_b = fnode_b;
-			contact_buffer.set(reinterpret_cast<int64_t>(contact), c);
-			// Buffer again into monitoring node
-			if (monitoringA) {
-				auto contacts = &fnode_a->body_node->contact_monitor->contacts;
-				contacts->insert(c);
-			}
-			if (monitoringB) {
-				auto contacts = &fnode_b->body_node->contact_monitor->contacts;
-				contacts->insert(c);
-			}
-			c_ptr = contact_buffer.getptr(reinterpret_cast<int64_t>(contact));
-		}
+		buffer_contact(contact);
+		c_ptr = contact_buffer.getptr(reinterpret_cast<int64_t>(contact)); // possible optimization: buffer contact could return c_ptr
 	}
 
-	// Only handle the first PreSolve for this contact this step (don't overwrite first impact_velocity)
+	// Only handle the first PreSolve for this contact this step (don't overwrite initial impact_velocity)
 	if (c_ptr && c_ptr->solves == 0) {
 		c_ptr->solves += 1;
 
@@ -188,6 +277,8 @@ void Box2DWorld::PostSolve(b2Contact *contact, const b2ContactImpulse *impulse) 
 		//}
 
 		Box2DContact *c_ptr = contact_buffer.getptr(reinterpret_cast<int64_t>(contact));
+		if (!c_ptr)
+			return;
 
 		Vector2 manifold_tan = c_ptr->normal.rotated(Math_PI * 0.5);
 		// TODO test: should impulse be accumulated (relevant to TOI solve), or does Box2D accumulate them itself?
@@ -221,6 +312,10 @@ void Box2DWorld::create_b2World() {
 	if (!world) {
 		world = memnew(b2World(gd_to_b2(gravity)));
 
+		world->SetDestructionListener(this);
+		world->SetContactFilter(this);
+		world->SetContactListener(this);
+
 		Set<Box2DPhysicsBody *>::Element *body = bodies.front();
 		while (body) {
 			body->get()->on_parent_created(this);
@@ -231,10 +326,6 @@ void Box2DWorld::create_b2World() {
 			joint->get()->on_parent_created(this);
 			joint = joint->next();
 		}
-
-		world->SetDestructionListener(this);
-		world->SetContactFilter(this);
-		world->SetContactListener(this);
 
 		if (!Engine::get_singleton()->is_editor_hint()) {
 			set_physics_process_internal(true);

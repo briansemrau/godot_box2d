@@ -23,7 +23,7 @@ This module also bridges the gap between Box2D features and Godot 2D physics fea
 This is a list of unimplemented features that are planned:
 
 - All remaining Box2D joints not yet implemented
-- Area2D node equivalent (using Box2D sensor fixtures)
+- Area2D equivalent area effects (gravity/damping modifiers)
 - Run Box2D computation on a separate thread
 - Look into a [multithreaded implementation of Box2D](https://github.com/jhoffman0x/Box2D-MT)
 
@@ -122,7 +122,7 @@ Many features of Box2D have very clear parallels to Godot physics. Here are a fe
 | Godot Physics feature | Godot Box2D module equivalent |
 |-|-|
 | `PhysicsBody2D` nodes (Rigid, Static, Kinematic) | Use `Box2DPhysicsBody`. Use `type` property to change body type. Material properties are set using fixtures. |
-| `Area2D` node | *Not yet implemented.* |
+| `Area2D` node | Use a `Box2DFixture` with the `sensor` property enabled. Be sure to enable contact monitoring on the body. |
 | `CollisionShape2D`/`CollisionPolygon2D` nodes | Use `Box2DFixture` and set the `shape` property. |
 | `Joint2D` nodes (Pin, Groove, Spring) | Use variants of `Box2DJoint`. |
 

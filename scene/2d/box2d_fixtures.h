@@ -72,7 +72,8 @@ public:
 	void set_shape(const Ref<Box2DShape> &p_shape);
 	Ref<Box2DShape> get_shape();
 
-	// sensor?
+	void set_sensor(bool p_sensor);
+	bool is_sensor() const;
 
 	void set_override_body_collision(bool p_override);
 	bool get_override_body_collision() const;

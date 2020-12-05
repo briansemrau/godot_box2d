@@ -799,8 +799,10 @@ void Box2DPrismaticJoint::on_editor_transforms_changed() {
 		// Some relative coordinate has changed
 		// We want to move our anchors to keep their relative location to each body the same
 		// This leaves the jointDef anchors unchanged
-		anchor_a = to_local(b2_to_gd(jointDef.bodyA->GetWorldPoint(jointDef.localAnchorA)));
-		anchor_b = to_local(b2_to_gd(jointDef.bodyB->GetWorldPoint(jointDef.localAnchorB)));
+		if (is_valid()) {
+			anchor_a = to_local(b2_to_gd(jointDef.bodyA->GetWorldPoint(jointDef.localAnchorA)));
+			anchor_b = to_local(b2_to_gd(jointDef.bodyB->GetWorldPoint(jointDef.localAnchorB)));
+		}
 		_change_notify();
 	}
 }

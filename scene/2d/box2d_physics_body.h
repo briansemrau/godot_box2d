@@ -20,6 +20,8 @@
 
 class Box2DWorld;
 
+// TODO either rename this more generic or add Area node that also uses b2Body
+// or maybe this is just noted in the future docs to handle Area2D functionality
 class Box2DPhysicsBody : public Node2D {
 	GDCLASS(Box2DPhysicsBody, Node2D);
 
@@ -49,6 +51,12 @@ private:
 	struct ContactMonitor {
 		// bool locked; // TODO when physics moved to separate thread
 		VSet<Box2DContact> contacts;
+
+		// TODO when adding area functionality, this list can be used to apply area effects
+		// All the bodies/fixtures currently in contact with this body.
+		// The int value stores the number of fixtures currently in contact.
+		// When the counter transitions from 0->1 or 1->0, body_entered/exited is emitted.
+		HashMap<ObjectID, int> entered_objects;
 	};
 
 	ContactMonitor *contact_monitor;
@@ -162,7 +170,7 @@ public:
 	Vector2 get_contact_tangent_impulse(int p_idx) const;
 	//Vector2 get_contact_total_impulse(int p_idx) const;
 	//bool get_contact_is_new(int p_idx) const;
-	
+
 	void apply_force(const Vector2 &p_force, const Vector2 &p_point, bool p_wake = true);
 	void apply_central_force(const Vector2 &p_force, bool p_wake = true);
 	void apply_torque(real_t p_torque, bool p_wake = true);

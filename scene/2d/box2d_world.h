@@ -115,6 +115,8 @@ private:
 	bool flag_rescan_contacts_monitored = false;
 	HashMap<int64_t, Box2DContact> contact_buffer;
 
+	inline void buffer_contact(b2Contact *contact);
+
 	virtual void BeginContact(b2Contact *contact) override;
 	virtual void EndContact(b2Contact *contact) override;
 	virtual void PreSolve(b2Contact *contact, const b2Manifold *oldManifold) override;
