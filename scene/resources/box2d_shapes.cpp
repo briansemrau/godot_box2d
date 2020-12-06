@@ -113,7 +113,7 @@ void Box2DCircleShape::draw(const RID &p_to_rid, const Color &p_color) {
 }
 
 Box2DCircleShape::Box2DCircleShape() {
-	set_radius(25.0f);
+	set_radius(10.0f);
 }
 
 void Box2DRectShape::_bind_methods() {
@@ -170,7 +170,7 @@ void Box2DRectShape::draw(const RID &p_to_rid, const Color &p_color) {
 }
 
 Box2DRectShape::Box2DRectShape() :
-		width(50.0f), height(50.0f) {
+		width(10.0f), height(10.0f) {
 	const float factor = GD_TO_B2;
 	shape.SetAsBox(width * factor * 0.5f, height * factor * 0.5f);
 }
@@ -278,9 +278,9 @@ void Box2DSegmentShape::draw(const RID &p_to_rid, const Color &p_color) {
 }
 
 Box2DSegmentShape::Box2DSegmentShape() {
-	shape.SetTwoSided(gd_to_b2(Vector2(-25, 0)), gd_to_b2(Vector2(25, 0)));
-	shape.m_vertex0 = gd_to_b2(Vector2(-50, 0));
-	shape.m_vertex3 = gd_to_b2(Vector2(50, 0));
+	shape.SetTwoSided(gd_to_b2(Vector2(0, 0)), gd_to_b2(Vector2(10, 0)));
+	shape.m_vertex0 = gd_to_b2(Vector2(-10, 0));
+	shape.m_vertex3 = gd_to_b2(Vector2(20, 0));
 }
 
 bool isPolygonValid(const b2Vec2 *vertices, int32 count) {
