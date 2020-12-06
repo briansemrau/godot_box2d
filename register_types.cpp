@@ -24,7 +24,7 @@ void register_godot_box2d_types() {
 	ClassDB::register_class<Box2DRectShape>();
 	ClassDB::register_class<Box2DSegmentShape>();
 	ClassDB::register_class<Box2DPolygonShape>();
-	// TODO capsule shape
+	ClassDB::register_class<Box2DCapsuleShape>();
 
 	ClassDB::register_virtual_class<Box2DJoint>();
 	ClassDB::register_class<Box2DRevoluteJoint>();

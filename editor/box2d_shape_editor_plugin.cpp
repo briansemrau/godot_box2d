@@ -57,7 +57,13 @@ Variant Box2DShapeEditor::get_handle_value(int idx) const {
 		} break;
 
 		case Box2DShapeEditor::CAPSULE_SHAPE: {
-			ERR_PRINT("Not yet implemented");
+			Ref<Box2DCapsuleShape> capsule = node->get_shape();
+
+			if (idx == 0) {
+				return capsule->get_radius();
+			} else if (idx == 1) {
+				return capsule->get_height();
+			}
 		} break;
 
 		case Box2DShapeEditor::UNEDITABLE_SHAPE:
@@ -117,7 +123,19 @@ void Box2DShapeEditor::set_handle(int idx, Point2 &p_point) {
 		} break;
 
 		case Box2DShapeEditor::CAPSULE_SHAPE: {
-			ERR_PRINT("Not yet implemented");
+			if (idx < 2) {
+				Ref<Box2DCapsuleShape> capsule = node->get_shape();
+
+				real_t parameter = Math::abs(p_point[idx]);
+
+				if (idx == 0) {
+					capsule->set_radius(parameter);
+				} else if (idx == 1) {
+					capsule->set_height(parameter * 2 - capsule->get_radius() * 2);
+				}
+
+				canvas_item_editor->update_viewport();
+			}
 		} break;
 
 		case Box2DShapeEditor::UNEDITABLE_SHAPE:
@@ -182,7 +200,19 @@ void Box2DShapeEditor::commit_handle(int idx, Variant &p_org) {
 		} break;
 
 		case Box2DShapeEditor::CAPSULE_SHAPE: {
-			ERR_PRINT("Not yet implemented");
+			Ref<Box2DCapsuleShape> capsule = node->get_shape();
+
+			if (idx == 0) {
+				undo_redo->add_do_method(capsule.ptr(), "set_radius", capsule->get_radius());
+				undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+				undo_redo->add_undo_method(capsule.ptr(), "set_radius", p_org);
+				undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+			} else if (idx == 1) {
+				undo_redo->add_do_method(capsule.ptr(), "set_height", capsule->get_height());
+				undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+				undo_redo->add_undo_method(capsule.ptr(), "set_height", p_org);
+				undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+			}
 		} break;
 
 		case Box2DShapeEditor::UNEDITABLE_SHAPE:
@@ -287,8 +317,8 @@ void Box2DShapeEditor::_get_current_shape_type() {
 		shape_type = SEGMENT_SHAPE;
 	} else if (Object::cast_to<Box2DPolygonShape>(*s)) {
 		shape_type = UNEDITABLE_SHAPE;
-		//} else if (Object::cast_to<Box2DCapsuleShape>(*s)) {
-		//	shape_type = CAPSULE_SHAPE;
+	} else if (Object::cast_to<Box2DCapsuleShape>(*s)) {
+		shape_type = CAPSULE_SHAPE;
 	} else {
 		shape_type = UNEDITABLE_SHAPE;
 	}
@@ -373,7 +403,17 @@ void Box2DShapeEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 		} break;
 
 		case Box2DShapeEditor::CAPSULE_SHAPE: {
-			ERR_PRINT("Not yet implemented");
+			Ref<Box2DCapsuleShape> shape = node->get_shape();
+
+			handles.resize(2);
+			float radius = shape->get_radius();
+			float height = shape->get_height() / 2;
+
+			handles.write[0] = Point2(radius, -height);
+			handles.write[1] = Point2(0, -(height + radius));
+
+			p_overlay->draw_texture(h, gt.xform(handles[0]) - size);
+			p_overlay->draw_texture(h, gt.xform(handles[1]) - size);
 		} break;
 
 		case Box2DShapeEditor::UNEDITABLE_SHAPE:

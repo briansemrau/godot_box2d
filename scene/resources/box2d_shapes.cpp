@@ -12,7 +12,48 @@
 * @author Brian Semrau
 */
 
-void draw_arrow(const RID &p_to_rid, const Vector2 &start, const Vector2 &end, const Color &p_color, float p_width) {
+inline void draw_circle(const RID &p_to_rid, const Point2 &p_pos, float p_radius, int p_vertices, const Color &p_color) {
+	Vector<Vector2> points;
+	for (int i = 0; i < p_vertices; i++) {
+		points.push_back(p_pos + Vector2(Math::cos(i * Math_PI * 2 / 24.0), Math::sin(i * Math_PI * 2 / 24.0)) * p_radius);
+	}
+
+	int vertex_count = points.size();
+	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p_pos, points[0], p_color, 1.0f);
+	for (int i = 0; i < vertex_count; i++) {
+		Vector2 p = points[i];
+		Vector2 n = points[(i + 1) % vertex_count];
+		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
+	}
+
+	Vector<Color> col;
+	col.push_back(p_color);
+	VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
+}
+
+inline void draw_rect(const RID &p_to_rid, float p_width, float p_height, const Color &p_color) {
+	Vector<Vector2> points;
+
+	const real_t hx = p_width * 0.5f;
+	const real_t hy = p_height * 0.5f;
+	points.push_back(Vector2(hx, hy));
+	points.push_back(Vector2(-hx, hy));
+	points.push_back(Vector2(-hx, -hy));
+	points.push_back(Vector2(hx, -hy));
+
+	int vertex_count = points.size();
+	for (int i = 0; i < vertex_count; i++) {
+		Vector2 p = points[i];
+		Vector2 n = points[(i + 1) % vertex_count];
+		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
+	}
+
+	Vector<Color> col;
+	col.push_back(p_color);
+	VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
+}
+
+inline void draw_arrow(const RID &p_to_rid, const Vector2 &start, const Vector2 &end, const Color &p_color, float p_width) {
 	Vector2 norm = (end - start).normalized();
 	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, start, end, p_color, p_width);
 	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, end, end - norm.rotated(Math_PI * 0.17f) * 4.0f, p_color, p_width);
@@ -37,7 +78,16 @@ bool Box2DShape::_edit_is_selected_on_click(const Point2 &p_point, double p_tole
 
 	Transform2D cursor_pos(0, p_point);
 
-	return b2TestOverlap(get_shape(), 0, &cursor, 0, gd_to_b2(Transform2D()), gd_to_b2(cursor_pos));
+	if (is_composite_shape()) {
+		for (int i = 0; i < get_shapes().size(); i++) {
+			if (b2TestOverlap(get_shapes()[i], 0, &cursor, 0, gd_to_b2(Transform2D()), gd_to_b2(cursor_pos))) {
+				return true;
+			}
+		}
+		return false;
+	} else {
+		return b2TestOverlap(get_shape(), 0, &cursor, 0, gd_to_b2(Transform2D()), gd_to_b2(cursor_pos));
+	}
 }
 
 void Box2DCircleShape::_bind_methods() {
@@ -57,24 +107,9 @@ real_t Box2DCircleShape::get_radius() const {
 }
 
 void Box2DCircleShape::draw(const RID &p_to_rid, const Color &p_color) {
-	// Same as in Godot's CircleShape2D::draw
-	Vector<Vector2> points;
-	for (int i = 0; i < 24; i++) {
-		points.push_back(Vector2(Math::cos(i * Math_PI * 2 / 24.0), Math::sin(i * Math_PI * 2 / 24.0)) * get_radius());
-	}
-
-	int vertex_count = points.size();
-	for (int i = 0; i < vertex_count; i++) {
-		Vector2 p = points[i];
-		Vector2 n = points[(i + 1) % vertex_count];
-		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
-	}
-
-	Vector<Color> col;
 	Color c(p_color);
 	c.a *= 0.5;
-	col.push_back(c);
-	VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
+	draw_circle(p_to_rid, Vector2(0, 0), get_radius(), 24, c);
 }
 
 Box2DCircleShape::Box2DCircleShape() {
@@ -129,27 +164,9 @@ real_t Box2DRectShape::get_height() const {
 }
 
 void Box2DRectShape::draw(const RID &p_to_rid, const Color &p_color) {
-	Vector<Vector2> points;
-
-	const real_t hx = width * 0.5;
-	const real_t hy = height * 0.5;
-	points.push_back(Vector2(hx, hy));
-	points.push_back(Vector2(-hx, hy));
-	points.push_back(Vector2(-hx, -hy));
-	points.push_back(Vector2(hx, -hy));
-
-	int vertex_count = points.size();
-	for (int i = 0; i < vertex_count; i++) {
-		Vector2 p = points[i];
-		Vector2 n = points[(i + 1) % vertex_count];
-		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
-	}
-
-	Vector<Color> col;
 	Color c(p_color);
 	c.a *= 0.5;
-	col.push_back(c);
-	VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
+	draw_rect(p_to_rid, width, height, c);
 }
 
 Box2DRectShape::Box2DRectShape() :
@@ -671,4 +688,67 @@ Box2DPolygonShape::Box2DPolygonShape() :
 
 Box2DPolygonShape::~Box2DPolygonShape() {
 	memdelete_notnull(chain_shape);
+}
+
+const Vector<const b2Shape *> Box2DCapsuleShape::get_shapes() const {
+	return shapes;
+}
+
+void Box2DCapsuleShape::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_height", "height"), &Box2DCapsuleShape::set_height);
+	ClassDB::bind_method(D_METHOD("get_height"), &Box2DCapsuleShape::get_height);
+	ClassDB::bind_method(D_METHOD("set_radius", "radius"), &Box2DCapsuleShape::set_radius);
+	ClassDB::bind_method(D_METHOD("get_radius"), &Box2DCapsuleShape::get_radius);
+
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "height", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_height", "get_height");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "radius", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_radius", "get_radius");
+}
+
+void Box2DCapsuleShape::set_height(real_t p_height) {
+	height = p_height;
+
+	const float hy = p_height * GD_TO_B2 * 0.5f;
+	topCircleShape.m_p.y = -hy;
+	bottomCircleShape.m_p.y = hy;
+	rectShape.SetAsBox(radius, hy);
+
+	emit_changed();
+}
+
+real_t Box2DCapsuleShape::get_height() const {
+	return height;
+}
+
+void Box2DCapsuleShape::set_radius(real_t p_radius) {
+	radius = p_radius;
+
+	const float r = MAX(p_radius * GD_TO_B2, b2_linearSlop);
+	topCircleShape.m_radius = r;
+	bottomCircleShape.m_radius = r;
+	rectShape.SetAsBox(radius, height * GD_TO_B2 * 0.5f);
+
+	emit_changed();
+}
+
+real_t Box2DCapsuleShape::get_radius() const {
+	return radius;
+}
+
+void Box2DCapsuleShape::draw(const RID &p_to_rid, const Color &p_color) {
+	Color c(p_color);
+	c.a *= 0.5;
+
+	draw_circle(p_to_rid, Vector2(0, -height / 2.0f), radius, 24, c);
+	draw_circle(p_to_rid, Vector2(0, height / 2.0f), radius, 24, c);
+
+	draw_rect(p_to_rid, radius * 2.0f, height, c);
+}
+
+Box2DCapsuleShape::Box2DCapsuleShape() {
+	shapes.push_back(&topCircleShape);
+	shapes.push_back(&bottomCircleShape);
+	shapes.push_back(&rectShape);
+
+	set_radius(10.0f);
+	set_height(20.0f);
 }
