@@ -11,7 +11,12 @@
 
 /**
 * @author Brian Semrau
+*
+* Conversion functions for switching between Box2D/Godot data structures and units.
 */
+
+#define B2_TO_GD static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"))
+#define GD_TO_B2 (1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor")))
 
 extern void b2_to_gd(b2Vec2 const &inVal, Vector2 &outVal);
 extern Vector2 b2_to_gd(b2Vec2 const &inVal);

@@ -499,7 +499,7 @@ real_t Box2DJoint::get_reaction_torque() const {
 	if (broken)
 		return real_t(); // Don't print a fail message for intended behavior
 	ERR_FAIL_COND_V_MSG(!joint, real_t(), "b2Joint is null.");
-	return joint->GetReactionTorque(1.0f / get_physics_process_delta_time());
+	return joint->GetReactionTorque(1.0f / get_physics_process_delta_time()) * B2_TO_GD;
 }
 
 bool Box2DJoint::is_enabled() const {
@@ -513,17 +513,7 @@ bool Box2DJoint::is_valid() const {
 	return jointDef->bodyA && jointDef->bodyB;
 }
 
-Box2DJoint::Box2DJoint() :
-		jointDef(NULL),
-		joint(NULL),
-		world_node(NULL),
-		bodyA_cache(0),
-		bodyB_cache(0),
-		broken(false),
-		breaking_enabled(false),
-		free_on_break(false),
-		max_force(0.0f),
-		max_torque(0.0f) {}
+Box2DJoint::Box2DJoint() {}
 
 Box2DJoint::~Box2DJoint() {
 	if (joint && world_node) {
@@ -586,7 +576,6 @@ void Box2DRevoluteJoint::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "motor_speed"), "set_motor_speed", "get_motor_speed");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "max_motor_torque"), "set_max_motor_torque", "get_max_motor_torque");
 	ADD_GROUP("Anchors", "");
-	// TODO rename this property to configurable_anchors and invert the bool
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_default_anchors"), "set_editor_use_default_anchors", "get_editor_use_default_anchors");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "anchor_a"), "set_anchor_a", "get_anchor_a");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "anchor_b"), "set_anchor_b", "get_anchor_b");
@@ -766,18 +755,19 @@ real_t Box2DRevoluteJoint::get_motor_speed() const {
 }
 
 void Box2DRevoluteJoint::set_max_motor_torque(real_t p_torque) {
+	const float torque = p_torque * GD_TO_B2;
 	if (get_b2Joint())
-		static_cast<b2RevoluteJoint *>(get_b2Joint())->SetMaxMotorTorque(p_torque);
-	jointDef.maxMotorTorque = p_torque;
+		static_cast<b2RevoluteJoint *>(get_b2Joint())->SetMaxMotorTorque(torque);
+	jointDef.maxMotorTorque = torque;
 }
 
 real_t Box2DRevoluteJoint::get_max_motor_torque() const {
-	return jointDef.maxMotorTorque;
+	return jointDef.maxMotorTorque * B2_TO_GD;
 }
 
 real_t Box2DRevoluteJoint::get_motor_torque() const {
 	ERR_FAIL_COND_V_MSG(!get_b2Joint(), real_t(), "b2Joint is null.");
-	return static_cast<b2RevoluteJoint *>(get_b2Joint())->GetMotorTorque(1.0f / get_physics_process_delta_time());
+	return static_cast<b2RevoluteJoint *>(get_b2Joint())->GetMotorTorque(1.0f / get_physics_process_delta_time()) * B2_TO_GD;
 }
 
 Box2DRevoluteJoint::Box2DRevoluteJoint() :
@@ -891,13 +881,13 @@ void Box2DPrismaticJoint::debug_draw(RID p_to_rid, Color p_color) {
 	Point2 x1 = to_local(b2_to_gd(posA));
 	Point2 x2 = to_local(b2_to_gd(posB));
 
+	draw_rect(Rect2(p1 - Vector2(5, 5), Vector2(10, 10)), p_color, false, 2.0f);
+	draw_rect(Rect2(p2 - Vector2(1, 1), Vector2(2, 2)), p_color);
+
 	if (jointDef.bodyA)
 		draw_set_transform(p1, jointDef.bodyA->GetUserData().owner->get_global_rotation() - axis_body_ref_angle, Vector2(1, 1));
 	else
 		draw_set_transform(p1, -axis_body_ref_angle, Vector2(1, 1));
-
-	draw_rect(Rect2(-Vector2(5, 5), Vector2(10, 10)), p_color, false, 2.0f);
-	draw_rect(Rect2(-Vector2(1, 1), Vector2(2, 2)), p_color);
 
 	Vector2 axis = get_local_axis();
 
@@ -919,10 +909,11 @@ void Box2DPrismaticJoint::debug_draw(RID p_to_rid, Color p_color) {
 		Vector2 tan = axis.rotated(Math_PI * 0.5f);
 
 		draw_line(start_p, start_p + axis * get_joint_speed(), c, 1.5f);
+		draw_line(start_p + axis * get_joint_speed(), start_p + axis * get_motor_speed(), Color(c.r, c.g, c.b, c.a * 0.3), 1.5f);
 		if (j) {
 			float forceUsage = get_motor_force() / get_max_motor_force();
 			c = Color(1.0, 1.0, 0.0, 0.5);
-			draw_line(start_p + tan, start_p + tan + axis * get_joint_speed(), c, 1.5f);
+			draw_line(start_p + tan, start_p + tan + axis * get_motor_speed() * forceUsage, c, 1.5f);
 		}
 	}
 
@@ -940,12 +931,12 @@ real_t Box2DPrismaticJoint::get_reference_angle() const {
 
 real_t Box2DPrismaticJoint::get_joint_translation() const {
 	ERR_FAIL_COND_V_MSG(!get_b2Joint(), real_t(), "b2Joint is null.");
-	return static_cast<b2PrismaticJoint *>(get_b2Joint())->GetJointTranslation();
+	return static_cast<b2PrismaticJoint *>(get_b2Joint())->GetJointTranslation() * B2_TO_GD;
 }
 
 real_t Box2DPrismaticJoint::get_joint_speed() const {
 	ERR_FAIL_COND_V_MSG(!get_b2Joint(), real_t(), "b2Joint is null.");
-	return static_cast<b2PrismaticJoint *>(get_b2Joint())->GetJointSpeed();
+	return static_cast<b2PrismaticJoint *>(get_b2Joint())->GetJointSpeed() * B2_TO_GD;
 }
 
 void Box2DPrismaticJoint::set_editor_use_default_anchors(bool p_default) {
@@ -1010,33 +1001,29 @@ bool Box2DPrismaticJoint::is_limit_enabled() const {
 }
 
 void Box2DPrismaticJoint::set_upper_limit(real_t p_distance) {
-	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	float distance = p_distance * factor;
+	float distance = p_distance * GD_TO_B2;
 	if (get_b2Joint())
 		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetLimits(jointDef.lowerTranslation, distance);
 	jointDef.upperTranslation = distance;
 }
 
 real_t Box2DPrismaticJoint::get_upper_limit() const {
-	const float factor = static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	return jointDef.upperTranslation * factor;
+	return jointDef.upperTranslation * B2_TO_GD;
 }
 
 void Box2DPrismaticJoint::set_lower_limit(real_t p_distance) {
-	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	float distance = p_distance * factor;
+	float distance = p_distance * GD_TO_B2;
 	if (get_b2Joint())
 		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetLimits(distance, jointDef.upperTranslation);
 	jointDef.lowerTranslation = distance;
 }
 
 real_t Box2DPrismaticJoint::get_lower_limit() const {
-	const float factor = static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	return jointDef.lowerTranslation * factor;
+	return jointDef.lowerTranslation * B2_TO_GD;
 }
 
 void Box2DPrismaticJoint::set_limits(real_t p_lower, real_t p_upper) {
-	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
+	const float factor = GD_TO_B2;
 	float lower = p_lower * factor;
 	float upper = p_upper * factor;
 	if (get_b2Joint())
@@ -1056,31 +1043,30 @@ bool Box2DPrismaticJoint::is_motor_enabled() const {
 }
 
 void Box2DPrismaticJoint::set_motor_speed(real_t p_speed) {
-	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	float speed = p_speed * factor;
+	float speed = p_speed * GD_TO_B2;
 	if (get_b2Joint())
 		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetMotorSpeed(speed);
 	jointDef.motorSpeed = speed;
 }
 
 real_t Box2DPrismaticJoint::get_motor_speed() const {
-	const float factor = static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	return jointDef.motorSpeed * factor;
+	return jointDef.motorSpeed * B2_TO_GD;
 }
 
 void Box2DPrismaticJoint::set_max_motor_force(real_t p_force) {
+	float force = p_force * GD_TO_B2;
 	if (get_b2Joint())
-		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetMaxMotorForce(p_force);
-	jointDef.maxMotorForce = p_force;
+		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetMaxMotorForce(force);
+	jointDef.maxMotorForce = force;
 }
 
 real_t Box2DPrismaticJoint::get_max_motor_force() const {
-	return jointDef.maxMotorForce;
+	return jointDef.maxMotorForce * B2_TO_GD;
 }
 
 real_t Box2DPrismaticJoint::get_motor_force() const {
 	ERR_FAIL_COND_V_MSG(!get_b2Joint(), real_t(), "b2Joint is null.");
-	return static_cast<b2PrismaticJoint *>(get_b2Joint())->GetMotorForce(1.0f / get_physics_process_delta_time());
+	return static_cast<b2PrismaticJoint *>(get_b2Joint())->GetMotorForce(1.0f / get_physics_process_delta_time()) * B2_TO_GD;
 }
 
 Box2DPrismaticJoint::Box2DPrismaticJoint() :
@@ -1092,15 +1078,20 @@ Box2DPrismaticJoint::Box2DPrismaticJoint() :
 }
 
 void Box2DDistanceJoint::on_editor_transforms_changed() {
-	// Some relative coordinate has changed
-	// We want to move our anchors to keep their relative location to each body the same
-	// This leaves the jointDef anchors unchanged
-	if (jointDef.bodyA && jointDef.bodyB) {
-		anchor_a = to_local(b2_to_gd(jointDef.bodyA->GetWorldPoint(jointDef.localAnchorA)));
-		anchor_b = to_local(b2_to_gd(jointDef.bodyB->GetWorldPoint(jointDef.localAnchorB)));
-		if (editor_use_default_rest_length)
-			reset_rest_length();
-		_change_notify();
+	if (editor_translate_anchors) {
+		// Update jointDef anchors to use our anchors
+		recreate_joint();
+	} else {
+		// Some relative coordinate has changed
+		// We want to move our anchors to keep their relative location to each body the same
+		// This leaves the jointDef anchors unchanged
+		if (jointDef.bodyA && jointDef.bodyB) {
+			anchor_a = to_local(b2_to_gd(jointDef.bodyA->GetWorldPoint(jointDef.localAnchorA)));
+			anchor_b = to_local(b2_to_gd(jointDef.bodyB->GetWorldPoint(jointDef.localAnchorB)));
+			if (editor_use_default_rest_length)
+				reset_rest_length();
+			_change_notify();
+		}
 	}
 }
 
@@ -1108,6 +1099,8 @@ void Box2DDistanceJoint::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_editor_use_default_rest_length", "default"), &Box2DDistanceJoint::set_editor_use_default_rest_length);
 	ClassDB::bind_method(D_METHOD("get_editor_use_default_rest_length"), &Box2DDistanceJoint::get_editor_use_default_rest_length);
 
+	ClassDB::bind_method(D_METHOD("set_editor_translate_anchors", "default"), &Box2DDistanceJoint::set_editor_translate_anchors);
+	ClassDB::bind_method(D_METHOD("get_editor_translate_anchors"), &Box2DDistanceJoint::get_editor_translate_anchors);
 	ClassDB::bind_method(D_METHOD("set_anchor_a", "anchor_a"), &Box2DDistanceJoint::set_anchor_a);
 	ClassDB::bind_method(D_METHOD("get_anchor_a"), &Box2DDistanceJoint::get_anchor_a);
 	ClassDB::bind_method(D_METHOD("set_anchor_b", "anchor_b"), &Box2DDistanceJoint::set_anchor_b);
@@ -1127,8 +1120,6 @@ void Box2DDistanceJoint::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_current_length"), &Box2DDistanceJoint::get_current_length);
 
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "anchor_a"), "set_anchor_a", "get_anchor_a");
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "anchor_b"), "set_anchor_b", "get_anchor_b");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_default_rest_length"), "set_editor_use_default_rest_length", "get_editor_use_default_rest_length");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "rest_length"), "set_rest_length", "get_rest_length");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "min_length"), "set_min_length", "get_min_length");
@@ -1136,10 +1127,14 @@ void Box2DDistanceJoint::_bind_methods() {
 	ADD_GROUP("Spring Tuning", "");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "stiffness"), "set_stiffness", "get_stiffness");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "damping"), "set_damping", "get_damping");
+	ADD_GROUP("Anchors", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "editor_translate_anchors"), "set_editor_translate_anchors", "get_editor_translate_anchors");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "anchor_a"), "set_anchor_a", "get_anchor_a");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "anchor_b"), "set_anchor_b", "get_anchor_b");
 }
 
 void Box2DDistanceJoint::init_b2JointDef(const b2Vec2 &) {
-	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
+	const float factor = GD_TO_B2;
 
 	b2Vec2 a = gd_to_b2(get_global_transform().xform(anchor_a));
 	b2Vec2 b = gd_to_b2(get_global_transform().xform(anchor_b));
@@ -1198,6 +1193,16 @@ void Box2DDistanceJoint::debug_draw(RID p_to_rid, Color p_color) {
 	draw_line(x2, p2, c, 1.0f);
 }
 
+void Box2DDistanceJoint::set_editor_translate_anchors(bool p_default) {
+	editor_translate_anchors = p_default;
+	//if (editor_use_default_anchors)
+	//	reset_joint_anchors();
+}
+
+bool Box2DDistanceJoint::get_editor_translate_anchors() const {
+	return editor_translate_anchors;
+}
+
 void Box2DDistanceJoint::set_editor_use_default_rest_length(bool p_default) {
 	editor_use_default_rest_length = p_default;
 	if (editor_use_default_rest_length) {
@@ -1231,10 +1236,16 @@ Vector2 Box2DDistanceJoint::get_anchor_b() const {
 	return anchor_b;
 }
 
+void Box2DDistanceJoint::reset_joint_anchors() {
+	ERR_FAIL_COND_MSG(!is_inside_tree(), "Can't reinitialize a joint outside of the SceneTree. It requires relative locations of bodies to initialize.");
+	anchor_a = Vector2();
+	anchor_b = Vector2();
+	recreate_joint();
+}
+
 void Box2DDistanceJoint::set_rest_length(real_t p_length) {
 	rest_length = p_length;
-	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	float length = p_length * factor;
+	float length = p_length * GD_TO_B2;
 	if (get_b2Joint())
 		static_cast<b2DistanceJoint *>(get_b2Joint())->SetLength(length);
 	jointDef.length = length;
@@ -1267,8 +1278,7 @@ void Box2DDistanceJoint::set_min_length(real_t p_length) {
 		min_length = rest_length;
 	}
 
-	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	float length = p_length * factor;
+	float length = p_length * GD_TO_B2;
 	if (get_b2Joint())
 		static_cast<b2DistanceJoint *>(get_b2Joint())->SetMinLength(length);
 	jointDef.length = length;
@@ -1285,8 +1295,7 @@ void Box2DDistanceJoint::set_max_length(real_t p_length) {
 		max_length = rest_length;
 	}
 
-	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	float length = p_length * factor;
+	float length = p_length * GD_TO_B2;
 	if (get_b2Joint())
 		static_cast<b2DistanceJoint *>(get_b2Joint())->SetMaxLength(length);
 	jointDef.length = length;
@@ -1319,25 +1328,54 @@ real_t Box2DDistanceJoint::get_damping() const {
 
 real_t Box2DDistanceJoint::get_current_length() const {
 	ERR_FAIL_COND_V_MSG(!get_b2Joint(), real_t(), "b2Joint is null.");
-	const float factor = static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	return static_cast<b2DistanceJoint *>(get_b2Joint())->GetCurrentLength();
+	return static_cast<b2DistanceJoint *>(get_b2Joint())->GetCurrentLength() * B2_TO_GD;
+}
+
+void Box2DWeldJoint::on_editor_transforms_changed() {
+	if (editor_use_default_anchors) {
+		// We need set reset anchors and reinit the jointDef
+		if (is_inside_tree()) {
+			reset_joint_anchors();
+			_change_notify();
+		}
+	} else {
+		// Some relative coordinate has changed
+		// We want to move our anchors to keep their relative location to each body the same
+		// This leaves the jointDef anchors unchanged
+		anchor_a = to_local(b2_to_gd(jointDef.bodyA->GetWorldPoint(jointDef.localAnchorA)));
+		anchor_b = to_local(b2_to_gd(jointDef.bodyB->GetWorldPoint(jointDef.localAnchorB)));
+		_change_notify();
+	}
 }
 
 void Box2DWeldJoint::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_editor_use_default_anchors", "default"), &Box2DWeldJoint::set_editor_use_default_anchors);
+	ClassDB::bind_method(D_METHOD("get_editor_use_default_anchors"), &Box2DWeldJoint::get_editor_use_default_anchors);
+	ClassDB::bind_method(D_METHOD("set_anchor_a", "anchor_a"), &Box2DWeldJoint::set_anchor_a);
+	ClassDB::bind_method(D_METHOD("get_anchor_a"), &Box2DWeldJoint::get_anchor_a);
+	ClassDB::bind_method(D_METHOD("set_anchor_b", "anchor_b"), &Box2DWeldJoint::set_anchor_b);
+	ClassDB::bind_method(D_METHOD("get_anchor_b"), &Box2DWeldJoint::get_anchor_b);
+	ClassDB::bind_method(D_METHOD("reset_joint_anchors"), &Box2DWeldJoint::reset_joint_anchors);
+
 	ClassDB::bind_method(D_METHOD("set_stiffness", "stiffness"), &Box2DWeldJoint::set_stiffness);
 	ClassDB::bind_method(D_METHOD("get_stiffness"), &Box2DWeldJoint::get_stiffness);
-	ClassDB::bind_method(D_METHOD("set_damping", "hz"), &Box2DWeldJoint::set_damping);
+	ClassDB::bind_method(D_METHOD("set_damping", "damping"), &Box2DWeldJoint::set_damping);
 	ClassDB::bind_method(D_METHOD("get_damping"), &Box2DWeldJoint::get_damping);
-	//ClassDB::bind_method(D_METHOD("set_", ""), &Box2DWeldJoint::set_);
-	//ClassDB::bind_method(D_METHOD("get_"), &Box2DWeldJoint::get_);
 
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "stiffness"), "set_stiffness", "get_stiffness");
 	ADD_PROPERTY(PropertyInfo(Variant::REAL, "damping"), "set_damping", "get_damping");
-	//ADD_PROPERTY(PropertyInfo(Variant::BOOL, ""), "set_", "get_");
+	ADD_GROUP("Anchors", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_default_anchors"), "set_editor_use_default_anchors", "get_editor_use_default_anchors");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "anchor_a"), "set_anchor_a", "get_anchor_a");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "anchor_b"), "set_anchor_b", "get_anchor_b");
 }
 
 void Box2DWeldJoint::init_b2JointDef(const b2Vec2 &p_joint_pos) {
 	jointDef.Initialize(jointDef.bodyA, jointDef.bodyB, p_joint_pos);
+
+	// Make the jointDef use the configured anchors
+	jointDef.localAnchorA = jointDef.bodyA->GetLocalPoint(gd_to_b2(get_global_transform().xform(anchor_a)));
+	jointDef.localAnchorB = jointDef.bodyB->GetLocalPoint(gd_to_b2(get_global_transform().xform(anchor_b)));
 }
 
 void Box2DWeldJoint::debug_draw(RID p_to_rid, Color p_color) {
@@ -1372,6 +1410,47 @@ void Box2DWeldJoint::debug_draw(RID p_to_rid, Color p_color) {
 	c.set_hsv(c.get_h(), c.get_s() * 0.5f, c.get_v(), c.a * 0.2f);
 	draw_line(x1, p1, c, 1.0f);
 	draw_line(x2, p2, c, 1.0f);
+}
+
+void Box2DWeldJoint::set_editor_use_default_anchors(bool p_update) {
+	editor_use_default_anchors = p_update;
+	if (editor_use_default_anchors)
+		reset_joint_anchors();
+}
+
+bool Box2DWeldJoint::get_editor_use_default_anchors() const {
+	return editor_use_default_anchors;
+}
+
+void Box2DWeldJoint::set_anchor_a(const Vector2 &p_anchor) {
+	anchor_a = p_anchor;
+
+	recreate_joint();
+}
+
+Vector2 Box2DWeldJoint::get_anchor_a() const {
+	if (jointDef.bodyA)
+		return to_local(b2_to_gd(jointDef.bodyA->GetWorldPoint(jointDef.localAnchorA)));
+	return anchor_a;
+}
+
+void Box2DWeldJoint::set_anchor_b(const Vector2 &p_anchor) {
+	anchor_b = p_anchor;
+
+	recreate_joint();
+}
+
+Vector2 Box2DWeldJoint::get_anchor_b() const {
+	if (jointDef.bodyB)
+		return to_local(b2_to_gd(jointDef.bodyB->GetWorldPoint(jointDef.localAnchorB)));
+	return anchor_b;
+}
+
+void Box2DWeldJoint::reset_joint_anchors() {
+	ERR_FAIL_COND_MSG(!is_inside_tree(), "Can't reinitialize a joint outside of the SceneTree. It requires relative locations of bodies to initialize.");
+	anchor_a = Vector2();
+	anchor_b = Vector2();
+	recreate_joint();
 }
 
 void Box2DWeldJoint::set_stiffness(real_t p_hz) {

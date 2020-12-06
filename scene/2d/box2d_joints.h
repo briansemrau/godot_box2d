@@ -34,22 +34,22 @@ class Box2DJoint : public Node2D {
 	friend class Box2DWorld;
 	friend class Box2DPhysicsBody;
 
-	b2JointDef *jointDef;
-	b2Joint *joint;
+	b2JointDef *jointDef = NULL;
+	b2Joint *joint = NULL;
 
-	Box2DWorld *world_node;
+	Box2DWorld *world_node = NULL;
 
 	NodePath a;
 	NodePath b;
 
-	ObjectID bodyA_cache;
-	ObjectID bodyB_cache;
+	ObjectID bodyA_cache = 0;
+	ObjectID bodyB_cache = 0;
 
-	bool broken;
-	bool breaking_enabled;
-	bool free_on_break; // TODO This feature may not be necessary. Perhaps this should be handled by the user in an "on_broken" signal.
-	real_t max_force;
-	real_t max_torque;
+	bool broken = false;
+	bool breaking_enabled = false;
+	bool free_on_break = false; // TODO This feature may not be necessary. Perhaps this should be handled by the user in an "on_broken" signal.
+	real_t max_force = 0.0f;
+	real_t max_torque = 0.0f;
 
 	void on_b2Joint_destroyed();
 
@@ -274,6 +274,7 @@ class Box2DDistanceJoint : public Box2DJoint {
 
 	Vector2 anchor_a = Vector2(0, 0);
 	Vector2 anchor_b = Vector2(0, 50);
+	bool editor_translate_anchors = true;
 
 	real_t rest_length = 50;
 	real_t min_length = 50;
@@ -291,6 +292,9 @@ protected:
 	virtual void debug_draw(RID p_to_rid, Color p_color) override;
 
 public:
+	void set_editor_translate_anchors(bool p_default);
+	bool get_editor_translate_anchors() const;
+
 	void set_editor_use_default_rest_length(bool p_default);
 	bool get_editor_use_default_rest_length() const;
 
@@ -299,6 +303,8 @@ public:
 
 	void set_anchor_b(const Vector2 &p_anchor);
 	Vector2 get_anchor_b() const;
+
+	void reset_joint_anchors();
 
 	void set_rest_length(real_t p_length);
 	real_t get_rest_length() const;
@@ -339,6 +345,13 @@ class Box2DWeldJoint : public Box2DJoint {
 
 	b2WeldJointDef jointDef;
 
+	Vector2 anchor_a = Vector2();
+	Vector2 anchor_b = Vector2();
+
+	bool editor_use_default_anchors = true;
+
+	virtual void on_editor_transforms_changed() override;
+
 protected:
 	static void _bind_methods();
 
@@ -347,6 +360,17 @@ protected:
 	virtual void debug_draw(RID p_to_rid, Color p_color) override;
 
 public:
+	void set_editor_use_default_anchors(bool p_update);
+	bool get_editor_use_default_anchors() const;
+
+	void set_anchor_a(const Vector2 &p_anchor);
+	Vector2 get_anchor_a() const;
+
+	void set_anchor_b(const Vector2 &p_anchor);
+	Vector2 get_anchor_b() const;
+
+	void reset_joint_anchors();
+
 	void set_stiffness(real_t p_hz); // TODO is this the best param name?
 	real_t get_stiffness() const;
 

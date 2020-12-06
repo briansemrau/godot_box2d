@@ -29,15 +29,15 @@ class Box2DFixture : public Node2D {
 	Ref<Box2DShape> shape;
 	b2FixtureDef fixtureDef;
 	b2Filter filterDef;
-	bool override_body_filterdata;
-	bool accept_body_collision_exceptions;
+	bool override_body_filterdata = false;
+	bool accept_body_collision_exceptions = true;
 	// TODO maybe implement a HashSet or use std
 	// Not sure why Godot uses a VSet for this
 	VSet<Box2DFixture *> filtered;
 	VSet<Box2DFixture *> filtering_me;
 	// TODO might fixtures need to filter other whole bodies?
 
-	Box2DPhysicsBody *body_node;
+	Box2DPhysicsBody *body_node = NULL;
 
 	Vector<b2Fixture *> fixtures;
 
@@ -96,6 +96,8 @@ public:
 	void add_collision_exception_with(Node *p_node);
 	void remove_collision_exception_with(Node *p_node);
 
+	// Density in units [grams/pixel^2]
+	// 1kg/m^2 (with default 50px/m) is 0.4g/px
 	void set_density(real_t p_density);
 	real_t get_density() const;
 

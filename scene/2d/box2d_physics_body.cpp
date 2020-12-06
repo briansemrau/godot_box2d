@@ -729,11 +729,6 @@ Vector2 Box2DPhysicsBody::get_contact_tangent_impulse(int p_idx) const {
 	return contact_monitor->contacts[p_idx].tangent_impulse;
 }
 
-//Vector2 Box2DPhysicsBody::get_contact_(int p_idx) const {
-//	ERR_FAIL_COND_V_MSG(!contact_monitor, Vector2(), "Contact monitoring is disabled.");
-//	return contact_monitor->contacts[p_idx].;
-//}
-
 void Box2DPhysicsBody::apply_force(const Vector2 &force, const Vector2 &point, bool wake) {
 	ERR_FAIL_COND_MSG(!body, "b2Body is null.");
 	body->ApplyForce(gd_to_b2(force), gd_to_b2(point), wake);
@@ -746,7 +741,7 @@ void Box2DPhysicsBody::apply_central_force(const Vector2 &force, bool wake) {
 
 void Box2DPhysicsBody::apply_torque(real_t torque, bool wake) {
 	ERR_FAIL_COND_MSG(!body, "b2Body is null.");
-	body->ApplyTorque(torque, wake);
+	body->ApplyTorque(torque * GD_TO_B2, wake);
 }
 
 void Box2DPhysicsBody::apply_linear_impulse(const Vector2 &impulse, const Vector2 &point, bool wake) {
@@ -761,23 +756,10 @@ void Box2DPhysicsBody::apply_central_linear_impulse(const Vector2 &impulse, bool
 
 void Box2DPhysicsBody::apply_torque_impulse(real_t impulse, bool wake) {
 	ERR_FAIL_COND_MSG(!body, "b2Body is null.");
-	body->ApplyAngularImpulse(impulse, wake);
+	body->ApplyAngularImpulse(impulse * GD_TO_B2, wake);
 }
 
-Box2DPhysicsBody::Box2DPhysicsBody() :
-		use_custom_massdata(false),
-		linear_damping(0.0f),
-		angular_damping(0.0f),
-		contact_monitor(NULL),
-		max_contacts_reported(0),
-		body(NULL),
-		world_node(NULL),
-		prev_sleeping_state(bodyDef.awake) {
-
-	massDataDef.mass = 1.0f;
-	massDataDef.center = b2Vec2_zero;
-	massDataDef.I = 0.5f; // default for a disk of 1kg, 1m radius
-
+Box2DPhysicsBody::Box2DPhysicsBody() {
 	filterDef.maskBits = 0x0001;
 
 	set_physics_process_internal(true);

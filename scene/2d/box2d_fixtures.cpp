@@ -408,15 +408,19 @@ void Box2DFixture::remove_collision_exception_with(Node *p_node) {
 }
 
 void Box2DFixture::set_density(real_t p_density) {
+	const float factor = GD_TO_B2;
+	float density = p_density * (1.0e-3f / (factor * factor)); // g/pixel^2 to kg/m^2
+
 	for (int i = 0; i < fixtures.size(); i++) {
-		fixtures[i]->SetDensity(p_density);
+		fixtures[i]->SetDensity(density);
 		body_node->body->ResetMassData();
 	}
-	fixtureDef.density = p_density;
+	fixtureDef.density = density;
 }
 
 real_t Box2DFixture::get_density() const {
-	return fixtureDef.density;
+	const float factor = B2_TO_GD;
+	return fixtureDef.density * (1.0e3f / (factor * factor)); // kg/m^2 to g/px^2
 }
 
 void Box2DFixture::set_friction(real_t p_friction) {
@@ -441,11 +445,9 @@ real_t Box2DFixture::get_restitution() const {
 	return fixtureDef.restitution;
 }
 
-Box2DFixture::Box2DFixture() :
-		body_node(NULL),
-		override_body_filterdata(false),
-		accept_body_collision_exceptions(true) {
-	fixtureDef.density = 1.0f;
+Box2DFixture::Box2DFixture() {
+	const float factor = GD_TO_B2;
+	fixtureDef.density = 0.4f * (1.0e-3f / (factor * factor)); // 0.4 g/px^2 default
 	filterDef.maskBits = 0x0001;
 
 	if (Engine::get_singleton()->is_editor_hint()) {

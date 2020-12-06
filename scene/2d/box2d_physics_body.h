@@ -38,10 +38,10 @@ public:
 
 private:
 	b2BodyDef bodyDef;
-	b2MassData massDataDef;
-	bool use_custom_massdata;
-	real_t linear_damping;
-	real_t angular_damping;
+	b2MassData massDataDef{ 1.0f, b2Vec2_zero, 0.5f }; // default for a disk of 1kg, 1m radius
+	bool use_custom_massdata = false;
+	real_t linear_damping = 0.0f;
+	real_t angular_damping = 0.0f;
 	b2Filter filterDef;
 
 	VSet<Box2DPhysicsBody *> filtered;
@@ -59,16 +59,16 @@ private:
 		HashMap<ObjectID, int> entered_objects;
 	};
 
-	ContactMonitor *contact_monitor;
-	int max_contacts_reported;
+	ContactMonitor *contact_monitor = NULL;
+	int max_contacts_reported = 0;
 
-	b2Body *body;
+	b2Body *body = NULL;
 
-	Box2DWorld *world_node;
+	Box2DWorld *world_node = NULL;
 	Set<Box2DJoint *> joints;
 
 	Transform2D last_valid_xform;
-	bool prev_sleeping_state;
+	bool prev_sleeping_state = true;
 
 	void on_parent_created(Node *);
 

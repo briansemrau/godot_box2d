@@ -32,10 +32,8 @@ const Vector<const b2Shape *> Box2DShape::get_shapes() const {
 }
 
 bool Box2DShape::_edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const {
-	const float factor = static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-
 	b2CircleShape cursor;
-	cursor.m_radius = p_tolerance / factor;
+	cursor.m_radius = p_tolerance * GD_TO_B2;
 
 	Transform2D cursor_pos(0, p_point);
 
@@ -50,14 +48,12 @@ void Box2DCircleShape::_bind_methods() {
 }
 
 void Box2DCircleShape::set_radius(real_t p_radius) {
-	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	circleShape.m_radius = MAX(p_radius * factor, b2_linearSlop);
+	circleShape.m_radius = MAX(p_radius * GD_TO_B2, b2_linearSlop);
 	emit_changed();
 }
 
 real_t Box2DCircleShape::get_radius() const {
-	const float factor = static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	return circleShape.m_radius * factor;
+	return circleShape.m_radius * B2_TO_GD;
 }
 
 void Box2DCircleShape::draw(const RID &p_to_rid, const Color &p_color) {
@@ -101,6 +97,7 @@ void Box2DRectShape::_bind_methods() {
 void Box2DRectShape::set_size(const Vector2 &p_size) {
 	set_width(p_size.width);
 	set_height(p_size.height);
+	_change_notify();
 }
 
 Vector2 Box2DRectShape::get_size() const {
@@ -108,9 +105,10 @@ Vector2 Box2DRectShape::get_size() const {
 }
 
 void Box2DRectShape::set_width(real_t p_width) {
-	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
+	const float factor = GD_TO_B2;
 	width = MAX(p_width * factor, b2_linearSlop) / factor;
 	shape.SetAsBox(width * factor * 0.5, height * factor * 0.5);
+	_change_notify();
 	emit_changed();
 }
 
@@ -119,9 +117,10 @@ real_t Box2DRectShape::get_width() const {
 }
 
 void Box2DRectShape::set_height(real_t p_height) {
-	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
+	const float factor = GD_TO_B2;
 	height = MAX(p_height * factor, b2_linearSlop) / factor;
 	shape.SetAsBox(width * factor * 0.5, height * factor * 0.5);
+	_change_notify();
 	emit_changed();
 }
 
@@ -155,8 +154,8 @@ void Box2DRectShape::draw(const RID &p_to_rid, const Color &p_color) {
 
 Box2DRectShape::Box2DRectShape() :
 		width(50.0f), height(50.0f) {
-	const float factor = 1.0f / static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-	shape.SetAsBox(width * factor * 0.5, height * factor * 0.5);
+	const float factor = GD_TO_B2;
+	shape.SetAsBox(width * factor * 0.5f, height * factor * 0.5f);
 }
 
 void Box2DSegmentShape::_bind_methods() {
@@ -531,10 +530,8 @@ const Vector<const b2Shape *> Box2DPolygonShape::get_shapes() const {
 }
 
 bool Box2DPolygonShape::_edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const {
-	const float factor = static_cast<float>(GLOBAL_GET("physics/2d/box2d_conversion_factor"));
-
 	b2CircleShape cursor;
-	cursor.m_radius = p_tolerance / factor;
+	cursor.m_radius = p_tolerance * GD_TO_B2;
 
 	Transform2D cursor_pos(0, p_point);
 
