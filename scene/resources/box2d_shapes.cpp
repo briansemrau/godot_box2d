@@ -1,7 +1,8 @@
 #include "box2d_shapes.h"
 
-#include <core/project_settings.h>
-#include <servers/visual_server.h>
+#include <core/config/project_settings.h>
+#include <core/math/geometry_2d.h>
+#include <servers/rendering_server.h>
 
 #include "../../util/box2d_types_converter.h"
 #include "../2d/box2d_fixtures.h"
@@ -14,9 +15,9 @@
 
 void draw_arrow(const RID &p_to_rid, const Vector2 &start, const Vector2 &end, const Color &p_color, float p_width) {
 	Vector2 norm = (end - start).normalized();
-	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, start, end, p_color, p_width);
-	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, end, end - norm.rotated(Math_PI * 0.17f) * 4.0f, p_color, p_width);
-	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, end, end - norm.rotated(-Math_PI * 0.17f) * 4.0f, p_color, p_width);
+	RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, start, end, p_color, p_width);
+	RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, end, end - norm.rotated(Math_PI * 0.17f) * 4.0f, p_color, p_width);
+	RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, end, end - norm.rotated(-Math_PI * 0.17f) * 4.0f, p_color, p_width);
 }
 
 void Box2DShape::_bind_methods() {
@@ -44,7 +45,7 @@ void Box2DCircleShape::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_radius", "radius"), &Box2DCircleShape::set_radius);
 	ClassDB::bind_method(D_METHOD("get_radius"), &Box2DCircleShape::get_radius);
 
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "radius", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_radius", "get_radius");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_radius", "get_radius");
 }
 
 void Box2DCircleShape::set_radius(real_t p_radius) {
@@ -67,14 +68,14 @@ void Box2DCircleShape::draw(const RID &p_to_rid, const Color &p_color) {
 	for (int i = 0; i < vertex_count; i++) {
 		Vector2 p = points[i];
 		Vector2 n = points[(i + 1) % vertex_count];
-		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
+		RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
 	}
 
 	Vector<Color> col;
 	Color c(p_color);
 	c.a *= 0.5;
 	col.push_back(c);
-	VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
+	RenderingServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
 }
 
 Box2DCircleShape::Box2DCircleShape() {
@@ -90,8 +91,8 @@ void Box2DRectShape::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_height"), &Box2DRectShape::get_height);
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "size"), "set_size", "get_size");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "width", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_width", "get_width");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "height", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_height", "get_height");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "width", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_width", "get_width");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "height", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_height", "get_height");
 }
 
 void Box2DRectShape::set_size(const Vector2 &p_size) {
@@ -142,14 +143,14 @@ void Box2DRectShape::draw(const RID &p_to_rid, const Color &p_color) {
 	for (int i = 0; i < vertex_count; i++) {
 		Vector2 p = points[i];
 		Vector2 n = points[(i + 1) % vertex_count];
-		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
+		RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
 	}
 
 	Vector<Color> col;
 	Color c(p_color);
 	c.a *= 0.5;
 	col.push_back(c);
-	VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
+	RenderingServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
 }
 
 Box2DRectShape::Box2DRectShape() :
@@ -243,14 +244,14 @@ void Box2DSegmentShape::draw(const RID &p_to_rid, const Color &p_color) {
 	const Vector2 a = get_a();
 	const Vector2 b = get_b();
 
-	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, a, b, p_color, 2.0f);
+	RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, a, b, p_color, 2.0f);
 
 	if (is_one_sided()) {
 		Color c_adj = p_color;
 		c_adj.set_hsv(c_adj.get_h(), c_adj.get_s() * 0.5, c_adj.get_v(), c_adj.a * 0.5);
 
-		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, get_a_adjacent(), a, c_adj, 1.0f);
-		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, get_b_adjacent(), b, c_adj, 1.0f);
+		RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, get_a_adjacent(), a, c_adj, 1.0f);
+		RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, get_b_adjacent(), b, c_adj, 1.0f);
 
 		// Draw arrow in normal direction
 		Vector2 midpoint = (a + b) / 2.0;
@@ -388,12 +389,12 @@ void Box2DPolygonShape::build_polygon() {
 
 			// Ensure all points are counterclockwise
 			Vector<Vector2> ccw_points = points;
-			if (Geometry::is_polygon_clockwise(ccw_points)) {
+			if (Geometry2D::is_polygon_clockwise(ccw_points)) {
 				ccw_points.invert();
 			}
 
 			// Decompose concave into multiple convex
-			Vector<Vector<Vector2> > decomp = Geometry::decompose_polygon_in_convex(ccw_points);
+			Vector<Vector<Vector2> > decomp = Geometry2D::decompose_polygon_in_convex(ccw_points);
 
 			// Cut convex into small N<=8 gons and create b2Shapes
 			constexpr int N = b2_maxPolygonVertices;
@@ -556,7 +557,7 @@ bool Box2DPolygonShape::_edit_is_selected_on_click(const Point2 &p_point, double
 }
 
 void Box2DPolygonShape::set_point_cloud(const Vector<Vector2> &p_points) {
-	Vector<Point2> hull = Geometry::convex_hull_2d(p_points);
+	Vector<Point2> hull = Geometry2D::convex_hull(p_points);
 	ERR_FAIL_COND(hull.size() < 3);
 	set_points(hull);
 }
@@ -599,7 +600,7 @@ void Box2DPolygonShape::draw(const RID &p_to_rid, const Color &p_color) {
 		for (int i = 0; i < vertex_count; i++) {
 			Vector2 p = points[i];
 			Vector2 n = points[(i + 1) % vertex_count];
-			VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
+			RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
 		}
 
 		Color c(p_color);
@@ -611,12 +612,12 @@ void Box2DPolygonShape::draw(const RID &p_to_rid, const Color &p_color) {
 			c.set_hsv(c.get_h(), c.get_s(), Math::fmod(c.get_v() - 0.7f + 0.221f, 0.3f) + 0.7, 0.5f);
 			Vector<Color> colors;
 			colors.push_back(c);
-			VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, decomposed[i], colors);
+			RenderingServer::get_singleton()->canvas_item_add_polygon(p_to_rid, decomposed[i], colors);
 		}
 #else
 		Vector<Color> colors;
 		colors.push_back(c);
-		VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, colors);
+		RenderingServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, colors);
 #endif
 
 	} else if (build_mode == BUILD_SEGMENTS) {
@@ -625,7 +626,7 @@ void Box2DPolygonShape::draw(const RID &p_to_rid, const Color &p_color) {
 		for (int i = 0; i < vertex_count; i++) {
 			Vector2 p = points[i];
 			Vector2 n = points[(i + 1) % vertex_count];
-			VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 2.0f);
+			RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 2.0f);
 
 			// Draw normal arrow
 			Vector2 midpoint = (p + n) / 2.0;
@@ -649,7 +650,7 @@ void Box2DPolygonShape::draw(const RID &p_to_rid, const Color &p_color) {
 				c_tmp.set_hsv(c_tmp.get_h(), c_tmp.get_s() * 0.5, c_tmp.get_v(), c_tmp.a * 0.5);
 				width = 1.0f;
 			}
-			VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, c_tmp, width);
+			RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, c_tmp, width);
 
 			if (!(i == 0 || i == vertex_count - 2)) {
 				// Draw arrow in normal direction

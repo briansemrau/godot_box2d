@@ -1,9 +1,9 @@
 #ifndef BOX2D_JOINTS_H
 #define BOX2D_JOINTS_H
 
-#include <core/object.h>
-#include <core/reference.h>
-#include <core/resource.h>
+#include <core/object/object.h>
+#include <core/object/reference.h>
+#include <core/io/resource.h>
 #include <scene/2d/node_2d.h>
 
 #include <box2d/b2_distance_joint.h>
@@ -42,8 +42,8 @@ class Box2DJoint : public Node2D {
 	NodePath a;
 	NodePath b;
 
-	ObjectID bodyA_cache = 0;
-	ObjectID bodyB_cache = 0;
+	ObjectID bodyA_cache{};
+	ObjectID bodyB_cache{};
 
 	bool broken = false;
 	bool breaking_enabled = false;

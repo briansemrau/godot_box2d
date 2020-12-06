@@ -1,9 +1,9 @@
 #ifndef BOX2D_FIXTURES_H
 #define BOX2D_FIXTURES_H
 
-#include <core/object.h>
-#include <core/reference.h>
-#include <core/resource.h>
+#include <core/object/object.h>
+#include <core/object/reference.h>
+#include <core/io/resource.h>
 #include <scene/2d/node_2d.h>
 
 #include <box2d/b2_chain_shape.h>
