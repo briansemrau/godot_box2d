@@ -1,5 +1,6 @@
 #include "register_types.h"
 
+#include "editor/box2d_joint_editor_plugin.h"
 #include "editor/box2d_polygon_editor_plugin.h"
 #include "editor/box2d_shape_editor_plugin.h"
 #include "scene/2d/box2d_fixtures.h"
@@ -36,6 +37,7 @@ void register_godot_box2d_types() {
 #ifdef TOOLS_ENABLED
 	EditorPlugins::add_by_type<Box2DPolygonEditorPlugin>();
 	EditorPlugins::add_by_type<Box2DShapeEditorPlugin>();
+	EditorPlugins::add_by_type<Box2DJointEditorPlugin>();
 #endif
 }
 
