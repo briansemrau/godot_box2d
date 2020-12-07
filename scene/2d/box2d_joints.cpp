@@ -231,13 +231,13 @@ void Box2DJoint::_notification(int p_what) {
 			Box2DPhysicsBody *body_b = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyB_cache));
 			if (body_a) {
 				body_a->joints.erase(this);
-				body_a->disconnect("tree_entered", this, "_node_a_tree_entered");
-				bodyA_cache = 0;
+				body_a->disconnect("tree_entered", Callable(this, "_node_a_tree_entered"));
+				bodyA_cache = ObjectID();
 			}
 			if (body_b) {
 				body_b->joints.erase(this);
-				body_b->disconnect("tree_entered", this, "_node_b_tree_entered");
-				bodyB_cache = 0;
+				body_b->disconnect("tree_entered", Callable(this, "_node_b_tree_entered"));
+				bodyB_cache = ObjectID();
 			}
 
 			destroy_b2Joint();
