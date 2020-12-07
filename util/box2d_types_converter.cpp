@@ -1,6 +1,6 @@
 #include "box2d_types_converter.h"
 
-#include <core/project_settings.h>
+#include <core/config/project_settings.h>
 
 /**
 * @author Brian Semrau

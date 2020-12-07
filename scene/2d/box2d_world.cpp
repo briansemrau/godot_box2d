@@ -1,6 +1,6 @@
 #include "box2d_world.h"
 
-#include <core/engine.h>
+#include <core/config/engine.h>
 #include <core/os/os.h>
 
 #include <box2d/b2_collision.h>
@@ -384,8 +384,10 @@ void Box2DWorld::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
-			float time = get_physics_process_delta_time();
-			step(time);
+			if(auto_step) {
+				float time = get_physics_process_delta_time();
+				step(time);
+			}
 		} break;
 	}
 }
@@ -393,12 +395,16 @@ void Box2DWorld::_notification(int p_what) {
 void Box2DWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_gravity", "gravity"), &Box2DWorld::set_gravity);
 	ClassDB::bind_method(D_METHOD("get_gravity"), &Box2DWorld::get_gravity);
+	ClassDB::bind_method(D_METHOD("set_auto_step", "auto_setp"), &Box2DWorld::set_auto_step);
+	ClassDB::bind_method(D_METHOD("get_auto_step"), &Box2DWorld::get_auto_step);
 
 	//ClassDB::bind_method(D_METHOD("query_aabb", "bounds"), &Box2DWorld::query_aabb);
 	ClassDB::bind_method(D_METHOD("intersect_point", "point"), &Box2DWorld::intersect_point, DEFVAL(32));
 	//ClassDB::bind_method(D_METHOD("intersect_shape", "TODO"), &Box2DWorld::intersect_shape);
+	ClassDB::bind_method(D_METHOD("step", "delta"), &Box2DWorld::step);
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "auto_step"), "set_auto_step", "get_auto_step");
 }
 
 void Box2DWorld::step(real_t p_step) {
@@ -426,6 +432,14 @@ void Box2DWorld::set_gravity(const Vector2 &p_gravity) {
 
 Vector2 Box2DWorld::get_gravity() const {
 	return gravity;
+}
+
+void Box2DWorld::set_auto_step(bool p_auto_step) {
+	auto_step = p_auto_step;
+}
+
+bool Box2DWorld::get_auto_step() const {
+	return auto_step;
 }
 
 Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results) { //, const Vector<Ref<Box2DPhysicsBody> > &p_exclude/*, uint32_t p_layers*/) {

@@ -1,7 +1,7 @@
 #ifndef BOX2D_SHAPES_H
 #define BOX2D_SHAPES_H
 
-#include <core/resource.h>
+#include <core/io/resource.h>
 
 #include <box2d/b2_chain_shape.h>
 #include <box2d/b2_circle_shape.h>

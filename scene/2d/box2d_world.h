@@ -1,9 +1,9 @@
 #ifndef BOX2D_WORLD_H
 #define BOX2D_WORLD_H
 
-#include <core/object.h>
-#include <core/reference.h>
-#include <core/resource.h>
+#include <core/object/object.h>
+#include <core/object/reference.h>
+#include <core/io/resource.h>
 #include <scene/2d/node_2d.h>
 
 #include <box2d/b2_contact.h>
@@ -101,6 +101,7 @@ private:
 
 private:
 	Vector2 gravity;
+	bool auto_step{true};
 	b2World *world;
 
 	Set<Box2DPhysicsBody *> bodies;
@@ -144,6 +145,9 @@ public:
 
 	void set_gravity(const Vector2 &gravity);
 	Vector2 get_gravity() const;
+
+	void set_auto_step(bool p_auto_step);
+	bool get_auto_step() const;
 
 	//bool isLocked() const;
 

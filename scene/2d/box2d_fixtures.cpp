@@ -1,6 +1,6 @@
 #include "box2d_fixtures.h"
 
-#include <core/engine.h>
+#include <core/config/engine.h>
 
 /**
 * @author Brian Semrau
@@ -192,7 +192,7 @@ void Box2DFixture::_notification(int p_what) {
 			}
 
 			if (is_sensor()) {
-				draw_col = draw_col.linear_interpolate(Color(0.4f, 0.7f, 1.0f, 0.5f), 0.7f);
+				draw_col = draw_col.lerp(Color(0.4f, 0.7f, 1.0f, 0.5f), 0.7f);
 			}
 
 			if (shape.is_valid()) {
@@ -235,9 +235,9 @@ void Box2DFixture::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shape", PROPERTY_HINT_RESOURCE_TYPE, "Box2DShape"), "set_shape", "get_shape");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sensor"), "set_sensor", "is_sensor");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "density"), "set_density", "get_density");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "friction"), "set_friction", "get_friction");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "restitution"), "set_restitution", "get_restitution");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "density"), "set_density", "get_density");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "friction"), "set_friction", "get_friction");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "restitution"), "set_restitution", "get_restitution");
 	ADD_GROUP("Collision", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "override_body_collision"), "set_override_body_collision", "get_override_body_collision");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_layer", "get_collision_layer");
@@ -296,12 +296,12 @@ String Box2DFixture::get_configuration_warning() const {
 
 void Box2DFixture::set_shape(const Ref<Box2DShape> &p_shape) {
 	if (shape.is_valid()) {
-		shape->disconnect("changed", this, "_shape_changed");
+		shape->disconnect("changed", Callable(this, "_shape_changed"));
 	}
 	shape = p_shape;
 
 	if (shape.is_valid()) {
-		shape->connect("changed", this, "_shape_changed");
+		shape->connect("changed", Callable(this, "_shape_changed"));
 	}
 
 	update_shape();
