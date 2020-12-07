@@ -84,8 +84,17 @@ void Box2DPhysicsBody::update_filterdata() {
 	}
 }
 
+void Box2DPhysicsBody::set_box2dworld_transform(const Transform2D &p_transform) {
+	if (world_node) {
+		set_transform(world_node->get_global_transform().affine_inverse() * p_transform);
+	} else {
+		set_transform(p_transform);
+	}
+}
+
 void Box2DPhysicsBody::state_changed() {
 	set_block_transform_notify(true);
+
 	set_global_transform(b2_to_gd(body->GetTransform()));
 	//if (get_script_instance())
 	//	get_script_instance()->call("_integrate_forces");
@@ -343,6 +352,23 @@ void Box2DPhysicsBody::_bind_methods() {
 	BIND_ENUM_CONSTANT(MODE_RIGID);
 	BIND_ENUM_CONSTANT(MODE_STATIC);
 	BIND_ENUM_CONSTANT(MODE_KINEMATIC);
+}
+
+Transform2D Box2DPhysicsBody::get_box2dworld_transform() {
+#ifdef DEBUG_ENABLED
+	ERR_FAIL_COND_V(!world_node, get_global_transform());
+#endif
+	if (in_world_transform_invalid) {
+		if (world_node) {
+			in_world_transform = world_node->get_global_transform() * get_transform();
+		} else {
+			in_world_transform = get_global_transform();
+		}
+
+		in_world_transform_invalid = false;
+	}
+
+	return in_world_transform;
 }
 
 String Box2DPhysicsBody::get_configuration_warning() const {
