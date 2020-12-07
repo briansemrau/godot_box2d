@@ -115,7 +115,7 @@ void Box2DJoint::update_joint_bodies() {
 	// Only recreate the joint if it will do anything
 	if (joint_invalid || bodies_changed) {
 		// Clear previous cache
-		if (bodyA_cache != 0) {
+		if (bodyA_cache.is_valid()) {
 			Box2DPhysicsBody *body_a = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyA_cache));
 			if (body_a) {
 				body_a->joints.erase(this);
@@ -123,7 +123,7 @@ void Box2DJoint::update_joint_bodies() {
 			}
 			bodyA_cache = ObjectID();
 		}
-		if (bodyB_cache != 0) {
+		if (bodyB_cache.is_valid()) {
 			Box2DPhysicsBody *body_b = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyB_cache));
 			if (body_b) {
 				body_b->joints.erase(this);
