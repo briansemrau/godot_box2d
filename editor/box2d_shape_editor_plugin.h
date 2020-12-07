@@ -18,12 +18,12 @@ class Box2DShapeEditor : public Control {
 	GDCLASS(Box2DShapeEditor, Control);
 
 	enum ShapeType {
+		UNEDITABLE_SHAPE = -1,
 		CIRCLE_SHAPE,
 		RECTANGLE_SHAPE,
 		SEGMENT_SHAPE,
 		POLYGON_SHAPE,
 		CAPSULE_SHAPE,
-		UNEDITABLE_SHAPE,
 	};
 
 	EditorNode *editor;
