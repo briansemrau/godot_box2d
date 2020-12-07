@@ -101,6 +101,7 @@ private:
 
 private:
 	Vector2 gravity;
+	bool auto_step{true};
 	b2World *world;
 
 	Set<Box2DPhysicsBody *> bodies;
@@ -144,6 +145,9 @@ public:
 
 	void set_gravity(const Vector2 &gravity);
 	Vector2 get_gravity() const;
+
+	void set_auto_step(bool p_auto_step);
+	bool get_auto_step() const;
 
 	//bool isLocked() const;
 
