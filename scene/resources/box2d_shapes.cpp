@@ -20,16 +20,16 @@ inline void draw_circle(const RID &p_to_rid, const Point2 &p_pos, float p_radius
 	}
 
 	int vertex_count = points.size();
-	VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p_pos, points[0], p_color, 1.0f);
+	RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, p_pos, points[0], p_color, 1.0f);
 	for (int i = 0; i < vertex_count; i++) {
 		Vector2 p = points[i];
 		Vector2 n = points[(i + 1) % vertex_count];
-		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
+		RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
 	}
 
 	Vector<Color> col;
 	col.push_back(p_color);
-	VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
+	RenderingServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
 }
 
 inline void draw_rect(const RID &p_to_rid, float p_width, float p_height, const Color &p_color) {
@@ -46,12 +46,12 @@ inline void draw_rect(const RID &p_to_rid, float p_width, float p_height, const 
 	for (int i = 0; i < vertex_count; i++) {
 		Vector2 p = points[i];
 		Vector2 n = points[(i + 1) % vertex_count];
-		VisualServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
+		RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
 	}
 
 	Vector<Color> col;
 	col.push_back(p_color);
-	VisualServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
+	RenderingServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
 }
 
 inline void draw_arrow(const RID &p_to_rid, const Vector2 &start, const Vector2 &end, const Color &p_color, float p_width) {
@@ -108,30 +108,9 @@ real_t Box2DCircleShape::get_radius() const {
 }
 
 void Box2DCircleShape::draw(const RID &p_to_rid, const Color &p_color) {
-<<<<<<< HEAD
-	// Same as in Godot's CircleShape2D::draw
-	Vector<Vector2> points;
-	for (int i = 0; i < 24; i++) {
-		points.push_back(Vector2(Math::cos(i * Math_PI * 2 / 24.0), Math::sin(i * Math_PI * 2 / 24.0)) * get_radius());
-	}
-
-	int vertex_count = points.size();
-	for (int i = 0; i < vertex_count; i++) {
-		Vector2 p = points[i];
-		Vector2 n = points[(i + 1) % vertex_count];
-		RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
-	}
-
-	Vector<Color> col;
-	Color c(p_color);
-	c.a *= 0.5;
-	col.push_back(c);
-	RenderingServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
-=======
 	Color c(p_color);
 	c.a *= 0.5;
 	draw_circle(p_to_rid, Vector2(0, 0), get_radius(), 24, c);
->>>>>>> upstream/main
 }
 
 Box2DCircleShape::Box2DCircleShape() {
@@ -186,33 +165,9 @@ real_t Box2DRectShape::get_height() const {
 }
 
 void Box2DRectShape::draw(const RID &p_to_rid, const Color &p_color) {
-<<<<<<< HEAD
-	Vector<Vector2> points;
-
-	const real_t hx = width * 0.5;
-	const real_t hy = height * 0.5;
-	points.push_back(Vector2(hx, hy));
-	points.push_back(Vector2(-hx, hy));
-	points.push_back(Vector2(-hx, -hy));
-	points.push_back(Vector2(hx, -hy));
-
-	int vertex_count = points.size();
-	for (int i = 0; i < vertex_count; i++) {
-		Vector2 p = points[i];
-		Vector2 n = points[(i + 1) % vertex_count];
-		RenderingServer::get_singleton()->canvas_item_add_line(p_to_rid, p, n, p_color, 1.0f);
-	}
-
-	Vector<Color> col;
-	Color c(p_color);
-	c.a *= 0.5;
-	col.push_back(c);
-	RenderingServer::get_singleton()->canvas_item_add_polygon(p_to_rid, points, col);
-=======
 	Color c(p_color);
 	c.a *= 0.5;
 	draw_rect(p_to_rid, width, height, c);
->>>>>>> upstream/main
 }
 
 Box2DRectShape::Box2DRectShape() :
@@ -746,8 +701,8 @@ void Box2DCapsuleShape::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_radius", "radius"), &Box2DCapsuleShape::set_radius);
 	ClassDB::bind_method(D_METHOD("get_radius"), &Box2DCapsuleShape::get_radius);
 
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "height", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_height", "get_height");
-	ADD_PROPERTY(PropertyInfo(Variant::REAL, "radius", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_radius", "get_radius");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "height", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_height", "get_height");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_radius", "get_radius");
 }
 
 void Box2DCapsuleShape::set_height(real_t p_height) {
