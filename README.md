@@ -9,8 +9,8 @@ Using [Box2D v2.4.1](https://github.com/erincatto/box2d)
 
 This module should work on all platforms.
 
-This module supports Godot 3.2.
-This should work with 4.0, but is untested.
+This module supports Godot 4.0.
+There is an occasionally update 3.2 branch.
 
 ## Purpose
 
@@ -73,14 +73,14 @@ To use this module, it helps to already be familiar with compiling the engine on
 
 ### Building it yourself:
 
-1. Clone the engine source code (Godot 3.2):
+1. Clone the engine source code:
 
 ```
 cd /your/documents/folder/wherever/
-git clone -b 3.2 https://github.com/godotengine/godot.git godot
+git clone https://github.com/godotengine/godot.git godot
 ```
 
-For Godot 4.0 use: `git clone https://github.com/godotengine/godot.git godot`
+For Godot 3.2 use: `git clone -b 3.2 https://github.com/godotengine/godot.git godot`
 
 2. Clone this module inside the modules folder:
 ```

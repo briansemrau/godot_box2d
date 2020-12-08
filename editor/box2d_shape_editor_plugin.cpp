@@ -17,6 +17,11 @@ void Box2DShapeEditor::_node_removed(Node *p_node) {
 	}
 }
 
+void Box2DShapeEditor::_shape_type_changed() {
+	// We might want to swap to the Box2DPolygonEditorPlugin
+	editor->edit_current();
+}
+
 Variant Box2DShapeEditor::get_handle_value(int idx) const {
 	switch (shape_type) {
 		case Box2DShapeEditor::CIRCLE_SHAPE: {
@@ -57,7 +62,13 @@ Variant Box2DShapeEditor::get_handle_value(int idx) const {
 		} break;
 
 		case Box2DShapeEditor::CAPSULE_SHAPE: {
-			ERR_PRINT("Not yet implemented");
+			Ref<Box2DCapsuleShape> capsule = node->get_shape();
+
+			if (idx == 0) {
+				return capsule->get_radius();
+			} else if (idx == 1) {
+				return capsule->get_height();
+			}
 		} break;
 
 		case Box2DShapeEditor::UNEDITABLE_SHAPE:
@@ -117,7 +128,19 @@ void Box2DShapeEditor::set_handle(int idx, Point2 &p_point) {
 		} break;
 
 		case Box2DShapeEditor::CAPSULE_SHAPE: {
-			ERR_PRINT("Not yet implemented");
+			if (idx < 2) {
+				Ref<Box2DCapsuleShape> capsule = node->get_shape();
+
+				real_t parameter = Math::abs(p_point[idx]);
+
+				if (idx == 0) {
+					capsule->set_radius(parameter);
+				} else if (idx == 1) {
+					capsule->set_height(parameter * 2 - capsule->get_radius() * 2);
+				}
+
+				canvas_item_editor->update_viewport();
+			}
 		} break;
 
 		case Box2DShapeEditor::UNEDITABLE_SHAPE:
@@ -182,7 +205,19 @@ void Box2DShapeEditor::commit_handle(int idx, Variant &p_org) {
 		} break;
 
 		case Box2DShapeEditor::CAPSULE_SHAPE: {
-			ERR_PRINT("Not yet implemented");
+			Ref<Box2DCapsuleShape> capsule = node->get_shape();
+
+			if (idx == 0) {
+				undo_redo->add_do_method(capsule.ptr(), "set_radius", capsule->get_radius());
+				undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+				undo_redo->add_undo_method(capsule.ptr(), "set_radius", p_org);
+				undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+			} else if (idx == 1) {
+				undo_redo->add_do_method(capsule.ptr(), "set_height", capsule->get_height());
+				undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+				undo_redo->add_undo_method(capsule.ptr(), "set_height", p_org);
+				undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+			}
 		} break;
 
 		case Box2DShapeEditor::UNEDITABLE_SHAPE:
@@ -287,8 +322,8 @@ void Box2DShapeEditor::_get_current_shape_type() {
 		shape_type = SEGMENT_SHAPE;
 	} else if (Object::cast_to<Box2DPolygonShape>(*s)) {
 		shape_type = UNEDITABLE_SHAPE;
-		//} else if (Object::cast_to<Box2DCapsuleShape>(*s)) {
-		//	shape_type = CAPSULE_SHAPE;
+	} else if (Object::cast_to<Box2DCapsuleShape>(*s)) {
+		shape_type = CAPSULE_SHAPE;
 	} else {
 		shape_type = UNEDITABLE_SHAPE;
 	}
@@ -374,7 +409,17 @@ void Box2DShapeEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 		} break;
 
 		case Box2DShapeEditor::CAPSULE_SHAPE: {
-			ERR_PRINT("Not yet implemented");
+			Ref<Box2DCapsuleShape> shape = node->get_shape();
+
+			handles.resize(2);
+			float radius = shape->get_radius();
+			float height = shape->get_height() / 2;
+
+			handles.write[0] = Point2(radius, -height);
+			handles.write[1] = Point2(0, -(height + radius));
+
+			p_overlay->draw_texture(h, gt.xform(handles[0]) - size);
+			p_overlay->draw_texture(h, gt.xform(handles[1]) - size);
 		} break;
 
 		case Box2DShapeEditor::UNEDITABLE_SHAPE:
@@ -401,8 +446,16 @@ void Box2DShapeEditor::edit(Node *p_node) {
 		canvas_item_editor = CanvasItemEditor::get_singleton();
 	}
 
+	if (node) {
+		node->disconnect("_shape_type_changed", Callable(this, "_shape_type_changed"));
+	}
+
 	if (p_node) {
 		node = Object::cast_to<Box2DFixture>(p_node);
+
+		if (node) {
+			node->connect("_shape_type_changed", Callable(this, "_shape_type_changed"), Vector<Variant>(), CONNECT_DEFERRED);
+		}
 
 		_get_current_shape_type();
 
@@ -417,19 +470,14 @@ void Box2DShapeEditor::edit(Node *p_node) {
 }
 
 void Box2DShapeEditor::_bind_methods() {
-
 	ClassDB::bind_method("_get_current_shape_type", &Box2DShapeEditor::_get_current_shape_type);
 	ClassDB::bind_method(D_METHOD("_node_removed"), &Box2DShapeEditor::_node_removed);
+	ClassDB::bind_method(D_METHOD("_shape_type_changed"), &Box2DShapeEditor::_shape_type_changed);
 }
 
 Box2DShapeEditor::Box2DShapeEditor(EditorNode *p_editor) :
-		node(NULL),
-		canvas_item_editor(NULL),
 		editor(p_editor),
-		undo_redo(p_editor->get_undo_redo()),
-		shape_type(UNEDITABLE_SHAPE),
-		edit_handle(-1),
-		pressed(false) {}
+		undo_redo(p_editor->get_undo_redo()) {}
 
 void Box2DShapeEditorPlugin::edit(Object *p_obj) {
 	box2d_shape_editor->edit(Object::cast_to<Node>(p_obj));
@@ -437,7 +485,8 @@ void Box2DShapeEditorPlugin::edit(Object *p_obj) {
 
 bool Box2DShapeEditorPlugin::handles(Object *p_obj) const {
 	Box2DFixture *node = Object::cast_to<Box2DFixture>(p_obj);
-	return node && node->get_shape().is_valid() && !dynamic_cast<Box2DPolygonShape *>(*node->get_shape());
+	// Handle null shapes so we can at least connect _shape_changed
+	return node && (node->get_shape().is_null() || !node->get_shape()->is_class("Box2DPolygonShape"));
 }
 
 void Box2DShapeEditorPlugin::make_visible(bool visible) {
@@ -448,10 +497,8 @@ void Box2DShapeEditorPlugin::make_visible(bool visible) {
 
 Box2DShapeEditorPlugin::Box2DShapeEditorPlugin(EditorNode *p_editor) {
 	editor = p_editor;
-
 	box2d_shape_editor = memnew(Box2DShapeEditor(p_editor));
 	p_editor->get_gui_base()->add_child(box2d_shape_editor);
 }
 
-Box2DShapeEditorPlugin::~Box2DShapeEditorPlugin() {
-}
+Box2DShapeEditorPlugin::~Box2DShapeEditorPlugin() {}

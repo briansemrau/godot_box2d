@@ -66,7 +66,7 @@ class Box2DRectShape : public Box2DShape {
 	real_t height;
 	// TODO replace width/height with a Vector2 for consistency
 
-	virtual const b2Shape *get_shape() const { return &shape; }
+	virtual const b2Shape *get_shape() const override { return &shape; }
 
 protected:
 	static void _bind_methods();
@@ -91,7 +91,7 @@ class Box2DSegmentShape : public Box2DShape {
 
 	b2EdgeShape shape;
 
-	virtual const b2Shape *get_shape() const { return &shape; }
+	virtual const b2Shape *get_shape() const override { return &shape; }
 
 protected:
 	static void _bind_methods();
@@ -155,8 +155,8 @@ protected:
 	static void _bind_methods();
 
 	virtual bool is_composite_shape() const override;
-	virtual const Vector<const b2Shape *> get_shapes() const;
-	virtual const b2Shape *get_shape() const { return chain_shape; }
+	virtual const Vector<const b2Shape *> get_shapes() const override;
+	virtual const b2Shape *get_shape() const override { return chain_shape; }
 
 public:
 	bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const override;
@@ -178,5 +178,38 @@ public:
 };
 
 VARIANT_ENUM_CAST(Box2DPolygonShape::BuildMode);
+
+class Box2DCapsuleShape : public Box2DShape {
+	GDCLASS(Box2DCapsuleShape, Box2DShape);
+
+	b2CircleShape topCircleShape;
+	b2CircleShape bottomCircleShape;
+	b2PolygonShape rectShape;
+	Vector<const b2Shape *> shapes;
+
+	real_t radius;
+	real_t height;
+
+	virtual bool is_composite_shape() const override { return true; };
+	virtual const Vector<const b2Shape *> get_shapes() const override;
+	virtual const b2Shape *get_shape() const override {
+		CRASH_NOW();
+		ERR_FAIL_V(&bottomCircleShape);
+	}
+
+protected:
+	static void _bind_methods();
+
+public:
+	void set_height(real_t p_height);
+	real_t get_height() const;
+
+	void set_radius(real_t p_radius);
+	real_t get_radius() const;
+
+	virtual void draw(const RID &p_to_rid, const Color &p_color) override;
+
+	Box2DCapsuleShape();
+};
 
 #endif // BOX2D_SHAPES_H
