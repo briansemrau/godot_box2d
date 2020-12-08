@@ -21,8 +21,8 @@ bool Box2DPhysicsBody::create_b2Body() {
 		ERR_FAIL_COND_V(!world_node->world, false);
 
 		// Create body
-		bodyDef.position = gd_to_b2(get_global_transform().get_origin());
-		bodyDef.angle = get_global_transform().get_rotation();
+		bodyDef.position = gd_to_b2(get_box2dworld_transform().get_origin());
+		bodyDef.angle = get_box2dworld_transform().get_rotation();
 
 		body = world_node->world->CreateBody(&bodyDef);
 		body->GetUserData().owner = this;
@@ -84,21 +84,36 @@ void Box2DPhysicsBody::update_filterdata() {
 	}
 }
 
+Transform2D Box2DPhysicsBody::get_box2dworld_transform() {
+#ifdef DEBUG_ENABLED
+	ERR_FAIL_COND_V(!world_node, get_global_transform());
+#endif
+	return get_relative_transform_to_parent(world_node);
+}
+
 void Box2DPhysicsBody::set_box2dworld_transform(const Transform2D &p_transform) {
-	if (world_node) {
-		set_transform(world_node->get_global_transform().affine_inverse() * p_transform);
+
+	CanvasItem *pi = get_parent_item();
+	if (pi) {
+		set_transform(pi->get_global_transform().affine_inverse() * p_transform);
 	} else {
 		set_transform(p_transform);
 	}
+
+	Node2D *parent_2d = Object::cast_to<Node2D>(get_parent());
+	if(!parent_2d) {
+		ERR_PRINT("Unsupported Node in between physics world and physics body");
+		return;
+	}
+	set_transform(parent_2d->get_relative_transform_to_parent(world_node).affine_inverse() * p_transform);
 }
 
 void Box2DPhysicsBody::state_changed() {
 	set_block_transform_notify(true);
-
-	set_global_transform(b2_to_gd(body->GetTransform()));
+	set_box2dworld_transform(b2_to_gd(body->GetTransform()));
+	set_block_transform_notify(false);
 	//if (get_script_instance())
 	//	get_script_instance()->call("_integrate_forces");
-	set_block_transform_notify(false);
 
 	// TODO something? check rigidbody2d impl
 	//if (contact_monitoring) {
@@ -126,7 +141,8 @@ void Box2DPhysicsBody::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_ENTER_TREE: {
-			last_valid_xform = get_global_transform();
+			//last_valid_xform = get_global_transform();
+			last_valid_xform = get_box2dworld_transform();
 
 			// Find the Box2DWorld
 			Node *_ancestor = get_parent();
@@ -174,7 +190,9 @@ void Box2DPhysicsBody::_notification(int p_what) {
 
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
 			// Send new transform to physics
-			Transform2D new_xform = get_global_transform();
+			//Transform2D new_xform = get_global_transform();
+			//Transform2D new_xform = get_box2dworld_transform();
+			Transform2D new_xform = get_box2dworld_transform();
 
 			bodyDef.position = gd_to_b2(new_xform.get_origin());
 			bodyDef.angle = new_xform.get_rotation();
@@ -236,7 +254,7 @@ void Box2DPhysicsBody::_notification(int p_what) {
 					b2WorldManifold worldManifold;
 					ce->contact->GetWorldManifold(&worldManifold);
 					for (int i = 0; i < count; i++) {
-						draw_circle(get_global_transform().xform_inv(b2_to_gd(worldManifold.points[i])), 1.0f, Color(1.0f, 1.0f, 0.0f));
+						draw_circle(get_box2dworld_transform().xform_inv(b2_to_gd(worldManifold.points[i])), 1.0f, Color(1.0f, 1.0f, 0.0f));
 					}
 
 					ce = ce->next;
@@ -352,23 +370,6 @@ void Box2DPhysicsBody::_bind_methods() {
 	BIND_ENUM_CONSTANT(MODE_RIGID);
 	BIND_ENUM_CONSTANT(MODE_STATIC);
 	BIND_ENUM_CONSTANT(MODE_KINEMATIC);
-}
-
-Transform2D Box2DPhysicsBody::get_box2dworld_transform() {
-#ifdef DEBUG_ENABLED
-	ERR_FAIL_COND_V(!world_node, get_global_transform());
-#endif
-	if (in_world_transform_invalid) {
-		if (world_node) {
-			in_world_transform = world_node->get_global_transform() * get_transform();
-		} else {
-			in_world_transform = get_global_transform();
-		}
-
-		in_world_transform_invalid = false;
-	}
-
-	return in_world_transform;
 }
 
 String Box2DPhysicsBody::get_configuration_warning() const {
