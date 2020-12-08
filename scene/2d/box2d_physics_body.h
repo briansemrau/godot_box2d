@@ -68,7 +68,11 @@ private:
 	Set<Box2DJoint *> joints;
 
 	Transform2D last_valid_xform;
+	
 	bool prev_sleeping_state = true;
+
+	void set_box2dworld_transform(const Transform2D &p_transform);
+	Transform2D get_box2dworld_transform();
 
 	void on_parent_created(Node *);
 
