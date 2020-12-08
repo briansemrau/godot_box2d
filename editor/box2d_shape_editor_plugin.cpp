@@ -17,6 +17,11 @@ void Box2DShapeEditor::_node_removed(Node *p_node) {
 	}
 }
 
+void Box2DShapeEditor::_shape_type_changed() {
+	// We might want to swap to the Box2DPolygonEditorPlugin
+	editor->edit_current();
+}
+
 Variant Box2DShapeEditor::get_handle_value(int idx) const {
 	switch (shape_type) {
 		case Box2DShapeEditor::CIRCLE_SHAPE: {
@@ -441,8 +446,16 @@ void Box2DShapeEditor::edit(Node *p_node) {
 		canvas_item_editor = CanvasItemEditor::get_singleton();
 	}
 
+	if (node) {
+		node->disconnect("_shape_type_changed", Callable(this, "_shape_type_changed"));
+	}
+
 	if (p_node) {
 		node = Object::cast_to<Box2DFixture>(p_node);
+
+		if (node) {
+			node->connect("_shape_type_changed", Callable(this, "_shape_type_changed"), Vector<Variant>(), CONNECT_DEFERRED);
+		}
 
 		_get_current_shape_type();
 
@@ -457,19 +470,14 @@ void Box2DShapeEditor::edit(Node *p_node) {
 }
 
 void Box2DShapeEditor::_bind_methods() {
-
 	ClassDB::bind_method("_get_current_shape_type", &Box2DShapeEditor::_get_current_shape_type);
 	ClassDB::bind_method(D_METHOD("_node_removed"), &Box2DShapeEditor::_node_removed);
+	ClassDB::bind_method(D_METHOD("_shape_type_changed"), &Box2DShapeEditor::_shape_type_changed);
 }
 
 Box2DShapeEditor::Box2DShapeEditor(EditorNode *p_editor) :
-		node(NULL),
-		canvas_item_editor(NULL),
 		editor(p_editor),
-		undo_redo(p_editor->get_undo_redo()),
-		shape_type(UNEDITABLE_SHAPE),
-		edit_handle(-1),
-		pressed(false) {}
+		undo_redo(p_editor->get_undo_redo()) {}
 
 void Box2DShapeEditorPlugin::edit(Object *p_obj) {
 	box2d_shape_editor->edit(Object::cast_to<Node>(p_obj));
@@ -477,7 +485,8 @@ void Box2DShapeEditorPlugin::edit(Object *p_obj) {
 
 bool Box2DShapeEditorPlugin::handles(Object *p_obj) const {
 	Box2DFixture *node = Object::cast_to<Box2DFixture>(p_obj);
-	return node && node->get_shape().is_valid() && !dynamic_cast<Box2DPolygonShape *>(*node->get_shape());
+	// Handle null shapes so we can at least connect _shape_changed
+	return node && (node->get_shape().is_null() || !node->get_shape()->is_class("Box2DPolygonShape"));
 }
 
 void Box2DShapeEditorPlugin::make_visible(bool visible) {
@@ -488,10 +497,8 @@ void Box2DShapeEditorPlugin::make_visible(bool visible) {
 
 Box2DShapeEditorPlugin::Box2DShapeEditorPlugin(EditorNode *p_editor) {
 	editor = p_editor;
-
 	box2d_shape_editor = memnew(Box2DShapeEditor(p_editor));
 	p_editor->get_gui_base()->add_child(box2d_shape_editor);
 }
 
-Box2DShapeEditorPlugin::~Box2DShapeEditorPlugin() {
-}
+Box2DShapeEditorPlugin::~Box2DShapeEditorPlugin() {}
