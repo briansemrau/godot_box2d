@@ -82,10 +82,11 @@ git clone https://github.com/godotengine/godot.git godot
 
 For Godot 3.2 use: `git clone -b 3.2 https://github.com/godotengine/godot.git godot`
 
-2. Clone this module inside the modules folder:
+2. Clone this module and init submodules (box2d) inside the modules folder:
 ```
 cd ./godot/modules
 git clone https://github.com/briansemrau/godot_box2d
+git submodule update --init --recursive
 ```
 
 3. Compile the engine.
@@ -107,7 +108,9 @@ Box2D has...
     - [Rope](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md93) (⚠ unimplemented)
     - [Friction joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md94) (⚠ unimplemented)
     - [Motor joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md95) (⚠ unimplemented)
-- Improved physics stability in some cases
+- Continuous collision detection (CCD) between dynamic rigid bodies and other dynamic rigid bodies.  Godot 2D physics CCD is limited to dynamic and static (and somewhat broken right now).  For example, you can fire a high-speed bullet at a stack of bricks in Box2D and blow them up.
+- Improved physics stability in some cases.  For the same input, and same binary, Box2D will reproduce any simulation. 
+- Has collision properties such as restitution (bounciness in Godot) as a property of the fixture (shape), unlike Godot which has a single value per rigid body as a physics material.  For exampe, this allows you to have a bumper shape attached to a car body with a different restitution than say a side panel shape.
 - Features that support game mechanics that are near-impossible with Godot:
     - Automatically calculated mass properties (body center of mass, body mass given material density, etc.)
     - Joints report what forces they're exerting (allows for breakable joints)
@@ -134,6 +137,9 @@ Gives joints new properties:
 - `breaking_enabled`: Lets the joint break when `max_force` and/or `max_torque` are exceeded
 - `free_on_break`: Whether the joint frees itself when broken. (This feature may be removed)
 - `max_force` and `max_torque`: Maximum linear force and torque. Either can be disabled by setting the property to 0.
+
+### Flexible Box2DWorld node transformations 
+The physics body/fixture transformations are synced to nearest ancestor Box2dWorld node's coordinate space.  That means that none of your physics objects are transformed into the global space.  This is more flexible than a global space sync because it means that any transformations ABOVE your Box2DWorld node will 'just work' as expected.  This also means, you don't need an additional viewport or camera to do things like a HUD layer, while transforming your view of the physics space.  You can simply move, rotate, and scale your world node, (or any node ABOVE it), like any other node in your scene scene tree, and things will just work as expected.
 
 # Contributing
 
