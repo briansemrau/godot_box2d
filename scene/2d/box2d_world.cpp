@@ -72,12 +72,18 @@ inline void Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
 	const bool monitoringA = fnode_a->body_node->is_contact_monitor_enabled();
 	const bool monitoringB = fnode_b->body_node->is_contact_monitor_enabled();
 
-	// Only buffer contacts that are being monitored, if contact report count isn't exceeded
+	// Only buffer contacts that are being monitored, if contact monitor report count isn't exceeded
+
+	// If the manifold is already buffered, make sure to buffer all points in the manifold (ignoring whether the monitors have capacity)
+	// We do this so that we don't have to worry about managing half-buffered manifolds.
+
 	const bool hasCapacityA = monitoringA && (body_a->contact_monitor->contacts.size() < body_a->max_contacts_reported);
 	const bool hasCapacityB = monitoringB && (body_b->contact_monitor->contacts.size() < body_b->max_contacts_reported);
-	if (monitoringA || monitoringB) {
-		// The contact pointer address seems to be the only way to create a unique key. Please prove me wrong.
-		ContactBufferManifold *buffer_manifold = contact_buffer.getptr(reinterpret_cast<uint64_t>(contact));
+
+	// Note: The b2Contact pointer address seems to be the only way to create a unique key. Please prove me wrong.
+	ContactBufferManifold *buffer_manifold = contact_buffer.getptr(reinterpret_cast<uint64_t>(contact));
+
+	if (hasCapacityA || hasCapacityB || buffer_manifold) {
 		if (!buffer_manifold) {
 			buffer_manifold = &contact_buffer.set(reinterpret_cast<uint64_t>(contact), ContactBufferManifold())->value();
 		}
