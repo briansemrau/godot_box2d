@@ -225,7 +225,6 @@ void Box2DPhysicsBody::_notification(int p_what) {
 
 			// TODO figure out if this can instead be a callback from Box2D.
 			//		I don't think it can.
-
 			if (body) {
 				const bool awake = body->IsAwake();
 				if (awake != prev_sleeping_state) {
@@ -490,18 +489,25 @@ void Box2DPhysicsBody::set_custom_mass_data(const real_t p_mass, const real_t p_
 }
 
 real_t Box2DPhysicsBody::get_mass() const {
-	ERR_FAIL_COND_V(!body, real_t());
-	return body->GetMass();
+	if(body) {
+		return body->GetMass();
+	}
+	return 1.0f; // if there is no body, we can safely return a default mass
 }
 
 real_t Box2DPhysicsBody::get_inertia() const {
-	ERR_FAIL_COND_V(!body, real_t());
-	return body->GetInertia();
+	if(body) {
+		return body->GetInertia();
+	}
+	return 1.0f;  // if there is no body, we can safely return a default mass
 }
 
 Vector2 Box2DPhysicsBody::get_center_of_mass() const {
-	ERR_FAIL_COND_V(!body, Vector2());
-	return b2_to_gd(body->GetLocalCenter());
+	if(body) {
+		return b2_to_gd(body->GetLocalCenter());
+	}
+	
+	return Vector2(0,0);
 }
 
 void Box2DPhysicsBody::set_linear_damping(real_t p_damping) {
