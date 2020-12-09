@@ -85,13 +85,14 @@ void Box2DPhysicsBody::update_filterdata() {
 }
 
 Transform2D Box2DPhysicsBody::get_box2dworld_transform() {
-#ifdef DEBUG_ENABLED
-	ERR_FAIL_COND_V(!world_node, get_global_transform());
-#endif
+	if(!world_node) 
+		return get_global_transform(); // editor or node is outside a world, get global to viewable root
 	return get_relative_transform_to_parent(world_node);
 }
 
 void Box2DPhysicsBody::set_box2dworld_transform(const Transform2D &p_transform) {
+	if(!world_node)
+		set_global_transform(p_transform);  // editor or node is outside a world, get global to viewable root
 
 	CanvasItem *pi = get_parent_item();
 	if (pi) {
@@ -224,14 +225,17 @@ void Box2DPhysicsBody::_notification(int p_what) {
 
 			// TODO figure out if this can instead be a callback from Box2D.
 			//		I don't think it can.
-			const bool awake = body->IsAwake();
-			if (awake != prev_sleeping_state) {
-				emit_signal("sleeping_state_changed");
-				prev_sleeping_state = awake;
-			}
 
-			if (body && awake) {
-				state_changed();
+			if (body) {
+				const bool awake = body->IsAwake();
+				if (awake != prev_sleeping_state) {
+					emit_signal("sleeping_state_changed");
+					prev_sleeping_state = awake;
+				}
+
+				if (awake) {
+					state_changed();
+				}
 			}
 		} break;
 
