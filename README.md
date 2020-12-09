@@ -1,5 +1,9 @@
 # Box2D for Godot
 
+![Godot_Box2D Logo](logo.svg)
+<!-- The original Godot logo is licensed as CC-BY-4.0. See the original here: https://github.com/godotengine/godot/blob/master/icon.svg -->
+<!-- The original Box2D logo is used under the MIT license. See the original here: https://box2d.org/images/logo.svg -->
+
 An unofficial [Box2D](https://box2d.org/) module for the [Godot game engine](https://github.com/godotengine/godot/).
 
 ## **This is a work in progress!**
