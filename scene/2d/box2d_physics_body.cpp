@@ -5,6 +5,8 @@
 #include "box2d_fixtures.h"
 #include "box2d_joints.h"
 
+#include <vector>
+
 /**
 * @author Brian Semrau
 */
@@ -85,28 +87,50 @@ void Box2DPhysicsBody::update_filterdata() {
 }
 
 Transform2D Box2DPhysicsBody::get_box2dworld_transform() {
-	if(!world_node) 
-		return get_global_transform(); // editor or node is outside a world, get global to viewable root
-	return get_relative_transform_to_parent(world_node);
+	std::vector<Transform2D> transforms{};
+	transforms.push_back(get_transform());
+	Node* parent = get_parent();
+	while(parent) {
+		if(parent == world_node) {
+			break;
+		}
+		CanvasItem* cv = Object::cast_to<CanvasItem>(parent);
+		if(cv) {
+			transforms.push_back(cv->get_transform());
+		}
+		parent = parent->get_parent();
+	}
+
+	Transform2D returned{};
+	while(transforms.size() > 0) {
+		returned = returned * transforms.back();
+		transforms.pop_back();
+	}
+
+	return returned;
 }
 
 void Box2DPhysicsBody::set_box2dworld_transform(const Transform2D &p_transform) {
-	if(!world_node)
-		set_global_transform(p_transform);  // editor or node is outside a world, get global to viewable root
-
-	CanvasItem *pi = get_parent_item();
-	if (pi) {
-		set_transform(pi->get_global_transform().affine_inverse() * p_transform);
-	} else {
-		set_transform(p_transform);
+	std::vector<Transform2D> transforms{};
+	transforms.push_back(p_transform);
+	Node* parent = get_parent();
+	while(parent) {
+		if(parent == world_node) {
+			break;
+		}
+		CanvasItem* cv = Object::cast_to<CanvasItem>(parent);
+		if(cv) {
+			transforms.push_back(cv->get_transform().affine_inverse());
+		}
+		parent = parent->get_parent();
 	}
 
-	Node2D *parent_2d = Object::cast_to<Node2D>(get_parent());
-	if(!parent_2d) {
-		ERR_PRINT("Unsupported Node in between physics world and physics body");
-		return;
+	Transform2D target_xform{};
+	while(transforms.size() > 0) {
+		target_xform = target_xform * transforms.back();
+		transforms.pop_back();
 	}
-	set_transform(parent_2d->get_relative_transform_to_parent(world_node).affine_inverse() * p_transform);
+	set_transform(target_xform);
 }
 
 void Box2DPhysicsBody::state_changed() {
