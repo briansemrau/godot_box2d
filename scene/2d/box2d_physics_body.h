@@ -71,6 +71,7 @@ private:
 	
 	bool prev_sleeping_state = true;
 
+	// Moving to and from world transform
 	void set_box2dworld_transform(const Transform2D &p_transform);
 	Transform2D get_box2dworld_transform();
 
