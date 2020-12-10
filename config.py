@@ -4,3 +4,6 @@ def can_build(env, platform):
 
 def configure(env):
     pass
+
+def get_icons_path():
+    return "icons"

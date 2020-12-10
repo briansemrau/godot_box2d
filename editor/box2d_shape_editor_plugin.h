@@ -5,6 +5,7 @@
 #include <editor/editor_plugin.h>
 
 #include "../scene/resources/box2d_shapes.h"
+#include "box2d_polygon_editor_plugin.h"
 
 /**
 * @author Brian Semrau
@@ -28,14 +29,14 @@ class Box2DShapeEditor : public Control {
 
 	EditorNode *editor;
 	UndoRedo *undo_redo;
-	CanvasItemEditor *canvas_item_editor;
-	Box2DFixture *node;
+	CanvasItemEditor *canvas_item_editor = NULL;
+	Box2DFixture *node = NULL;
 
 	Vector<Point2> handles;
 
-	ShapeType shape_type;
-	int edit_handle;
-	bool pressed;
+	ShapeType shape_type = UNEDITABLE_SHAPE;
+	int edit_handle = -1;
+	bool pressed = false;
 	Variant original;
 
 	Variant get_handle_value(int idx) const;
@@ -47,6 +48,7 @@ class Box2DShapeEditor : public Control {
 protected:
 	void _notification(int p_what);
 	void _node_removed(Node *p_node);
+	void _shape_type_changed();
 	static void _bind_methods();
 
 public:
