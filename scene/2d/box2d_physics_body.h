@@ -69,7 +69,10 @@ private:
 
 	Transform2D last_valid_xform;
 	
+	// TODO maybe keep a list of local state we want this class to track wrt a b2body parameter or field
+	// are there any others?  enabled for example can bet set on the fly in code
 	bool prev_sleeping_state = true;
+	bool prev_enabled_state = true;
 
 	// Moving to and from world transform
 	void set_box2dworld_transform(const Transform2D &p_transform);
