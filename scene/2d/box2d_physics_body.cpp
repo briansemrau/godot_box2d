@@ -172,9 +172,11 @@ void Box2DPhysicsBody::_notification(int p_what) {
 				}
 			}
 
+#ifdef TOOLS_ENABLED
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
 				set_process_internal(true);
 			}
+#endif
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
@@ -185,7 +187,11 @@ void Box2DPhysicsBody::_notification(int p_what) {
 			//      Exiting w/o reentering should destroy body.
 			//      This applies to Box2DFixture and Box2DJoint as well.
 
-			set_process_internal(false);
+#ifdef TOOLS_ENABLED
+			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
+				set_process_internal(false);
+			}
+#endif
 		} break;
 
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
@@ -207,6 +213,7 @@ void Box2DPhysicsBody::_notification(int p_what) {
 				}
 			}
 
+#ifdef TOOLS_ENABLED
 			// Inform joints in editor that we moved
 			if (Engine::get_singleton()->is_editor_hint()) {
 				auto joint = joints.front();
@@ -215,12 +222,15 @@ void Box2DPhysicsBody::_notification(int p_what) {
 					joint = joint->next();
 				}
 			}
+#endif
 		} break;
 
 		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
+#ifdef TOOLS_ENABLED
 			if (Engine::get_singleton()->is_editor_hint()) {
 				break;
 			}
+#endif
 
 			// TODO figure out if this can instead be a callback from Box2D.
 			//		I don't think it can.
@@ -236,30 +246,27 @@ void Box2DPhysicsBody::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_INTERNAL_PROCESS: {
+#ifdef TOOLS_ENABLED
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
-				update();
+				if (is_awake())
+					update();
 			}
+#endif
 		} break;
 
 		case NOTIFICATION_DRAW: {
+#ifdef TOOLS_ENABLED
 			if (!Engine::get_singleton()->is_editor_hint() && !get_tree()->is_debugging_collisions_hint()) {
 				break;
 			}
 
-			if (body) {
-				b2ContactEdge *ce = body->GetContactList();
-				while (ce) {
-					int count = ce->contact->GetManifold()->pointCount;
-
-					b2WorldManifold worldManifold;
-					ce->contact->GetWorldManifold(&worldManifold);
-					for (int i = 0; i < count; i++) {
-						draw_circle(get_box2dworld_transform().xform_inv(b2_to_gd(worldManifold.points[i])), 1.0f, Color(1.0f, 1.0f, 0.0f));
-					}
-
-					ce = ce->next;
+			if (body && is_contact_monitor_enabled()) {
+				for (int i = 0; i < get_contact_count(); i++) {
+					Vector2 point = get_box2dworld_transform().xform_inv(get_contact_world_pos(i));
+					draw_rect(Rect2(point + Point2(-1.0f, -1.0f), Size2(2.0f, 2.0f)), Color(1.0f, 1.0f, 0.0f));
 				}
 			}
+#endif
 		}
 	}
 }
