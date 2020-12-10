@@ -172,9 +172,11 @@ void Box2DPhysicsBody::_notification(int p_what) {
 				}
 			}
 
+#ifdef TOOLS_ENABLED
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
 				set_process_internal(true);
 			}
+#endif
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
@@ -185,7 +187,11 @@ void Box2DPhysicsBody::_notification(int p_what) {
 			//      Exiting w/o reentering should destroy body.
 			//      This applies to Box2DFixture and Box2DJoint as well.
 
-			set_process_internal(false);
+#ifdef TOOLS_ENABLED
+			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
+				set_process_internal(false);
+			}
+#endif
 		} break;
 
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
@@ -207,6 +213,7 @@ void Box2DPhysicsBody::_notification(int p_what) {
 				}
 			}
 
+#ifdef TOOLS_ENABLED
 			// Inform joints in editor that we moved
 			if (Engine::get_singleton()->is_editor_hint()) {
 				auto joint = joints.front();
@@ -215,12 +222,15 @@ void Box2DPhysicsBody::_notification(int p_what) {
 					joint = joint->next();
 				}
 			}
+#endif
 		} break;
 
 		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
+#ifdef TOOLS_ENABLED
 			if (Engine::get_singleton()->is_editor_hint()) {
 				break;
 			}
+#endif
 
 			// TODO figure out if this can instead be a callback from Box2D.
 			//		I don't think it can.
@@ -236,13 +246,16 @@ void Box2DPhysicsBody::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_INTERNAL_PROCESS: {
+#ifdef TOOLS_ENABLED
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
 				if (is_awake())
 					update();
 			}
+#endif
 		} break;
 
 		case NOTIFICATION_DRAW: {
+#ifdef TOOLS_ENABLED
 			if (!Engine::get_singleton()->is_editor_hint() && !get_tree()->is_debugging_collisions_hint()) {
 				break;
 			}
@@ -253,6 +266,7 @@ void Box2DPhysicsBody::_notification(int p_what) {
 					draw_rect(Rect2(point + Point2(-1.0f, -1.0f), Size2(2.0f, 2.0f)), Color(1.0f, 1.0f, 0.0f));
 				}
 			}
+#endif
 		}
 	}
 }
