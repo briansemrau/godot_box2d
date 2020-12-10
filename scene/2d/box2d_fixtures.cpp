@@ -244,6 +244,8 @@ void Box2DFixture::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_mask", "get_collision_mask");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "group_index"), "set_group_index", "get_group_index");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_parent_exceptions"), "set_use_parent_exceptions", "get_use_parent_exceptions");
+
+	ADD_SIGNAL(MethodInfo("_shape_type_changed"));
 }
 
 void Box2DFixture::update_shape() {
@@ -252,7 +254,9 @@ void Box2DFixture::update_shape() {
 		destroy_b2();
 		create_b2();
 	}
+
 	update();
+
 	if (Engine::get_singleton()->is_editor_hint()) {
 		update_configuration_warning();
 	}
@@ -303,6 +307,8 @@ void Box2DFixture::set_shape(const Ref<Box2DShape> &p_shape) {
 	if (shape.is_valid()) {
 		shape->connect("changed", this, "_shape_changed");
 	}
+
+	emit_signal("_shape_type_changed");
 
 	update_shape();
 }

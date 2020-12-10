@@ -55,7 +55,7 @@ bool Box2DJoint::create_b2Joint() {
 bool Box2DJoint::destroy_b2Joint() {
 	if (joint) {
 		ERR_FAIL_COND_V(!world_node, false);
-		ERR_FAIL_COND_V(!world_node->world, false)
+		ERR_FAIL_COND_V(!world_node->world, false);
 
 		world_node->world->DestroyJoint(joint);
 		joint = NULL;

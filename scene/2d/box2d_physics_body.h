@@ -50,7 +50,7 @@ private:
 
 	struct ContactMonitor {
 		// bool locked; // TODO when physics moved to separate thread
-		VSet<Box2DContact> contacts;
+		VSet<Box2DContactPoint> contacts;
 
 		// TODO when adding area functionality, this list can be used to apply area effects
 		// All the bodies/fixtures currently in contact with this body.
@@ -68,7 +68,11 @@ private:
 	Set<Box2DJoint *> joints;
 
 	Transform2D last_valid_xform;
+	
 	bool prev_sleeping_state = true;
+
+	void set_box2dworld_transform(const Transform2D &p_transform);
+	Transform2D get_box2dworld_transform();
 
 	void on_parent_created(Node *);
 

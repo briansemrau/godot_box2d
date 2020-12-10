@@ -20,23 +20,20 @@
 
 class Box2DShape;
 
-struct Box2DContact {
-	int32_t id; // do not modify
+struct Box2DContactPoint {
+	// This ID is required for inserting this object into a VSet
+	int32_t id = -1;
 
-	int solves;
-	Box2DFixture *fixture_a;
-	Box2DFixture *fixture_b;
-	// TODO bodies (but can probably be handled in the contact getter)
-	Vector2 world_pos;
-	Vector2 impact_velocity;
-	Vector2 normal;
-	float normal_impulse;
-	Vector2 tangent_impulse;
-	// TODO local normal (but can probably be handled in the contact getter)
-	// TODO local position (^ same)
-	// TODO state (new, persist) (not delete - deleted contacts will never be reported - i think???)
+	int solves = 0; // TODO might belong inside ContactBufferManifold, but probably not
+	Box2DFixture *fixture_a = NULL;
+	Box2DFixture *fixture_b = NULL;
+	Vector2 world_pos = Vector2();
+	Vector2 impact_velocity = Vector2();
+	Vector2 normal = Vector2();
+	float normal_impulse = 0;
+	Vector2 tangent_impulse = Vector2();
 
-	bool operator<(const Box2DContact &p_c) const {
+	bool operator<(const Box2DContactPoint &p_c) const {
 		return id < p_c.id;
 	}
 
@@ -44,13 +41,51 @@ struct Box2DContact {
 		solves = 0;
 	}
 
-	inline Box2DContact flipped_a_b() const {
-		Box2DContact ret(*this);
+	inline Box2DContactPoint flipped_a_b() const {
+		Box2DContactPoint ret(*this);
 		ret.fixture_a = fixture_b;
 		ret.fixture_b = fixture_a;
 		ret.normal = -ret.normal;
 		ret.tangent_impulse = -ret.tangent_impulse;
 		return ret;
+	}
+};
+
+struct ContactBufferManifold {
+	Box2DContactPoint points[b2_maxManifoldPoints];
+	int count = 0;
+
+	// TODO Optimize? These functions may be overkill, but everything currently works this way
+
+	inline void insert(Box2DContactPoint &p_point, int p_idx) {
+		ERR_FAIL_COND(count + 1 > b2_maxManifoldPoints);
+		ERR_FAIL_COND(p_idx < 0 || p_idx >= b2_maxManifoldPoints);
+		ERR_FAIL_COND(p_idx > count); // Can't insert a point leaving a null at the index below
+
+		// Shift points up
+		if (p_idx < count) {
+			for (int i = count; i > p_idx; --i) {
+				points[i] = points[i - 1];
+			}
+		}
+		points[p_idx] = p_point;
+
+		++count;
+	}
+
+	inline void remove(int p_idx) {
+		ERR_FAIL_COND(p_idx < 0 || p_idx >= count || p_idx >= b2_maxManifoldPoints);
+
+		// Shift points down
+		if (p_idx < count - 1) {
+			for (int i = p_idx; i < count - 1; ++i) {
+				// There's a buffer overflow warning for this line but I don't believe it
+				points[i] = points[i + 1];
+			}
+			points[count - 1].id = -1;
+		}
+
+		--count;
 	}
 };
 
@@ -101,6 +136,7 @@ private:
 
 private:
 	Vector2 gravity;
+	bool auto_step{true};
 	b2World *world;
 
 	Set<Box2DPhysicsBody *> bodies;
@@ -113,9 +149,9 @@ private:
 
 	int32_t next_contact_id = 0;
 	bool flag_rescan_contacts_monitored = false;
-	HashMap<int64_t, Box2DContact> contact_buffer;
+	HashMap<uint64_t, ContactBufferManifold> contact_buffer;
 
-	inline void buffer_contact(b2Contact *contact);
+	inline void try_buffer_contact(b2Contact *contact, int i);
 
 	virtual void BeginContact(b2Contact *contact) override;
 	virtual void EndContact(b2Contact *contact) override;
@@ -144,6 +180,9 @@ public:
 
 	void set_gravity(const Vector2 &gravity);
 	Vector2 get_gravity() const;
+
+	void set_auto_step(bool p_auto_step);
+	bool get_auto_step() const;
 
 	//bool isLocked() const;
 

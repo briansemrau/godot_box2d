@@ -12,10 +12,16 @@
 class Box2DPolygonEditor : public AbstractPolygon2DEditor {
 	GDCLASS(Box2DPolygonEditor, AbstractPolygon2DEditor);
 
-	Box2DFixture *node;
-	Box2DPolygonShape *shape;
+	EditorNode *editor;
+
+	Box2DFixture *node = NULL;
+	Box2DPolygonShape *shape = NULL;
 
 protected:
+	void _shape_type_changed();
+
+	static void _bind_methods();
+
 	virtual Node2D *_get_node() const override;
 	virtual void _set_node(Node *p_polygon) override;
 
