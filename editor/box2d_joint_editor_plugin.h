@@ -14,8 +14,8 @@
 
 class CanvasItemEditor;
 
-class Box2DJointEditor : public Control {
-	GDCLASS(Box2DJointEditor, Control);
+class Box2DJointEditor : public HBoxContainer {
+	GDCLASS(Box2DJointEditor, HBoxContainer);
 
 	enum JointType {
 		REVOLUTE_JOINT,
@@ -34,15 +34,32 @@ class Box2DJointEditor : public Control {
 
 	EditorNode *editor;
 	UndoRedo *undo_redo;
-	CanvasItemEditor *canvas_item_editor;
-	Box2DJoint *node;
+	CanvasItemEditor *canvas_item_editor = NULL;
+	Box2DJoint *node = NULL;
+
+	Button *button_anchor_local;
+	Button *button_anchor_global;
+
+public:
+	enum Mode {
+		MODE_ANCHORS_LOCAL, // Anchors keep their local transform while translating
+		MODE_ANCHORS_STICKY // Anchors stick with the body local transform
+	};
+
+private:
+	Mode anchor_mode = MODE_ANCHORS_LOCAL;
+	Transform2D prev_joint_xform;
 
 	Vector<Point2> handles;
+	Vector<Point2> handle_offsets;
 
-	JointType joint_type;
-	int edit_handle;
-	bool pressed;
+	JointType joint_type = INVALID_JOINT;
+	int edit_handle = -1;
+	bool pressed = false;
 	Variant original;
+
+	void _menu_option(int p_option);
+	void disable_anchor_modes(bool p_disable, String p_reason);
 
 	Variant get_handle_value(int idx) const;
 	void set_handle(int idx, Point2 &p_point);
@@ -54,6 +71,8 @@ protected:
 	void _notification(int p_what);
 	void _node_removed(Node *p_node);
 	static void _bind_methods();
+
+	virtual void _changed_callback(Object *p_changed, const char *p_prop);
 
 public:
 	bool forward_canvas_gui_input(const Ref<InputEvent> &p_event);
@@ -77,7 +96,7 @@ public:
 	bool has_main_screen() const { return false; }
 	virtual void edit(Object *p_obj);
 	virtual bool handles(Object *p_obj) const;
-	virtual void make_visible(bool visible);
+	virtual void make_visible(bool p_visible);
 
 	Box2DJointEditorPlugin(EditorNode *p_editor);
 	~Box2DJointEditorPlugin();

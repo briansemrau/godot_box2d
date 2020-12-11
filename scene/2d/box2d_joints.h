@@ -1,9 +1,9 @@
 #ifndef BOX2D_JOINTS_H
 #define BOX2D_JOINTS_H
 
+#include <core/io/resource.h>
 #include <core/object/object.h>
 #include <core/object/reference.h>
-#include <core/io/resource.h>
 #include <scene/2d/node_2d.h>
 
 #include <box2d/b2_distance_joint.h>
@@ -19,6 +19,7 @@
 #include <box2d/b2_weld_joint.h>
 #include <box2d/b2_wheel_joint.h>
 
+#include "../../editor/box2d_joint_editor_plugin.h"
 #include "../../util/box2d_types_converter.h"
 #include "box2d_physics_body.h"
 
@@ -28,11 +29,19 @@
 
 class Box2DWorld;
 
+// TODO maybe relevant joints should inherit some LocalAnchorBearer class (name TBD)
+//     It would store local anchors and their accessors
+//     This would not be a Godot class
+//     Inheritance: Box2DJoint -> LocalAnchorBearer -> Box2D[Revolute, etc.]Joint
+// dunno, needs a lot more thought
+
 class Box2DJoint : public Node2D {
 	GDCLASS(Box2DJoint, Node2D);
 
 	friend class Box2DWorld;
 	friend class Box2DPhysicsBody;
+
+	friend class Box2DJointEditor; // this is questionable TODO remove probably
 
 	b2JointDef *jointDef = NULL;
 	b2Joint *joint = NULL;
@@ -42,7 +51,7 @@ class Box2DJoint : public Node2D {
 	NodePath a;
 	NodePath b;
 
-	ObjectID bodyA_cache{};
+	ObjectID bodyA_cache{}; // TODO rename to objA_cache when update_joint_bodies is made virtual
 	ObjectID bodyB_cache{};
 
 	bool broken = false;
@@ -61,12 +70,14 @@ class Box2DJoint : public Node2D {
 	virtual void on_editor_transforms_changed() {}
 
 	// Rescans the nodepaths to find b2Bodies and create our b2joint
-	void update_joint_bodies();
+	void update_joint_bodies(); // TODO make virtual. Gear joint links joints, not bodies. Rename "update_joint_linkages/connections/nodepaths" or similar
 
 	void _node_a_tree_entered();
 	void _node_b_tree_entered();
 
 protected:
+	Box2DJointEditor::Mode editor_anchor_mode; // TODO this is NOT the place for this
+
 	// Destroys and recreates the b2Joint, if valid. Useful for updating constant parameters, such as bodies.
 	void recreate_joint();
 
@@ -130,6 +141,8 @@ protected:
 class Box2DRevoluteJoint : public Box2DJoint {
 	GDCLASS(Box2DRevoluteJoint, Box2DJoint);
 
+	friend class Box2DJointEditor; //nononononono tmeporary TODO remove
+
 	b2RevoluteJointDef jointDef;
 
 	// Joint node local-space anchor points. These sync with jointDef's body-local anchor points.
@@ -139,7 +152,7 @@ class Box2DRevoluteJoint : public Box2DJoint {
 	Vector2 anchor_b = Vector2();
 	// Controls whether moving the joint or linked bodies in the editor can modify the jointDef body-local anchor points.
 	// With this option off, joints anchors can be moved to different world locations without being reset.
-	bool editor_use_default_anchors = true;
+	//bool editor_use_default_anchors = true;
 
 	virtual void on_editor_transforms_changed() override;
 
@@ -151,12 +164,11 @@ protected:
 	virtual void debug_draw(RID p_to_rid, Color p_color) override;
 
 public:
-	real_t get_reference_angle() const;
 	real_t get_joint_angle() const;
 	real_t get_joint_speed() const;
 
-	void set_editor_use_default_anchors(bool p_update);
-	bool get_editor_use_default_anchors() const;
+	//void set_editor_use_default_anchors(bool p_update);
+	//bool get_editor_use_default_anchors() const;
 
 	// TODO documentation: Setting anchors is advanced behavior. These values are in joint node local space.
 	void set_anchor_a(const Vector2 &p_anchor);
@@ -178,6 +190,10 @@ public:
 	real_t get_lower_limit() const;
 
 	void set_limits(real_t p_lower, real_t p_upper);
+
+	// Changes the reference angle between bodies.
+	//void set_reference_angle(real_t p_angle);
+	real_t get_reference_angle() const;
 
 	void set_motor_enabled(bool p_enabled);
 	bool is_motor_enabled() const;

@@ -263,7 +263,7 @@ void Box2DJoint::_notification(int p_what) {
 #ifdef TOOLS_ENABLED
 			// Update in editor to represent what initialized state will look like
 			if (Engine::get_singleton()->is_editor_hint()) {
-				on_editor_transforms_changed();
+				on_editor_transforms_changed(); // TODO remove
 			}
 #endif
 		} break;
@@ -532,29 +532,29 @@ Box2DJoint::~Box2DJoint() {
 }
 
 void Box2DRevoluteJoint::on_editor_transforms_changed() {
-	if (editor_use_default_anchors) {
-		// We need set reset anchors and reinit the jointDef
-		if (is_inside_tree()) {
-			reset_joint_anchors();
-			_change_notify();
-		}
-	} else {
+	// TODO this is probably where to fix issue ticket #1
+
+	if (editor_anchor_mode == Box2DJointEditor::Mode::MODE_ANCHORS_STICKY) {
 		// Some relative coordinate has changed
 		// We want to move our anchors to keep their relative location to each body the same
 		// This leaves the jointDef anchors unchanged
-		anchor_a = to_local(b2_to_gd(jointDef.bodyA->GetWorldPoint(jointDef.localAnchorA)));
+		anchor_a = to_local(b2_to_gd(jointDef.bodyA->GetWorldPoint(jointDef.localAnchorA))); // TODO should this use box2d_global_transform?
 		anchor_b = to_local(b2_to_gd(jointDef.bodyB->GetWorldPoint(jointDef.localAnchorB)));
 		_change_notify();
+		update();
+	} else {
+		// Keep our local anchors in-place
+		recreate_joint();
+		//update();
 	}
 }
 
 void Box2DRevoluteJoint::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("get_reference_angle"), &Box2DRevoluteJoint::get_reference_angle);
 	ClassDB::bind_method(D_METHOD("get_joint_angle"), &Box2DRevoluteJoint::get_joint_angle);
 	ClassDB::bind_method(D_METHOD("get_joint_speed"), &Box2DRevoluteJoint::get_joint_speed);
 
-	ClassDB::bind_method(D_METHOD("set_editor_use_default_anchors", "default"), &Box2DRevoluteJoint::set_editor_use_default_anchors);
-	ClassDB::bind_method(D_METHOD("get_editor_use_default_anchors"), &Box2DRevoluteJoint::get_editor_use_default_anchors);
+	//ClassDB::bind_method(D_METHOD("set_editor_use_default_anchors", "default"), &Box2DRevoluteJoint::set_editor_use_default_anchors);
+	//ClassDB::bind_method(D_METHOD("get_editor_use_default_anchors"), &Box2DRevoluteJoint::get_editor_use_default_anchors);
 	ClassDB::bind_method(D_METHOD("set_anchor_a", "anchor_a"), &Box2DRevoluteJoint::set_anchor_a);
 	ClassDB::bind_method(D_METHOD("get_anchor_a"), &Box2DRevoluteJoint::get_anchor_a);
 	ClassDB::bind_method(D_METHOD("set_anchor_b", "anchor_b"), &Box2DRevoluteJoint::set_anchor_b);
@@ -570,6 +570,9 @@ void Box2DRevoluteJoint::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_limits", "lower", "upper"), &Box2DRevoluteJoint::set_limits);
 
+	//ClassDB::bind_method(D_METHOD("set_reference_angle", "angle"), &Box2DRevoluteJoint::set_reference_angle);
+	ClassDB::bind_method(D_METHOD("get_reference_angle"), &Box2DRevoluteJoint::get_reference_angle);
+
 	ClassDB::bind_method(D_METHOD("set_motor_enabled", "motor_enabled"), &Box2DRevoluteJoint::set_motor_enabled);
 	ClassDB::bind_method(D_METHOD("is_motor_enabled"), &Box2DRevoluteJoint::is_motor_enabled);
 	ClassDB::bind_method(D_METHOD("set_motor_speed", "motor_speed"), &Box2DRevoluteJoint::set_motor_speed);
@@ -581,11 +584,12 @@ void Box2DRevoluteJoint::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "limit_enabled"), "set_limit_enabled", "is_limit_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "upper_limit"), "set_upper_limit", "get_upper_limit");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "lower_limit"), "set_lower_limit", "get_lower_limit");
+	// TODO reference_angle, maybe
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "motor_enabled"), "set_motor_enabled", "is_motor_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "motor_speed"), "set_motor_speed", "get_motor_speed");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_motor_torque"), "set_max_motor_torque", "get_max_motor_torque");
 	ADD_GROUP("Anchors", "");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_default_anchors"), "set_editor_use_default_anchors", "get_editor_use_default_anchors");
+	//ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_default_anchors"), "set_editor_use_default_anchors", "get_editor_use_default_anchors");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "anchor_a"), "set_anchor_a", "get_anchor_a");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "anchor_b"), "set_anchor_b", "get_anchor_b");
 }
@@ -627,9 +631,9 @@ void Box2DRevoluteJoint::debug_draw(RID p_to_rid, Color p_color) {
 	draw_circle(p2, 2, p_color);
 
 	if (jointDef.enableLimit) {
-		draw_line(p1, p1 + Point2(8, 0).rotated(jointDef.referenceAngle), p_color);
-		draw_line(p1, p1 + Point2(8, 0).rotated(jointDef.lowerAngle), p_color);
-		draw_line(p1, p1 + Point2(8, 0).rotated(jointDef.upperAngle), p_color);
+		draw_line(p1, p1 + Point2(15, 0).rotated(jointDef.referenceAngle), p_color);
+		draw_line(p1, p1 + Point2(10, 0).rotated(jointDef.lowerAngle), p_color);
+		draw_line(p1, p1 + Point2(10, 0).rotated(jointDef.upperAngle), p_color);
 	}
 	if (jointDef.enableMotor) {
 		float a = jointDef.referenceAngle;
@@ -650,11 +654,6 @@ void Box2DRevoluteJoint::debug_draw(RID p_to_rid, Color p_color) {
 	draw_line(x2, p2, c, 1.0f);
 }
 
-real_t Box2DRevoluteJoint::get_reference_angle() const {
-	ERR_FAIL_COND_V_MSG(!get_b2Joint(), real_t(), "b2Joint is null.");
-	return static_cast<b2RevoluteJoint *>(get_b2Joint())->GetReferenceAngle();
-}
-
 real_t Box2DRevoluteJoint::get_joint_angle() const {
 	ERR_FAIL_COND_V_MSG(!get_b2Joint(), real_t(), "b2Joint is null.");
 	return static_cast<b2RevoluteJoint *>(get_b2Joint())->GetJointAngle();
@@ -665,18 +664,19 @@ real_t Box2DRevoluteJoint::get_joint_speed() const {
 	return static_cast<b2RevoluteJoint *>(get_b2Joint())->GetJointSpeed();
 }
 
-void Box2DRevoluteJoint::set_editor_use_default_anchors(bool p_update) {
-	editor_use_default_anchors = p_update;
-	if (editor_use_default_anchors)
-		reset_joint_anchors();
-}
-
-bool Box2DRevoluteJoint::get_editor_use_default_anchors() const {
-	return editor_use_default_anchors;
-}
+//void Box2DRevoluteJoint::set_editor_use_default_anchors(bool p_update) {
+//	editor_use_default_anchors = p_update;
+//	if (editor_use_default_anchors)
+//		reset_joint_anchors();
+//}
+//
+//bool Box2DRevoluteJoint::get_editor_use_default_anchors() const {
+//	return editor_use_default_anchors;
+//}
 
 void Box2DRevoluteJoint::set_anchor_a(const Vector2 &p_anchor) {
 	anchor_a = p_anchor;
+	_change_notify();
 
 	recreate_joint();
 }
@@ -689,6 +689,7 @@ Vector2 Box2DRevoluteJoint::get_anchor_a() const {
 
 void Box2DRevoluteJoint::set_anchor_b(const Vector2 &p_anchor) {
 	anchor_b = p_anchor;
+	_change_notify();
 
 	recreate_joint();
 }
@@ -710,6 +711,7 @@ void Box2DRevoluteJoint::set_limit_enabled(bool p_enabled) {
 	if (get_b2Joint())
 		static_cast<b2RevoluteJoint *>(get_b2Joint())->EnableLimit(p_enabled);
 	jointDef.enableLimit = p_enabled;
+	_change_notify();
 }
 
 bool Box2DRevoluteJoint::is_limit_enabled() const {
@@ -717,9 +719,16 @@ bool Box2DRevoluteJoint::is_limit_enabled() const {
 }
 
 void Box2DRevoluteJoint::set_upper_limit(real_t p_angle) {
+	if (p_angle <= get_lower_limit()) {
+		WARN_PRINT("Attempting to set an upper limit less than or equal to the lower limit. Bounding to the lower limit.");
+		p_angle = get_lower_limit() + 0.01f;
+	}
+
 	if (get_b2Joint())
 		static_cast<b2RevoluteJoint *>(get_b2Joint())->SetLimits(get_lower_limit(), p_angle);
 	jointDef.upperAngle = p_angle;
+
+	_change_notify();
 }
 
 real_t Box2DRevoluteJoint::get_upper_limit() const {
@@ -727,9 +736,16 @@ real_t Box2DRevoluteJoint::get_upper_limit() const {
 }
 
 void Box2DRevoluteJoint::set_lower_limit(real_t p_angle) {
+	if (p_angle >= get_upper_limit()) {
+		WARN_PRINT("Attempting to set a lower limit greater than or equal to the upper limit. Bounding to the upper limit.");
+		p_angle = get_upper_limit() - 0.01f;
+	}
+
 	if (get_b2Joint())
 		static_cast<b2RevoluteJoint *>(get_b2Joint())->SetLimits(p_angle, get_upper_limit());
 	jointDef.lowerAngle = p_angle;
+
+	_change_notify();
 }
 
 real_t Box2DRevoluteJoint::get_lower_limit() const {
@@ -737,10 +753,24 @@ real_t Box2DRevoluteJoint::get_lower_limit() const {
 }
 
 void Box2DRevoluteJoint::set_limits(real_t p_lower, real_t p_upper) {
+	ERR_FAIL_COND_MSG(p_lower >= p_upper, "Cannot set the upper limit less than or equal than the lower limit.");
+
 	if (get_b2Joint())
 		static_cast<b2RevoluteJoint *>(get_b2Joint())->SetLimits(p_lower, p_upper);
 	jointDef.lowerAngle = p_lower;
 	jointDef.upperAngle = p_upper;
+}
+
+//void Box2DRevoluteJoint::set_reference_angle(real_t p_angle) {
+//	// TODO not sure if this will work as intended - needs testing
+//	jointDef.referenceAngle = p_angle;
+//	recreate_joint();
+//}
+
+real_t Box2DRevoluteJoint::get_reference_angle() const {
+	if (get_b2Joint())
+		return static_cast<b2RevoluteJoint *>(get_b2Joint())->GetReferenceAngle();
+	return jointDef.referenceAngle;
 }
 
 void Box2DRevoluteJoint::set_motor_enabled(bool p_enabled) {
@@ -782,9 +812,9 @@ real_t Box2DRevoluteJoint::get_motor_torque() const {
 Box2DRevoluteJoint::Box2DRevoluteJoint() :
 		Box2DJoint(&jointDef) {
 
-	if (!Engine::get_singleton()->is_editor_hint()) {
-		editor_use_default_anchors = false;
-	}
+	//if (!Engine::get_singleton()->is_editor_hint()) {
+	//	editor_use_default_anchors = false;
+	//}
 };
 
 void Box2DPrismaticJoint::on_editor_transforms_changed() {

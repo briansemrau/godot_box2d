@@ -4,6 +4,8 @@
 
 #include "../scene/2d/box2d_joints.h"
 
+#include <string.h>
+
 /**
 * @author Brian Semrau
 *
@@ -13,6 +15,38 @@
 void Box2DJointEditor::_node_removed(Node *p_node) {
 	if (p_node == node) {
 		node = NULL;
+	}
+}
+
+void Box2DJointEditor::_menu_option(int p_option) {
+	switch (p_option) {
+		case Box2DJointEditor::MODE_ANCHORS_LOCAL: {
+			anchor_mode = MODE_ANCHORS_LOCAL;
+			button_anchor_local->set_pressed(true);
+			button_anchor_global->set_pressed(false);
+		} break;
+
+		case Box2DJointEditor::MODE_ANCHORS_STICKY: {
+			anchor_mode = MODE_ANCHORS_STICKY;
+			button_anchor_local->set_pressed(false);
+			button_anchor_global->set_pressed(true);
+		} break;
+	}
+
+	if (node)
+		node->editor_anchor_mode = static_cast<Box2DJointEditor::Mode>(p_option);
+}
+
+void Box2DJointEditor::disable_anchor_modes(bool p_disable, String p_reason) {
+	button_anchor_local->set_disabled(p_disable);
+	button_anchor_global->set_disabled(p_disable);
+
+	if (p_disable) {
+		button_anchor_local->set_tooltip(p_reason);
+		button_anchor_global->set_tooltip(p_reason);
+	} else {
+		button_anchor_local->set_tooltip(TTR("Move anchors with joint")); // TODO translation file?
+		button_anchor_global->set_tooltip(TTR("Anchors stick to their body"));
 	}
 }
 
@@ -52,7 +86,18 @@ Variant Box2DJointEditor::get_handle_value(int idx) const {
 			//} break;
 
 		case REVOLUTE_JOINT: {
-			// TODO
+			Box2DRevoluteJoint *j = Object::cast_to<Box2DRevoluteJoint>(node);
+
+			switch (idx) {
+				case 0:
+					return j->get_anchor_a();
+				case 1:
+					return j->get_anchor_b();
+				case 2:
+					return j->get_lower_limit();
+				case 3:
+					return j->get_upper_limit();
+			}
 		} break;
 
 		case PRISMATIC_JOINT: {
@@ -130,7 +175,35 @@ void Box2DJointEditor::set_handle(int idx, Point2 &p_point) {
 			//} break;
 
 		case REVOLUTE_JOINT: {
-			// TODO
+			Box2DRevoluteJoint *j = Object::cast_to<Box2DRevoluteJoint>(node);
+
+			Point2 offset_point = p_point - j->get_anchor_a(); // offset to match debug draw
+
+			switch (idx) {
+				case 0: {
+					j->set_anchor_a(p_point);
+				} break;
+				case 1: {
+					j->set_anchor_b(p_point);
+				} break;
+				case 2: {
+					// This allows you to wrap handle around to set limit angles >180 or <-180
+					float angle_prev = j->get_lower_limit();
+					float angle_vector = offset_point.angle();
+					int n = roundf((angle_prev - angle_vector) / static_cast<float>(Math_PI));
+
+					j->set_lower_limit(angle_vector + n * Math_PI);
+				} break;
+				case 3: {
+					float angle_prev = j->get_upper_limit();
+					float angle_vector = offset_point.angle();
+					int n = roundf((angle_prev - angle_vector) / static_cast<float>(Math_PI));
+
+					j->set_upper_limit(angle_vector + n * Math_PI);
+				} break;
+			}
+
+			canvas_item_editor->update_viewport();
 		} break;
 
 		case PRISMATIC_JOINT: {
@@ -213,7 +286,34 @@ void Box2DJointEditor::commit_handle(int idx, Variant &p_org) {
 			//} break;
 
 		case REVOLUTE_JOINT: {
-			// TODO
+			Box2DRevoluteJoint *j = Object::cast_to<Box2DRevoluteJoint>(node);
+
+			switch (idx) {
+				case 0: {
+					undo_redo->add_do_method(j, "set_anchor_a", j->get_anchor_a());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_anchor_a", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+				case 1: {
+					undo_redo->add_do_method(j, "set_anchor_b", j->get_anchor_b());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_anchor_b", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+				case 2: {
+					undo_redo->add_do_method(j, "set_lower_limit", j->get_lower_limit());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_lower_limit", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+				case 3: {
+					undo_redo->add_do_method(j, "set_upper_limit", j->get_upper_limit());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_upper_limit", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+			}
 		} break;
 
 		case PRISMATIC_JOINT: {
@@ -260,15 +360,13 @@ bool Box2DJointEditor::forward_canvas_gui_input(const Ref<InputEvent> &p_event) 
 	Transform2D xform = canvas_item_editor->get_canvas_transform() * node->get_global_transform();
 
 	if (mb.is_valid()) {
-
 		Vector2 gpoint = mb->get_position();
 
 		if (mb->get_button_index() == BUTTON_LEFT) {
 			if (mb->is_pressed()) {
 				for (int i = 0; i < handles.size(); i++) {
-					if (xform.xform(handles[i]).distance_to(gpoint) < 8) {
+					if (xform.xform(handles[i]).distance_to(gpoint - handle_offsets[i]) < 8) {
 						edit_handle = i;
-
 						break;
 					}
 				}
@@ -306,7 +404,7 @@ bool Box2DJointEditor::forward_canvas_gui_input(const Ref<InputEvent> &p_event) 
 			return false;
 		}
 
-		Vector2 cpoint = canvas_item_editor->snap_point(canvas_item_editor->get_canvas_transform().affine_inverse().xform(mm->get_position()));
+		Vector2 cpoint = canvas_item_editor->snap_point(canvas_item_editor->get_canvas_transform().affine_inverse().xform(mm->get_position() - handle_offsets[edit_handle]));
 		cpoint = node->get_global_transform().affine_inverse().xform(cpoint);
 
 		set_handle(edit_handle, cpoint);
@@ -361,10 +459,13 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 	Transform2D gt = canvas_item_editor->get_canvas_transform() * node->get_global_transform();
 
 	Ref<Theme> theme = EditorNode::get_singleton()->get_editor_theme();
-	Ref<Texture2D> h = theme->get_icon("EditorHandle", "EditorIcons");
-	Vector2 size = h->get_size() * 0.5;
+	Ref<Texture2D> handle_icon = theme->get_icon("EditorHandle", "EditorIcons");
+	Ref<Texture2D> anchor_icon = theme->get_icon("EditorControlAnchor", "EditorIcons");
+	Vector2 anchor_size = anchor_icon->get_size();
+	Vector2 handle_hsize = handle_icon->get_size() * 0.5;
 
 	handles.clear();
+	handle_offsets.clear();
 
 	switch (joint_type) {
 			//case Box2DJointEditor::CIRCLE_SHAPE: {
@@ -373,7 +474,7 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 			//	handles.resize(1);
 			//	handles.write[0] = Point2(shape->get_radius(), 0);
 
-			//	p_overlay->draw_texture(h, gt.xform(handles[0]) - size);
+			//	p_overlay->draw_texture(handle_icon, gt.xform(handles[0]) - hsize);
 			//} break;
 
 			//case Box2DJointEditor::RECTANGLE_SHAPE: {
@@ -385,9 +486,9 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 			//	handles.write[1] = Point2(0, -ext.y);
 			//	handles.write[2] = Point2(ext.x, -ext.y);
 
-			//	p_overlay->draw_texture(h, gt.xform(handles[0]) - size);
-			//	p_overlay->draw_texture(h, gt.xform(handles[1]) - size);
-			//	p_overlay->draw_texture(h, gt.xform(handles[2]) - size);
+			//	p_overlay->draw_texture(handle_icon, gt.xform(handles[0]) - hsize);
+			//	p_overlay->draw_texture(handle_icon, gt.xform(handles[1]) - hsize);
+			//	p_overlay->draw_texture(handle_icon, gt.xform(handles[2]) - hsize);
 			//} break;
 
 			//case Box2DJointEditor::SEGMENT_SHAPE: {
@@ -401,23 +502,52 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 			//		handles.write[2] = shape->get_a_adjacent();
 			//		handles.write[3] = shape->get_b_adjacent();
 
-			//		p_overlay->draw_texture(h, gt.xform(handles[0]) - size);
-			//		p_overlay->draw_texture(h, gt.xform(handles[1]) - size);
-			//		p_overlay->draw_texture(h, gt.xform(handles[2]) - size);
-			//		p_overlay->draw_texture(h, gt.xform(handles[3]) - size);
+			//		p_overlay->draw_texture(handle_icon, gt.xform(handles[0]) - hsize);
+			//		p_overlay->draw_texture(handle_icon, gt.xform(handles[1]) - hsize);
+			//		p_overlay->draw_texture(handle_icon, gt.xform(handles[2]) - hsize);
+			//		p_overlay->draw_texture(handle_icon, gt.xform(handles[3]) - hsize);
 			//	} else {
 			//		handles.resize(2);
 
 			//		handles.write[0] = shape->get_a();
 			//		handles.write[1] = shape->get_b();
 
-			//		p_overlay->draw_texture(h, gt.xform(handles[0]) - size);
-			//		p_overlay->draw_texture(h, gt.xform(handles[1]) - size);
+			//		p_overlay->draw_texture(handle_icon, gt.xform(handles[0]) - hsize);
+			//		p_overlay->draw_texture(handle_icon, gt.xform(handles[1]) - hsize);
 			//	}
 			//} break;
 
 		case REVOLUTE_JOINT: {
-			// TODO
+			Box2DRevoluteJoint *j = Object::cast_to<Box2DRevoluteJoint>(node);
+
+			handles.resize(2);
+			handles.write[0] = j->get_anchor_a();
+			handles.write[1] = j->get_anchor_b();
+
+			p_overlay->draw_texture(anchor_icon, gt.xform(handles[0]) - anchor_size);
+			// what the F i just want a rotated texture
+			Transform2D rot_xform = Transform2D(Math_PI * 0.5f, Vector2());
+			Transform2D xform = (rot_xform.inverse() * gt);
+			p_overlay->draw_set_transform_matrix(rot_xform);
+			p_overlay->draw_texture(anchor_icon, xform.xform(handles[1]) - anchor_size);
+			p_overlay->draw_set_transform_matrix(Transform2D());
+
+			handle_offsets.resize(2);
+			handle_offsets.write[0] = (-anchor_size + handle_hsize); // approximately correct
+			handle_offsets.write[1] = (-anchor_size + handle_hsize) * Size2(-1, 1);
+
+			if (j->is_limit_enabled()) {
+				handles.resize(4);
+				handles.write[2] = j->get_anchor_a() + Point2(10, 0).rotated(j->get_lower_limit());
+				handles.write[3] = j->get_anchor_a() + Point2(10, 0).rotated(j->get_upper_limit());
+
+				p_overlay->draw_texture(handle_icon, gt.xform(handles[2]) - handle_hsize);
+				p_overlay->draw_texture(handle_icon, gt.xform(handles[3]) - handle_hsize);
+
+				handle_offsets.resize(4);
+				handle_offsets.write[2] = Point2();
+				handle_offsets.write[3] = Point2();
+			}
 		} break;
 
 		case PRISMATIC_JOINT: {
@@ -451,12 +581,20 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 
 void Box2DJointEditor::_notification(int p_what) {
 	switch (p_what) {
+		case NOTIFICATION_READY: {
+			disable_anchor_modes(false, String());
+
+			button_anchor_local->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("AnchorsLocal", "EditorIcons"));
+			button_anchor_global->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("StickyAnchors", "EditorIcons"));
+			button_anchor_local->set_pressed(true);
+		} break;
+
 		case NOTIFICATION_ENTER_TREE: {
-			get_tree()->connect("node_removed", Callable(this, "_node_removed"));
+			get_tree()->connect("node_removed", callable_mp(this, &Box2DJointEditor::_node_removed));
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
-			get_tree()->disconnect("node_removed", Callable(this, "_node_removed"));
+			get_tree()->disconnect("node_removed", callable_mp(this, &Box2DJointEditor::_node_removed));
 		} break;
 	}
 }
@@ -468,13 +606,38 @@ void Box2DJointEditor::edit(Node *p_node) {
 
 	if (p_node) {
 		node = Object::cast_to<Box2DJoint>(p_node);
-
 		_get_current_joint_type();
 
+		//node->add_change_receptor(this);
+
+		_menu_option(node->editor_anchor_mode);
+
+		prev_joint_xform = node->get_global_transform(); // TODO should this be box2d_global_transform?
+
+		switch (joint_type) {
+			// TODO I think certain joints don't use body anchors like the others (gear?)
+			case Box2DJointEditor::REVOLUTE_JOINT:
+			case Box2DJointEditor::PRISMATIC_JOINT:
+			case Box2DJointEditor::DISTANCE_JOINT:
+			case Box2DJointEditor::PULLEY_JOINT:
+			case Box2DJointEditor::MOUSE_JOINT:
+			case Box2DJointEditor::GEAR_JOINT:
+			case Box2DJointEditor::WHEEL_JOINT:
+			case Box2DJointEditor::WELD_JOINT:
+			case Box2DJointEditor::FRICTION_JOINT:
+			case Box2DJointEditor::ROPE_JOINT:
+			case Box2DJointEditor::MOTOR_JOINT:
+			case Box2DJointEditor::INVALID_JOINT: {
+				disable_anchor_modes(false, String());
+			} break;
+		}
+		// TODO if more buttons added, enable/disable them here as they apply
 	} else {
 		edit_handle = -1;
 		joint_type = INVALID_JOINT;
 
+		//if (node)
+		//	node->remove_change_receptor(this);
 		node = NULL;
 	}
 
@@ -482,19 +645,27 @@ void Box2DJointEditor::edit(Node *p_node) {
 }
 
 void Box2DJointEditor::_bind_methods() {
-
-	ClassDB::bind_method("_get_current_joint_type", &Box2DJointEditor::_get_current_joint_type);
-	ClassDB::bind_method(D_METHOD("_node_removed"), &Box2DJointEditor::_node_removed);
 }
 
 Box2DJointEditor::Box2DJointEditor(EditorNode *p_editor) :
-		node(NULL),
-		canvas_item_editor(NULL),
 		editor(p_editor),
-		undo_redo(p_editor->get_undo_redo()),
-		joint_type(INVALID_JOINT),
-		edit_handle(-1),
-		pressed(false) {}
+		undo_redo(EditorNode::get_undo_redo()) {
+	add_child(memnew(VSeparator));
+	button_anchor_local = memnew(Button);
+	button_anchor_local->set_flat(true);
+	add_child(button_anchor_local);
+	button_anchor_local->connect("pressed", callable_mp(this, &Box2DJointEditor::_menu_option), varray(Mode::MODE_ANCHORS_LOCAL));
+	button_anchor_local->set_toggle_mode(true);
+
+	button_anchor_global = memnew(Button);
+	button_anchor_global->set_flat(true);
+	add_child(button_anchor_global);
+	button_anchor_global->connect("pressed", callable_mp(this, &Box2DJointEditor::_menu_option), varray(Mode::MODE_ANCHORS_STICKY));
+	button_anchor_global->set_toggle_mode(true);
+
+	// [VSeparator]
+	// TODO add any additional buttons for other joints
+}
 
 void Box2DJointEditorPlugin::edit(Object *p_obj) {
 	box2d_joint_editor->edit(Object::cast_to<Node>(p_obj));
@@ -502,12 +673,15 @@ void Box2DJointEditorPlugin::edit(Object *p_obj) {
 
 bool Box2DJointEditorPlugin::handles(Object *p_obj) const {
 	Box2DJoint *node = Object::cast_to<Box2DJoint>(p_obj);
-	return node != NULL;
+	return node != nullptr;
 }
 
-void Box2DJointEditorPlugin::make_visible(bool visible) {
-	if (!visible) {
-		edit(NULL);
+void Box2DJointEditorPlugin::make_visible(bool p_visible) {
+	if (p_visible) {
+		box2d_joint_editor->show();
+	} else {
+		box2d_joint_editor->hide();
+		edit(nullptr);
 	}
 }
 
@@ -515,7 +689,9 @@ Box2DJointEditorPlugin::Box2DJointEditorPlugin(EditorNode *p_editor) {
 	editor = p_editor;
 
 	box2d_joint_editor = memnew(Box2DJointEditor(p_editor));
-	p_editor->get_gui_base()->add_child(box2d_joint_editor);
+	//p_editor->get_gui_base()->add_child(box2d_joint_editor);
+	CanvasItemEditor::get_singleton()->add_control_to_menu_panel(box2d_joint_editor);
+	box2d_joint_editor->hide();
 }
 
 Box2DJointEditorPlugin::~Box2DJointEditorPlugin() {
