@@ -29,12 +29,6 @@
 
 class Box2DWorld;
 
-// TODO maybe relevant joints should inherit some LocalAnchorBearer class (name TBD)
-//     It would store local anchors and their accessors
-//     This would not be a Godot class
-//     Inheritance: Box2DJoint -> LocalAnchorBearer -> Box2D[Revolute, etc.]Joint
-// dunno, needs a lot more thought
-
 class Box2DJoint : public Node2D {
 	GDCLASS(Box2DJoint, Node2D);
 
@@ -67,7 +61,7 @@ class Box2DJoint : public Node2D {
 
 	void on_parent_created(Node *p_parent);
 	void on_node_predelete(Box2DPhysicsBody *node);
-	virtual void on_editor_transforms_changed() {}
+	virtual void on_editor_transforms_changed();
 
 	// Rescans the nodepaths to find b2Bodies and create our b2joint
 	void update_joint_bodies(); // TODO make virtual. Gear joint links joints, not bodies. Rename "update_joint_linkages/connections/nodepaths" or similar
@@ -76,23 +70,46 @@ class Box2DJoint : public Node2D {
 	void _node_b_tree_entered();
 
 protected:
-	Box2DJointEditor::AnchorMode editor_anchor_mode = Box2DJointEditor::AnchorMode::MODE_ANCHORS_LOCAL; // TODO this is NOT the place for this
+	Box2DJointEditor::AnchorMode editor_anchor_mode = Box2DJointEditor::AnchorMode::MODE_ANCHORS_LOCAL;
 
-	// Destroys and recreates the b2Joint, if valid. Useful for updating constant parameters, such as bodies.
-	void recreate_joint();
+	// Destroys and recreates the b2Joint, if valid.
+	// Useful for modifying const b2 parameters, such as anchors. In these cases, set p_soft_reset to true.
+	// `p_soft_reset` indicates whether initial-configuration properties should not be reset, such as relative body angles.
+	void recreate_joint(bool p_soft_reset);
 
 	b2Joint *get_b2Joint() { return joint; }
 	b2Joint *get_b2Joint() const { return joint; }
 
-	b2Vec2 get_b2_pos() const;
+	b2Vec2 get_b2_pos() const; // TODO update this with world-relative transforms, following changes in PR #31
 
 	void _notification(int p_what);
 	static void _bind_methods();
 
+	// Joint node local-space anchor points. These sync with jointDef's body-local anchor points.
+	// Allows configuring anchor points to be in different world positions when added to the scene.
+	// Modifying these is generally not recommended unless required for initializing a broken joint that starts separated.
+	Vector2 anchor_a = Vector2();
+	Vector2 anchor_b = Vector2();
+
 	// Allows all joint types to perform their custom initializations.
-	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) = 0;
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos, bool p_soft_reset) = 0;
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) = 0;
+
+	// TODO maybe this should not be pure virtual?
+	virtual Vector2 get_body_local_anchor_a() const = 0;
+	virtual Vector2 get_body_local_anchor_b() const = 0;
+
+	// These functions have to be proxied in all subclasses that bind them.
+	//     ClassDB binds to the function's class, irrespective of class scope used when binding.
+	//     That is, bind_method(..., &Box2DWeldJoint::set_anchor_a); would bind to the Godot class Box2DJoint.
+	void set_anchor_a(const Vector2 &p_anchor);
+	Vector2 get_anchor_a() const;
+
+	void set_anchor_b(const Vector2 &p_anchor);
+	Vector2 get_anchor_b() const;
+
+	void reset_joint_anchors();
 
 public:
 	virtual String get_configuration_warning() const override;
@@ -141,45 +158,34 @@ protected:
 class Box2DRevoluteJoint : public Box2DJoint {
 	GDCLASS(Box2DRevoluteJoint, Box2DJoint);
 
-	friend class Box2DJointEditor; //nononononono tmeporary TODO remove
-
 	b2RevoluteJointDef jointDef;
-
-	// Joint node local-space anchor points. These sync with jointDef's body-local anchor points.
-	// Allows configuring anchor points to be in different world positions when added to the scene.
-	// Modifying these is generally not recommended unless required for initializing a broken joint that starts separated.
-	Vector2 anchor_a = Vector2();
-	Vector2 anchor_b = Vector2();
-	// Controls whether moving the joint or linked bodies in the editor can modify the jointDef body-local anchor points.
-	// With this option off, joints anchors can be moved to different world locations without being reset.
-	//bool editor_use_default_anchors = true;
-
-	virtual void on_editor_transforms_changed() override;
 
 protected:
 	static void _bind_methods();
 
-	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) override;
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos, bool p_soft_reset) override;
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) override;
 
 public:
+	Vector2 get_body_local_anchor_a() const override { return b2_to_gd(jointDef.localAnchorA); }
+	Vector2 get_body_local_anchor_b() const override { return b2_to_gd(jointDef.localAnchorB); }
+
+	// Proxy to Box2DJoint for correct ClassDB binding
+	void set_anchor_a(const Vector2 &p_anchor) { Box2DJoint::set_anchor_a(p_anchor); }
+	Vector2 get_anchor_a() const { return Box2DJoint::get_anchor_a(); }
+	void set_anchor_b(const Vector2 &p_anchor) { Box2DJoint::set_anchor_b(p_anchor); }
+	Vector2 get_anchor_b() const { return Box2DJoint::get_anchor_b(); }
+
+	// TODO all relevant joints should have a property for reference_angle for save/load retention
+	//      Somehow it needs to overwrite the initial hard init, perhaps with a custom_ref_angle flag?
+	// TODO
+	// Changes the reference angle between bodies.
+	//void set_reference_angle(real_t p_angle);
+	real_t get_reference_angle() const;
+
 	real_t get_joint_angle() const;
 	real_t get_joint_speed() const;
-
-	//void set_editor_use_default_anchors(bool p_update);
-	//bool get_editor_use_default_anchors() const;
-
-	// TODO documentation: Setting anchors is advanced behavior. These values are in joint node local space.
-	void set_anchor_a(const Vector2 &p_anchor);
-	Vector2 get_anchor_a() const;
-
-	void set_anchor_b(const Vector2 &p_anchor);
-	Vector2 get_anchor_b() const;
-
-	// TODO IMPORTANT for (future) documentation:
-	//      this function lets you re-place the joint on the same bodies with the joint's current pos and current body relative positions
-	void reset_joint_anchors();
 
 	void set_limit_enabled(bool p_enabled);
 	bool is_limit_enabled() const;
@@ -190,10 +196,6 @@ public:
 	real_t get_lower_limit() const;
 
 	void set_limits(real_t p_lower, real_t p_upper);
-
-	// Changes the reference angle between bodies.
-	//void set_reference_angle(real_t p_angle);
-	real_t get_reference_angle() const;
 
 	void set_motor_enabled(bool p_enabled);
 	bool is_motor_enabled() const;
@@ -214,49 +216,34 @@ class Box2DPrismaticJoint : public Box2DJoint {
 
 	b2PrismaticJointDef jointDef;
 
-	// Joint node local-space anchor points. These sync with jointDef's body-local anchor points.
-	// Allows configuring anchor points to be in different world positions when added to the scene.
-	// Modifying these is generally not recommended unless required for initializing a broken joint that starts separated.
-	Vector2 anchor_a = Vector2();
-	Vector2 anchor_b = Vector2();
-	// Controls whether moving the joint or linked bodies in the editor can modify the jointDef body-local anchor points.
-	// With this option off, joints anchors can be moved to different world locations without being reset.
-	bool editor_use_default_anchors = true;
-
 	// The relative angle between node A and this joint node. Used for debug drawing.
 	float axis_body_ref_angle = 0.0f;
 	// The prismatic axis to initialize the joint with. In joint-node-local coordinates.
 	Vector2 local_axis = Vector2(1.0f, 0);
 
-	virtual void on_editor_transforms_changed() override;
-
 protected:
 	static void _bind_methods();
 
-	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) override;
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos, bool p_soft_reset) override;
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) override;
 
 public:
+	Vector2 get_body_local_anchor_a() const override { return b2_to_gd(jointDef.localAnchorA); }
+	Vector2 get_body_local_anchor_b() const override { return b2_to_gd(jointDef.localAnchorB); }
+
+	// Proxy to Box2DJoint for correct ClassDB binding
+	void set_anchor_a(const Vector2 &p_anchor) { Box2DJoint::set_anchor_a(p_anchor); }
+	Vector2 get_anchor_a() const { return Box2DJoint::get_anchor_a(); }
+	void set_anchor_b(const Vector2 &p_anchor) { Box2DJoint::set_anchor_b(p_anchor); }
+	Vector2 get_anchor_b() const { return Box2DJoint::get_anchor_b(); }
+	void reset_joint_anchors() { Box2DJoint::reset_joint_anchors(); }
+
 	real_t get_reference_angle() const;
 	real_t get_joint_translation() const;
 	real_t get_joint_speed() const;
 
-	void set_editor_use_default_anchors(bool p_default);
-	bool get_editor_use_default_anchors() const;
-
-	// TODO documentation: Setting anchors is advanced behavior. These values are in joint node local space.
-	void set_anchor_a(const Vector2 &p_anchor);
-	Vector2 get_anchor_a() const;
-
-	void set_anchor_b(const Vector2 &p_anchor);
-	Vector2 get_anchor_b() const;
-
-	// TODO IMPORTANT for (future) documentation:
-	//      this function lets you re-place the joint on the same bodies with the joint's current pos and current body relative positions
-	void reset_joint_anchors();
-
-	void set_local_axis(Vector2 p_axis);
+	void set_local_axis(const Vector2 &p_axis);
 	Vector2 get_local_axis() const;
 
 	void set_limit_enabled(bool p_enabled);
@@ -288,14 +275,11 @@ class Box2DDistanceJoint : public Box2DJoint {
 
 	b2DistanceJointDef jointDef;
 
-	Vector2 anchor_a = Vector2(0, 0);
-	Vector2 anchor_b = Vector2(0, 50);
-	bool editor_translate_anchors = true;
-
 	real_t rest_length = 50;
 	real_t min_length = 50;
 	real_t max_length = 50;
 
+	// TODO move to joint editor plugin
 	bool editor_use_default_rest_length = true;
 
 	virtual void on_editor_transforms_changed() override;
@@ -303,24 +287,23 @@ class Box2DDistanceJoint : public Box2DJoint {
 protected:
 	static void _bind_methods();
 
-	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) override;
+	virtual void init_b2JointDef(const b2Vec2 &, bool) override;
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) override;
 
 public:
-	void set_editor_translate_anchors(bool p_default);
-	bool get_editor_translate_anchors() const;
+	Vector2 get_body_local_anchor_a() const override { return b2_to_gd(jointDef.localAnchorA); }
+	Vector2 get_body_local_anchor_b() const override { return b2_to_gd(jointDef.localAnchorB); }
+
+	// Proxy to Box2DJoint for correct ClassDB binding
+	void set_anchor_a(const Vector2 &p_anchor) { Box2DJoint::set_anchor_a(p_anchor); }
+	Vector2 get_anchor_a() const { return Box2DJoint::get_anchor_a(); }
+	void set_anchor_b(const Vector2 &p_anchor) { Box2DJoint::set_anchor_b(p_anchor); }
+	Vector2 get_anchor_b() const { return Box2DJoint::get_anchor_b(); }
+	void reset_joint_anchors() { Box2DJoint::reset_joint_anchors(); }
 
 	void set_editor_use_default_rest_length(bool p_default);
 	bool get_editor_use_default_rest_length() const;
-
-	void set_anchor_a(const Vector2 &p_anchor);
-	Vector2 get_anchor_a() const;
-
-	void set_anchor_b(const Vector2 &p_anchor);
-	Vector2 get_anchor_b() const;
-
-	void reset_joint_anchors();
 
 	void set_rest_length(real_t p_length);
 	real_t get_rest_length() const;
@@ -345,7 +328,9 @@ public:
 	real_t get_current_length() const;
 
 	Box2DDistanceJoint() :
-			Box2DJoint(&jointDef) {}
+			Box2DJoint(&jointDef) {
+		anchor_b = Vector2(0, 50);
+	}
 };
 
 // TODO pulley
@@ -361,31 +346,23 @@ class Box2DWeldJoint : public Box2DJoint {
 
 	b2WeldJointDef jointDef;
 
-	Vector2 anchor_a = Vector2();
-	Vector2 anchor_b = Vector2();
-
-	bool editor_use_default_anchors = true;
-
-	virtual void on_editor_transforms_changed() override;
-
 protected:
 	static void _bind_methods();
 
-	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos) override;
+	virtual void init_b2JointDef(const b2Vec2 &p_joint_pos, bool p_soft_reset) override;
 
 	virtual void debug_draw(RID p_to_rid, Color p_color) override;
 
 public:
-	void set_editor_use_default_anchors(bool p_update);
-	bool get_editor_use_default_anchors() const;
+	Vector2 get_body_local_anchor_a() const override { return b2_to_gd(jointDef.localAnchorA); }
+	Vector2 get_body_local_anchor_b() const override { return b2_to_gd(jointDef.localAnchorB); }
 
-	void set_anchor_a(const Vector2 &p_anchor);
-	Vector2 get_anchor_a() const;
-
-	void set_anchor_b(const Vector2 &p_anchor);
-	Vector2 get_anchor_b() const;
-
-	void reset_joint_anchors();
+	// Proxy to Box2DJoint for correct ClassDB binding
+	void set_anchor_a(const Vector2 &p_anchor) { Box2DJoint::set_anchor_a(p_anchor); }
+	Vector2 get_anchor_a() const { return Box2DJoint::get_anchor_a(); }
+	void set_anchor_b(const Vector2 &p_anchor) { Box2DJoint::set_anchor_b(p_anchor); }
+	Vector2 get_anchor_b() const { return Box2DJoint::get_anchor_b(); }
+	void reset_joint_anchors() { Box2DJoint::reset_joint_anchors(); }
 
 	void set_stiffness(real_t p_hz); // TODO is this the best param name?
 	real_t get_stiffness() const;
