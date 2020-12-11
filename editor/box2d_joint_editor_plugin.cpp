@@ -233,8 +233,6 @@ void Box2DJointEditor::set_handle(int idx, Point2 &p_point) {
 			ERR_PRINT("Invalid shape type");
 		} break;
 	}
-
-	node->_change_notify();
 }
 
 void Box2DJointEditor::commit_handle(int idx, Variant &p_org) {

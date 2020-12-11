@@ -80,7 +80,7 @@ protected:
 	b2Joint *get_b2Joint() { return joint; }
 	b2Joint *get_b2Joint() const { return joint; }
 
-	b2Vec2 get_b2_pos() const; // TODO update this with world-relative transforms, following changes in PR #31
+	b2Vec2 get_b2_pos() const; // TODO verify that this is correct. Maybe modify to match changes in PR #31
 
 	void _notification(int p_what);
 	static void _bind_methods();
