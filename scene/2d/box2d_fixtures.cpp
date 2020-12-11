@@ -140,30 +140,32 @@ void Box2DFixture::_notification(int p_what) {
 
 			// If new parent, recreate fixture
 			if (body_node != new_body) {
+				if(body_node) {
+					body_node->disconnect("sleeping_state_changed", Callable(this, "update"));
+					body_node->disconnect("enabled_state_changed", Callable(this, "update"));
+				}
 				destroy_b2();
 
 				body_node = new_body;
+
+				body_node->connect("sleeping_state_changed", Callable(this, "update"));
+				body_node->connect("enabled_state_changed", Callable(this, "update"));
 
 				if (body_node && body_node->body && shape.is_valid()) {
 					create_b2();
 				}
 			}
 
-#ifdef TOOLS_ENABLED
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
 				set_process_internal(true);
 			}
-#endif
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
 			// Don't destroy fixture. It could be exiting/entering.
 			// Fixture should be destroyed in destructor if node is being freed.
-#ifdef TOOLS_ENABLED
-			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
-				set_process_internal(false);
-			}
-#endif
+
+			set_process_internal(false);
 		} break;
 
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
@@ -171,15 +173,10 @@ void Box2DFixture::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_INTERNAL_PROCESS: {
-#ifdef TOOLS_ENABLED
-			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
-				update();
-			}
-#endif
+			// Do nothing
 		} break;
 
 		case NOTIFICATION_DRAW: {
-#ifdef TOOLS_ENABLED
 			if (!Engine::get_singleton()->is_editor_hint() && !get_tree()->is_debugging_collisions_hint()) {
 				break;
 			}
@@ -206,7 +203,6 @@ void Box2DFixture::_notification(int p_what) {
 			if (shape.is_valid()) {
 				shape->draw(get_canvas_item(), draw_col);
 			}
-#endif
 		} break;
 	}
 }
@@ -465,11 +461,9 @@ Box2DFixture::Box2DFixture() {
 	fixtureDef.density = 0.4f * (1.0e-3f / (factor * factor)); // 0.4 g/px^2 default
 	filterDef.maskBits = 0x0001;
 
-#ifdef TOOLS_ENABLED
 	if (Engine::get_singleton()->is_editor_hint()) {
 		set_process_internal(true);
 	}
-#endif
 };
 
 Box2DFixture::~Box2DFixture() {

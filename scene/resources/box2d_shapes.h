@@ -44,7 +44,7 @@ class Box2DCircleShape : public Box2DShape {
 
 	b2CircleShape circleShape;
 
-	virtual const b2Shape *get_shape() const { return &circleShape; }
+	virtual const b2Shape *get_shape() const override { return &circleShape; }
 
 protected:
 	static void _bind_methods();
