@@ -76,7 +76,7 @@ class Box2DJoint : public Node2D {
 	void _node_b_tree_entered();
 
 protected:
-	Box2DJointEditor::Mode editor_anchor_mode; // TODO this is NOT the place for this
+	Box2DJointEditor::AnchorMode editor_anchor_mode = Box2DJointEditor::AnchorMode::MODE_ANCHORS_LOCAL; // TODO this is NOT the place for this
 
 	// Destroys and recreates the b2Joint, if valid. Useful for updating constant parameters, such as bodies.
 	void recreate_joint();

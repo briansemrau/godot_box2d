@@ -19,22 +19,22 @@ void Box2DJointEditor::_node_removed(Node *p_node) {
 }
 
 void Box2DJointEditor::_menu_option(int p_option) {
-	switch (p_option) {
-		case Box2DJointEditor::MODE_ANCHORS_LOCAL: {
-			anchor_mode = MODE_ANCHORS_LOCAL;
+	switch (static_cast<AnchorMode>(p_option)) {
+		case AnchorMode::MODE_ANCHORS_LOCAL: {
+			anchor_mode = AnchorMode::MODE_ANCHORS_LOCAL;
 			button_anchor_local->set_pressed(true);
 			button_anchor_global->set_pressed(false);
 		} break;
 
-		case Box2DJointEditor::MODE_ANCHORS_STICKY: {
-			anchor_mode = MODE_ANCHORS_STICKY;
+		case AnchorMode::MODE_ANCHORS_STICKY: {
+			anchor_mode = AnchorMode::MODE_ANCHORS_STICKY;
 			button_anchor_local->set_pressed(false);
 			button_anchor_global->set_pressed(true);
 		} break;
 	}
 
 	if (node)
-		node->editor_anchor_mode = static_cast<Box2DJointEditor::Mode>(p_option);
+		node->editor_anchor_mode = static_cast<Box2DJointEditor::AnchorMode>(p_option);
 }
 
 void Box2DJointEditor::disable_anchor_modes(bool p_disable, String p_reason) {
@@ -85,7 +85,7 @@ Variant Box2DJointEditor::get_handle_value(int idx) const {
 
 			//} break;
 
-		case REVOLUTE_JOINT: {
+		case JointType::REVOLUTE_JOINT: {
 			Box2DRevoluteJoint *j = Object::cast_to<Box2DRevoluteJoint>(node);
 
 			switch (idx) {
@@ -100,29 +100,29 @@ Variant Box2DJointEditor::get_handle_value(int idx) const {
 			}
 		} break;
 
-		case PRISMATIC_JOINT: {
+		case JointType::PRISMATIC_JOINT: {
 			// TODO
 		} break;
 
-		case DISTANCE_JOINT: {
+		case JointType::DISTANCE_JOINT: {
 			// TODO
 		} break;
 
-		case PULLEY_JOINT:
-		case MOUSE_JOINT:
-		case GEAR_JOINT:
-		case WHEEL_JOINT: {
+		case JointType::PULLEY_JOINT:
+		case JointType::MOUSE_JOINT:
+		case JointType::GEAR_JOINT:
+		case JointType::WHEEL_JOINT: {
 			ERR_PRINT("Not yet implemented");
 		} break;
 
-		case WELD_JOINT: {
+		case JointType::WELD_JOINT: {
 			// TODO
 		} break;
 
-		case FRICTION_JOINT:
-		case ROPE_JOINT:
-		case MOTOR_JOINT:
-		case INVALID_JOINT:
+		case JointType::FRICTION_JOINT:
+		case JointType::ROPE_JOINT:
+		case JointType::MOTOR_JOINT:
+		case JointType::INVALID_JOINT:
 		default: {
 			ERR_PRINT("Invalid shape type");
 		} break;
@@ -174,7 +174,7 @@ void Box2DJointEditor::set_handle(int idx, Point2 &p_point) {
 			//	// }
 			//} break;
 
-		case REVOLUTE_JOINT: {
+		case JointType::REVOLUTE_JOINT: {
 			Box2DRevoluteJoint *j = Object::cast_to<Box2DRevoluteJoint>(node);
 
 			Point2 offset_point = p_point - j->get_anchor_a(); // offset to match debug draw
@@ -206,29 +206,29 @@ void Box2DJointEditor::set_handle(int idx, Point2 &p_point) {
 			canvas_item_editor->update_viewport();
 		} break;
 
-		case PRISMATIC_JOINT: {
+		case JointType::PRISMATIC_JOINT: {
 			// TODO
 		} break;
 
-		case DISTANCE_JOINT: {
+		case JointType::DISTANCE_JOINT: {
 			// TODO
 		} break;
 
-		case PULLEY_JOINT:
-		case MOUSE_JOINT:
-		case GEAR_JOINT:
-		case WHEEL_JOINT: {
+		case JointType::PULLEY_JOINT:
+		case JointType::MOUSE_JOINT:
+		case JointType::GEAR_JOINT:
+		case JointType::WHEEL_JOINT: {
 			ERR_PRINT("Not yet implemented");
 		} break;
 
-		case WELD_JOINT: {
+		case JointType::WELD_JOINT: {
 			// TODO
 		} break;
 
-		case FRICTION_JOINT:
-		case ROPE_JOINT:
-		case MOTOR_JOINT:
-		case INVALID_JOINT:
+		case JointType::FRICTION_JOINT:
+		case JointType::ROPE_JOINT:
+		case JointType::MOTOR_JOINT:
+		case JointType::INVALID_JOINT:
 		default: {
 			ERR_PRINT("Invalid shape type");
 		} break;
@@ -285,7 +285,7 @@ void Box2DJointEditor::commit_handle(int idx, Variant &p_org) {
 			//	}
 			//} break;
 
-		case REVOLUTE_JOINT: {
+		case JointType::REVOLUTE_JOINT: {
 			Box2DRevoluteJoint *j = Object::cast_to<Box2DRevoluteJoint>(node);
 
 			switch (idx) {
@@ -316,29 +316,29 @@ void Box2DJointEditor::commit_handle(int idx, Variant &p_org) {
 			}
 		} break;
 
-		case PRISMATIC_JOINT: {
+		case JointType::PRISMATIC_JOINT: {
 			// TODO
 		} break;
 
-		case DISTANCE_JOINT: {
+		case JointType::DISTANCE_JOINT: {
 			// TODO
 		} break;
 
-		case PULLEY_JOINT:
-		case MOUSE_JOINT:
-		case GEAR_JOINT:
-		case WHEEL_JOINT: {
+		case JointType::PULLEY_JOINT:
+		case JointType::MOUSE_JOINT:
+		case JointType::GEAR_JOINT:
+		case JointType::WHEEL_JOINT: {
 			ERR_PRINT("Not yet implemented");
 		} break;
 
-		case WELD_JOINT: {
+		case JointType::WELD_JOINT: {
 			// TODO
 		} break;
 
-		case FRICTION_JOINT:
-		case ROPE_JOINT:
-		case MOTOR_JOINT:
-		case INVALID_JOINT:
+		case JointType::FRICTION_JOINT:
+		case JointType::ROPE_JOINT:
+		case JointType::MOTOR_JOINT:
+		case JointType::INVALID_JOINT:
 		default: {
 			ERR_PRINT("Invalid shape type");
 		} break;
@@ -352,7 +352,7 @@ bool Box2DJointEditor::forward_canvas_gui_input(const Ref<InputEvent> &p_event) 
 		return false;
 	}
 
-	if (joint_type == INVALID_JOINT) {
+	if (joint_type == JointType::INVALID_JOINT) {
 		return false;
 	}
 
@@ -429,17 +429,17 @@ void Box2DJointEditor::_get_current_joint_type() {
 	}
 
 	if (Object::cast_to<Box2DRevoluteJoint>(j)) {
-		joint_type = REVOLUTE_JOINT;
+		joint_type = JointType::REVOLUTE_JOINT;
 	} else if (Object::cast_to<Box2DPrismaticJoint>(j)) {
-		joint_type = PRISMATIC_JOINT;
+		joint_type = JointType::PRISMATIC_JOINT;
 	} else if (Object::cast_to<Box2DDistanceJoint>(j)) {
-		joint_type = DISTANCE_JOINT;
+		joint_type = JointType::DISTANCE_JOINT;
 		// TODO more joints
 	} else if (Object::cast_to<Box2DWeldJoint>(j)) {
-		joint_type = WELD_JOINT;
+		joint_type = JointType::WELD_JOINT;
 		// TODO rest of joints
 	} else {
-		joint_type = INVALID_JOINT;
+		joint_type = JointType::INVALID_JOINT;
 	}
 
 	canvas_item_editor->update_viewport();
@@ -452,7 +452,7 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 
 	_get_current_joint_type();
 
-	if (joint_type == -1) {
+	if (joint_type == JointType::INVALID_JOINT) {
 		return;
 	}
 
@@ -517,7 +517,7 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 			//	}
 			//} break;
 
-		case REVOLUTE_JOINT: {
+		case JointType::REVOLUTE_JOINT: {
 			Box2DRevoluteJoint *j = Object::cast_to<Box2DRevoluteJoint>(node);
 
 			handles.resize(2);
@@ -550,29 +550,29 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 			}
 		} break;
 
-		case PRISMATIC_JOINT: {
+		case JointType::PRISMATIC_JOINT: {
 			// TODO
 		} break;
 
-		case DISTANCE_JOINT: {
+		case JointType::DISTANCE_JOINT: {
 			// TODO
 		} break;
 
-		case PULLEY_JOINT:
-		case MOUSE_JOINT:
-		case GEAR_JOINT:
-		case WHEEL_JOINT: {
+		case JointType::PULLEY_JOINT:
+		case JointType::MOUSE_JOINT:
+		case JointType::GEAR_JOINT:
+		case JointType::WHEEL_JOINT: {
 			ERR_PRINT("Not yet implemented");
 		} break;
 
-		case WELD_JOINT: {
+		case JointType::WELD_JOINT: {
 			// TODO
 		} break;
 
-		case FRICTION_JOINT:
-		case ROPE_JOINT:
-		case MOTOR_JOINT:
-		case INVALID_JOINT:
+		case JointType::FRICTION_JOINT:
+		case JointType::ROPE_JOINT:
+		case JointType::MOTOR_JOINT:
+		case JointType::INVALID_JOINT:
 		default: {
 			ERR_PRINT("Invalid shape type");
 		} break;
@@ -610,31 +610,31 @@ void Box2DJointEditor::edit(Node *p_node) {
 
 		//node->add_change_receptor(this);
 
-		_menu_option(node->editor_anchor_mode);
+		_menu_option(static_cast<int>(node->editor_anchor_mode));
 
 		prev_joint_xform = node->get_global_transform(); // TODO should this be box2d_global_transform?
 
 		switch (joint_type) {
 			// TODO I think certain joints don't use body anchors like the others (gear?)
-			case Box2DJointEditor::REVOLUTE_JOINT:
-			case Box2DJointEditor::PRISMATIC_JOINT:
-			case Box2DJointEditor::DISTANCE_JOINT:
-			case Box2DJointEditor::PULLEY_JOINT:
-			case Box2DJointEditor::MOUSE_JOINT:
-			case Box2DJointEditor::GEAR_JOINT:
-			case Box2DJointEditor::WHEEL_JOINT:
-			case Box2DJointEditor::WELD_JOINT:
-			case Box2DJointEditor::FRICTION_JOINT:
-			case Box2DJointEditor::ROPE_JOINT:
-			case Box2DJointEditor::MOTOR_JOINT:
-			case Box2DJointEditor::INVALID_JOINT: {
+			case Box2DJointEditor::JointType::REVOLUTE_JOINT:
+			case Box2DJointEditor::JointType::PRISMATIC_JOINT:
+			case Box2DJointEditor::JointType::DISTANCE_JOINT:
+			case Box2DJointEditor::JointType::PULLEY_JOINT:
+			case Box2DJointEditor::JointType::MOUSE_JOINT:
+			case Box2DJointEditor::JointType::GEAR_JOINT:
+			case Box2DJointEditor::JointType::WHEEL_JOINT:
+			case Box2DJointEditor::JointType::WELD_JOINT:
+			case Box2DJointEditor::JointType::FRICTION_JOINT:
+			case Box2DJointEditor::JointType::ROPE_JOINT:
+			case Box2DJointEditor::JointType::MOTOR_JOINT:
+			case Box2DJointEditor::JointType::INVALID_JOINT: {
 				disable_anchor_modes(false, String());
 			} break;
 		}
 		// TODO if more buttons added, enable/disable them here as they apply
 	} else {
 		edit_handle = -1;
-		joint_type = INVALID_JOINT;
+		joint_type = JointType::INVALID_JOINT;
 
 		//if (node)
 		//	node->remove_change_receptor(this);
@@ -654,13 +654,13 @@ Box2DJointEditor::Box2DJointEditor(EditorNode *p_editor) :
 	button_anchor_local = memnew(Button);
 	button_anchor_local->set_flat(true);
 	add_child(button_anchor_local);
-	button_anchor_local->connect("pressed", callable_mp(this, &Box2DJointEditor::_menu_option), varray(Mode::MODE_ANCHORS_LOCAL));
+	button_anchor_local->connect("pressed", callable_mp(this, &Box2DJointEditor::_menu_option), varray(static_cast<int>(AnchorMode::MODE_ANCHORS_LOCAL)));
 	button_anchor_local->set_toggle_mode(true);
 
 	button_anchor_global = memnew(Button);
 	button_anchor_global->set_flat(true);
 	add_child(button_anchor_global);
-	button_anchor_global->connect("pressed", callable_mp(this, &Box2DJointEditor::_menu_option), varray(Mode::MODE_ANCHORS_STICKY));
+	button_anchor_global->connect("pressed", callable_mp(this, &Box2DJointEditor::_menu_option), varray(static_cast<int>(AnchorMode::MODE_ANCHORS_STICKY)));
 	button_anchor_global->set_toggle_mode(true);
 
 	// [VSeparator]

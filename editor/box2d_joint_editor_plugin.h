@@ -17,7 +17,7 @@ class CanvasItemEditor;
 class Box2DJointEditor : public HBoxContainer {
 	GDCLASS(Box2DJointEditor, HBoxContainer);
 
-	enum JointType {
+	enum class JointType {
 		REVOLUTE_JOINT,
 		PRISMATIC_JOINT,
 		DISTANCE_JOINT,
@@ -41,19 +41,19 @@ class Box2DJointEditor : public HBoxContainer {
 	Button *button_anchor_global;
 
 public:
-	enum Mode {
+	enum class AnchorMode {
 		MODE_ANCHORS_LOCAL, // Anchors keep their local transform while translating
 		MODE_ANCHORS_STICKY // Anchors stick with the body local transform
 	};
 
 private:
-	Mode anchor_mode = MODE_ANCHORS_LOCAL;
+	AnchorMode anchor_mode = AnchorMode::MODE_ANCHORS_LOCAL;
 	Transform2D prev_joint_xform;
 
 	Vector<Point2> handles;
 	Vector<Point2> handle_offsets;
 
-	JointType joint_type = INVALID_JOINT;
+	JointType joint_type = JointType::INVALID_JOINT;
 	int edit_handle = -1;
 	bool pressed = false;
 	Variant original;

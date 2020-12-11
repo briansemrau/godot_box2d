@@ -534,7 +534,7 @@ Box2DJoint::~Box2DJoint() {
 void Box2DRevoluteJoint::on_editor_transforms_changed() {
 	// TODO this is probably where to fix issue ticket #1
 
-	if (editor_anchor_mode == Box2DJointEditor::Mode::MODE_ANCHORS_STICKY) {
+	if (editor_anchor_mode == Box2DJointEditor::AnchorMode::MODE_ANCHORS_STICKY) {
 		// Some relative coordinate has changed
 		// We want to move our anchors to keep their relative location to each body the same
 		// This leaves the jointDef anchors unchanged
