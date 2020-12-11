@@ -140,6 +140,10 @@ void Box2DFixture::_notification(int p_what) {
 
 			// If new parent, recreate fixture
 			if (body_node != new_body) {
+				if(body_node) {
+					body_node->disconnect("sleeping_state_changed", Callable(this, "update"));
+					body_node->disconnect("enabled_state_changed", Callable(this, "update"));
+				}
 				destroy_b2();
 
 				body_node = new_body;
