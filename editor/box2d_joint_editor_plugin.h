@@ -72,8 +72,6 @@ protected:
 	void _node_removed(Node *p_node);
 	static void _bind_methods();
 
-	virtual void _changed_callback(Object *p_changed, const char *p_prop);
-
 public:
 	bool forward_canvas_gui_input(const Ref<InputEvent> &p_event);
 	void forward_canvas_draw_over_viewport(Control *p_overlay);
