@@ -139,7 +139,7 @@ void Box2DJoint::update_joint_bodies() {
 			Box2DPhysicsBody *body_a = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyA_cache));
 			if (body_a) {
 				body_a->joints.erase(this);
-				body_a->disconnect("tree_entered", Callable(this, "_node_a_tree_entered"));
+				body_a->disconnect("tree_entered", callable_mp(this, &Box2DJoint::_node_a_tree_entered));
 			}
 			bodyA_cache = ObjectID();
 		}
@@ -147,7 +147,7 @@ void Box2DJoint::update_joint_bodies() {
 			Box2DPhysicsBody *body_b = Object::cast_to<Box2DPhysicsBody>(ObjectDB::get_instance(bodyB_cache));
 			if (body_b) {
 				body_b->joints.erase(this);
-				body_b->disconnect("tree_entered", Callable(this, "_node_b_tree_entered"));
+				body_b->disconnect("tree_entered", callable_mp(this, &Box2DJoint::_node_b_tree_entered));
 			}
 			bodyB_cache = ObjectID();
 		}
@@ -165,8 +165,8 @@ void Box2DJoint::update_joint_bodies() {
 		// Make sure we receive b2Body creation/deletion events
 		body_a->joints.insert(this);
 		body_b->joints.insert(this);
-		body_a->connect("tree_entered", Callable(this, "_node_a_tree_entered"));
-		body_b->connect("tree_entered", Callable(this, "_node_b_tree_entered"));
+		body_a->connect("tree_entered", callable_mp(this, &Box2DJoint::_node_a_tree_entered));
+		body_b->connect("tree_entered", callable_mp(this, &Box2DJoint::_node_b_tree_entered));
 
 		// Init and create joint
 		jointDef->bodyA = body_a->body;
@@ -373,10 +373,6 @@ void Box2DJoint::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_reaction_force"), &Box2DJoint::get_reaction_force);
 	ClassDB::bind_method(D_METHOD("get_reaction_torque"), &Box2DJoint::get_reaction_torque);
-
-	// TODO remove these and replace usage with callable_mp
-	ClassDB::bind_method(D_METHOD("_node_a_tree_entered"), &Box2DJoint::_node_a_tree_entered);
-	ClassDB::bind_method(D_METHOD("_node_b_tree_entered"), &Box2DJoint::_node_b_tree_entered);
 
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_a"), "set_node_a", "get_node_a");
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "node_b"), "set_node_b", "get_node_b");
@@ -684,10 +680,14 @@ void Box2DRevoluteJoint::debug_draw(RID p_to_rid, Color p_color) {
 	Point2 x1 = to_local(b2_to_gd(posA));
 	Point2 x2 = to_local(b2_to_gd(posB));
 
+	// Draw anchors
 	draw_arc(p1, 5, 0, Math_PI * 2.0f, 12, p_color, 2.0f);
 	draw_circle(p2, 2, p_color);
+	// Draw anchor position violation
+	draw_line(p1, p2, Color(1.0f, 0, 0));
 
 	if (jointDef.enableLimit) {
+		// Angle limits
 		draw_line(p1, p1 + Point2(15, 0).rotated(jointDef.referenceAngle), p_color);
 		draw_line(p1, p1 + Point2(10, 0).rotated(jointDef.lowerAngle), p_color);
 		draw_line(p1, p1 + Point2(10, 0).rotated(jointDef.upperAngle), p_color);
@@ -695,16 +695,24 @@ void Box2DRevoluteJoint::debug_draw(RID p_to_rid, Color p_color) {
 	if (jointDef.enableMotor) {
 		float a = jointDef.referenceAngle;
 		Color c = jointDef.motorSpeed > 0 ? Color(0.0, 1.0, 0.0, 0.5) : Color(1.0, 0.0, 0.0, 0.5);
+
+		// Draw max speed
 		float arclen = jointDef.motorSpeed;
-		draw_arc(p1, 7, a, a + arclen, MAX(static_cast<int>(5.0f * arclen), 2), c, 2.0f);
+		draw_arc(p1, 7, a, a + arclen, MAX(static_cast<int>(abs(5.0f * arclen)), 2), Color(c.r, c.g, c.b, c.a * 0.3), 2.0f);
+		// Draw current speed
+		arclen = get_joint_speed();
+		draw_arc(p1, 7, a, a + arclen, MAX(static_cast<int>(abs(5.0f * arclen)), 2), c, 2.0f);
+
+		// Draw torque applied
 		if (j) {
-			float torqueUsage = get_motor_torque() / get_max_motor_torque();
-			arclen *= torqueUsage;
+			float torqueUsage = abs(get_motor_torque() / get_max_motor_torque());
+			arclen = jointDef.motorSpeed * torqueUsage;
 			c = Color(1.0, 1.0, 0.0, 0.5);
-			draw_arc(p1, 9, a, a + arclen, MAX(static_cast<int>(5.0f * arclen), 2), c, 2.0f);
+			draw_arc(p1, 9, a, a + arclen, MAX(static_cast<int>(abs(5.0f * arclen)), 2), c, 2.0f);
 		}
 	}
 
+	// Draw lines to relevant bodies
 	Color c(p_color);
 	c.set_hsv(c.get_h(), c.get_s() * 0.5f, c.get_v(), c.a * 0.2f);
 	draw_line(x1, p1, c, 1.0f);
@@ -735,7 +743,7 @@ bool Box2DRevoluteJoint::is_limit_enabled() const {
 void Box2DRevoluteJoint::set_upper_limit(real_t p_angle) {
 	if (p_angle <= get_lower_limit()) {
 		WARN_PRINT("Attempting to set an upper limit less than or equal to the lower limit. Bounding to the lower limit.");
-		p_angle = get_lower_limit() + 0.01f;
+		p_angle = get_lower_limit() + b2_angularSlop;
 	}
 
 	if (get_b2Joint())
@@ -752,7 +760,7 @@ real_t Box2DRevoluteJoint::get_upper_limit() const {
 void Box2DRevoluteJoint::set_lower_limit(real_t p_angle) {
 	if (p_angle >= get_upper_limit()) {
 		WARN_PRINT("Attempting to set a lower limit greater than or equal to the upper limit. Bounding to the upper limit.");
-		p_angle = get_upper_limit() - 0.01f;
+		p_angle = get_upper_limit() - b2_angularSlop;
 	}
 
 	if (get_b2Joint())
@@ -767,7 +775,7 @@ real_t Box2DRevoluteJoint::get_lower_limit() const {
 }
 
 void Box2DRevoluteJoint::set_limits(real_t p_lower, real_t p_upper) {
-	ERR_FAIL_COND_MSG(p_lower >= p_upper, "Cannot set the upper limit less than or equal than the lower limit.");
+	ERR_FAIL_COND_MSG(p_lower <= p_upper, "Lower limit cannot be less than or equal to upper limit.");
 
 	if (get_b2Joint())
 		static_cast<b2RevoluteJoint *>(get_b2Joint())->SetLimits(p_lower, p_upper);
@@ -897,7 +905,7 @@ void Box2DPrismaticJoint::init_b2JointDef(const b2Vec2 &p_joint_pos, bool p_soft
 }
 
 void Box2DPrismaticJoint::debug_draw(RID p_to_rid, Color p_color) {
-	b2PrismaticJoint *j = static_cast<b2PrismaticJoint *>(get_b2Joint());
+	const b2PrismaticJoint *j = static_cast<b2PrismaticJoint *>(get_b2Joint());
 	b2Vec2 anchorA = gd_to_b2(get_global_position());
 	b2Vec2 anchorB = anchorA;
 	if (jointDef.bodyA) {
@@ -916,29 +924,35 @@ void Box2DPrismaticJoint::debug_draw(RID p_to_rid, Color p_color) {
 		posB = jointDef.bodyB->GetWorldCenter();
 	}
 
-	Point2 p1 = to_local(b2_to_gd(anchorA));
-	Point2 p2 = to_local(b2_to_gd(anchorB));
-	Point2 x1 = to_local(b2_to_gd(posA));
-	Point2 x2 = to_local(b2_to_gd(posB));
+	const Point2 p1 = to_local(b2_to_gd(anchorA));
+	const Point2 p2 = to_local(b2_to_gd(anchorB));
+	const Point2 x1 = to_local(b2_to_gd(posA));
+	const Point2 x2 = to_local(b2_to_gd(posB));
 
+	Vector2 axis = get_local_axis();
+
+	// Draw anchor points
 	draw_rect(Rect2(p1 - Vector2(5, 5), Vector2(10, 10)), p_color, false, 2.0f);
 	draw_rect(Rect2(p2 - Vector2(1, 1), Vector2(2, 2)), p_color);
+	// Draw anchor misalignments
+	draw_line(p2, p1 + p2.project(axis), Color(1.0f, 0, 0));
 
+	// Transform to axis
 	if (jointDef.bodyA)
 		draw_set_transform(p1, jointDef.bodyA->GetUserData().owner->get_global_rotation() - axis_body_ref_angle, Vector2(1, 1));
 	else
 		draw_set_transform(p1, -axis_body_ref_angle, Vector2(1, 1));
 
-	Vector2 axis = get_local_axis();
-
 	if (jointDef.enableLimit) {
+		// Draw prismatic limits and axis
 		Vector2 start = axis * get_lower_limit();
 		Vector2 end = axis * get_upper_limit();
-		draw_line(start, end, p_color, 1.0f);
+		draw_line(start, end, p_color);
 		Vector2 tan = axis.rotated(Math_PI * 0.5f) * 5.0f;
-		draw_line(start + tan, start - tan, p_color, 1.0f);
-		draw_line(end + tan, end - tan, p_color, 1.0f);
+		draw_line(start + tan, start - tan, p_color);
+		draw_line(end + tan, end - tan, p_color);
 	} else {
+		// Draw axis
 		draw_line(Vector2(0, 0), axis * 25.0, p_color);
 	}
 	if (jointDef.enableMotor) {
@@ -948,6 +962,7 @@ void Box2DPrismaticJoint::debug_draw(RID p_to_rid, Color p_color) {
 		Vector2 start_p = axis * get_joint_translation();
 		Vector2 tan = axis.rotated(Math_PI * 0.5f);
 
+		// Draw motor speed and force
 		draw_line(start_p, start_p + axis * get_joint_speed(), c, 1.5f);
 		draw_line(start_p + axis * get_joint_speed(), start_p + axis * get_motor_speed(), Color(c.r, c.g, c.b, c.a * 0.3), 1.5f);
 		if (j) {
@@ -957,11 +972,12 @@ void Box2DPrismaticJoint::debug_draw(RID p_to_rid, Color p_color) {
 		}
 	}
 
-	draw_set_transform(Vector2(0, 0), 0, Vector2(1, 1));
+	// Draw lines to relevant bodies
+	draw_set_transform_matrix(Transform2D());
 	Color c(p_color);
 	c.set_hsv(c.get_h(), c.get_s() * 0.5f, c.get_v(), c.a * 0.2f);
-	draw_line(x1, p1, c, 1.0f);
-	draw_line(x2, p2, c, 1.0f);
+	draw_line(x1, p1, c);
+	draw_line(x2, p2, c);
 }
 
 real_t Box2DPrismaticJoint::get_reference_angle() const {
@@ -987,6 +1003,8 @@ void Box2DPrismaticJoint::set_local_axis(const Vector2 &p_axis) {
 
 	if (recreate && is_inside_tree())
 		recreate_joint(true);
+
+	_change_notify("local_axis");
 }
 
 Vector2 Box2DPrismaticJoint::get_local_axis() const {
@@ -1004,10 +1022,17 @@ bool Box2DPrismaticJoint::is_limit_enabled() const {
 }
 
 void Box2DPrismaticJoint::set_upper_limit(real_t p_distance) {
-	float distance = p_distance * GD_TO_B2;
+	if (p_distance <= get_lower_limit()) {
+		WARN_PRINT("Attempting to set an upper limit less than or equal to the lower limit. Bounding to the lower limit.");
+		p_distance = get_lower_limit() + b2_linearSlop;
+	}
+
+	const float distance = p_distance * GD_TO_B2;
 	if (get_b2Joint())
 		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetLimits(jointDef.lowerTranslation, distance);
 	jointDef.upperTranslation = distance;
+
+	_change_notify("upper_limit");
 }
 
 real_t Box2DPrismaticJoint::get_upper_limit() const {
@@ -1015,10 +1040,17 @@ real_t Box2DPrismaticJoint::get_upper_limit() const {
 }
 
 void Box2DPrismaticJoint::set_lower_limit(real_t p_distance) {
-	float distance = p_distance * GD_TO_B2;
+	if (p_distance >= get_upper_limit()) {
+		WARN_PRINT("Attempting to set a lower limit greater than or equal to the upper limit. Bounding to the upper limit.");
+		p_distance = get_upper_limit() - b2_linearSlop;
+	}
+
+	const float distance = p_distance * GD_TO_B2;
 	if (get_b2Joint())
 		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetLimits(distance, jointDef.upperTranslation);
 	jointDef.lowerTranslation = distance;
+
+	_change_notify("lower_limit");
 }
 
 real_t Box2DPrismaticJoint::get_lower_limit() const {
@@ -1026,13 +1058,18 @@ real_t Box2DPrismaticJoint::get_lower_limit() const {
 }
 
 void Box2DPrismaticJoint::set_limits(real_t p_lower, real_t p_upper) {
+	ERR_FAIL_COND_MSG(p_lower <= p_upper, "Lower limit cannot be less than or equal to upper limit.");
+
 	const float factor = GD_TO_B2;
-	float lower = p_lower * factor;
-	float upper = p_upper * factor;
+	const float lower = p_lower * factor;
+	const float upper = p_upper * factor;
 	if (get_b2Joint())
 		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetLimits(lower, upper);
 	jointDef.lowerTranslation = lower;
 	jointDef.upperTranslation = upper;
+
+	_change_notify("lower_limit");
+	_change_notify("upper_limit");
 }
 
 void Box2DPrismaticJoint::set_motor_enabled(bool p_enabled) {

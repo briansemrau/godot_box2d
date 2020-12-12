@@ -101,7 +101,20 @@ Variant Box2DJointEditor::get_handle_value(int idx) const {
 		} break;
 
 		case JointType::PRISMATIC_JOINT: {
-			// TODO
+			Box2DPrismaticJoint *j = Object::cast_to<Box2DPrismaticJoint>(node);
+
+			switch (idx) {
+				case 0:
+					return j->get_anchor_a();
+				case 1:
+					return j->get_anchor_b();
+				case 2:
+					return j->get_local_axis();
+				case 3:
+					return j->get_lower_limit();
+				case 4:
+					return j->get_upper_limit();
+			}
 		} break;
 
 		case JointType::DISTANCE_JOINT: {
@@ -207,7 +220,29 @@ void Box2DJointEditor::set_handle(int idx, Point2 &p_point) {
 		} break;
 
 		case JointType::PRISMATIC_JOINT: {
-			// TODO
+			Box2DPrismaticJoint *j = Object::cast_to<Box2DPrismaticJoint>(node);
+
+			Point2 offset_point = p_point - j->get_anchor_a(); // offset to match debug draw
+
+			switch (idx) {
+				case 0: {
+					j->set_anchor_a(p_point);
+				} break;
+				case 1: {
+					j->set_anchor_b(p_point);
+				} break;
+				case 2: {
+					j->set_local_axis(offset_point);
+				} break;
+				case 3: {
+					j->set_lower_limit(offset_point.dot(j->get_local_axis().normalized()));
+				} break;
+				case 4: {
+					j->set_upper_limit(offset_point.dot(j->get_local_axis().normalized()));
+				} break;
+			}
+
+			canvas_item_editor->update_viewport();
 		} break;
 
 		case JointType::DISTANCE_JOINT: {
@@ -315,10 +350,47 @@ void Box2DJointEditor::commit_handle(int idx, Variant &p_org) {
 		} break;
 
 		case JointType::PRISMATIC_JOINT: {
-			// TODO
+			Box2DPrismaticJoint *j = Object::cast_to<Box2DPrismaticJoint>(node);
+
+			switch (idx) {
+				case 0: {
+					undo_redo->add_do_method(j, "set_anchor_a", j->get_anchor_a());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_anchor_a", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+				case 1: {
+					undo_redo->add_do_method(j, "set_anchor_b", j->get_anchor_b());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_anchor_b", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+				case 2: {
+					undo_redo->add_do_method(j, "set_local_axis", j->get_local_axis());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_local_axis", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+				case 3: {
+					undo_redo->add_do_method(j, "set_lower_limit", j->get_lower_limit());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_lower_limit", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+				case 4: {
+					undo_redo->add_do_method(j, "set_upper_limit", j->get_upper_limit());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_upper_limit", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+			}
 		} break;
 
 		case JointType::DISTANCE_JOINT: {
+			//undo_redo->add_do_method(j, "set_", j->get_());
+			//undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+			//undo_redo->add_undo_method(j, "set_", p_org);
+			//undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
 			// TODO
 		} break;
 
@@ -522,14 +594,6 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 			handles.write[0] = j->get_anchor_a();
 			handles.write[1] = j->get_anchor_b();
 
-			p_overlay->draw_texture(anchor_icon, gt.xform(handles[0]) - anchor_size);
-			// what the F i just want a rotated texture
-			Transform2D rot_xform = Transform2D(Math_PI * 0.5f, Vector2());
-			Transform2D xform = (rot_xform.inverse() * gt);
-			p_overlay->draw_set_transform_matrix(rot_xform);
-			p_overlay->draw_texture(anchor_icon, xform.xform(handles[1]) - anchor_size);
-			p_overlay->draw_set_transform_matrix(Transform2D());
-
 			handle_offsets.resize(2);
 			handle_offsets.write[0] = (-anchor_size + handle_hsize); // approximately correct
 			handle_offsets.write[1] = (-anchor_size + handle_hsize) * Size2(-1, 1);
@@ -539,17 +603,59 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 				handles.write[2] = j->get_anchor_a() + Point2(10, 0).rotated(j->get_lower_limit());
 				handles.write[3] = j->get_anchor_a() + Point2(10, 0).rotated(j->get_upper_limit());
 
-				p_overlay->draw_texture(handle_icon, gt.xform(handles[2]) - handle_hsize);
-				p_overlay->draw_texture(handle_icon, gt.xform(handles[3]) - handle_hsize);
-
 				handle_offsets.resize(4);
 				handle_offsets.write[2] = Point2();
 				handle_offsets.write[3] = Point2();
+
+				p_overlay->draw_texture(handle_icon, gt.xform(handles[3]) - handle_hsize);
+				p_overlay->draw_texture(handle_icon, gt.xform(handles[2]) - handle_hsize);
 			}
+
+			// what the F i just want a rotated texture
+			Transform2D rot_xform = Transform2D(Math_PI * 0.5f, Vector2());
+			Transform2D xform = (rot_xform.inverse() * gt);
+			p_overlay->draw_set_transform_matrix(rot_xform);
+			p_overlay->draw_texture(anchor_icon, xform.xform(handles[1]) - anchor_size);
+			p_overlay->draw_set_transform_matrix(Transform2D());
+
+			p_overlay->draw_texture(anchor_icon, gt.xform(handles[0]) - anchor_size);
 		} break;
 
 		case JointType::PRISMATIC_JOINT: {
-			// TODO
+			Box2DPrismaticJoint *j = Object::cast_to<Box2DPrismaticJoint>(node);
+
+			handles.resize(3);
+			handles.write[0] = j->get_anchor_a();
+			handles.write[1] = j->get_anchor_b();
+			handles.write[2] = j->get_anchor_a() + j->get_local_axis() * 25;
+
+			handle_offsets.resize(3);
+			handle_offsets.write[0] = (-anchor_size + handle_hsize);
+			handle_offsets.write[1] = (-anchor_size + handle_hsize) * Size2(-1, 1);
+			handle_offsets.write[2] = Point2();
+
+			if (j->is_limit_enabled()) {
+				handles.resize(5);
+				handles.write[3] = j->get_anchor_a() + j->get_local_axis() * j->get_lower_limit();
+				handles.write[4] = j->get_anchor_a() + j->get_local_axis() * j->get_upper_limit();
+
+				p_overlay->draw_texture(handle_icon, gt.xform(handles[4]) - handle_hsize);
+				p_overlay->draw_texture(handle_icon, gt.xform(handles[3]) - handle_hsize);
+
+				handle_offsets.resize(5);
+				handle_offsets.write[3] = Point2();
+				handle_offsets.write[4] = Point2();
+			}
+
+			p_overlay->draw_texture(handle_icon, gt.xform(handles[2]) - handle_hsize);
+
+			Transform2D rot_xform = Transform2D(Math_PI * 0.5f, Vector2());
+			Transform2D xform = (rot_xform.inverse() * gt);
+			p_overlay->draw_set_transform_matrix(rot_xform);
+			p_overlay->draw_texture(anchor_icon, xform.xform(handles[1]) - anchor_size);
+			p_overlay->draw_set_transform_matrix(Transform2D());
+
+			p_overlay->draw_texture(anchor_icon, gt.xform(handles[0]) - anchor_size);
 		} break;
 
 		case JointType::DISTANCE_JOINT: {

@@ -176,6 +176,7 @@ public:
 	Vector2 get_anchor_a() const { return Box2DJoint::get_anchor_a(); }
 	void set_anchor_b(const Vector2 &p_anchor) { Box2DJoint::set_anchor_b(p_anchor); }
 	Vector2 get_anchor_b() const { return Box2DJoint::get_anchor_b(); }
+	void reset_joint_anchors() { Box2DJoint::reset_joint_anchors(); }
 
 	// TODO all relevant joints should have a property for reference_angle for save/load retention
 	//      Somehow it needs to overwrite the initial hard init, perhaps with a custom_ref_angle flag?
@@ -300,7 +301,6 @@ public:
 	Vector2 get_anchor_a() const { return Box2DJoint::get_anchor_a(); }
 	void set_anchor_b(const Vector2 &p_anchor) { Box2DJoint::set_anchor_b(p_anchor); }
 	Vector2 get_anchor_b() const { return Box2DJoint::get_anchor_b(); }
-	void reset_joint_anchors() { Box2DJoint::reset_joint_anchors(); }
 
 	void set_editor_use_default_rest_length(bool p_default);
 	bool get_editor_use_default_rest_length() const;
