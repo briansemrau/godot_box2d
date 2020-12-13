@@ -653,7 +653,7 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 			handles.resize(3);
 			handles.write[0] = j->get_anchor_a();
 			handles.write[1] = j->get_anchor_b();
-			handles.write[2] = j->get_anchor_a() + j->get_local_axis() * 25;
+			handles.write[2] = j->get_anchor_a() + j->get_local_axis();
 
 			handle_offsets.resize(3);
 			handle_offsets.write[0] = (-anchor_size + handle_hsize);
@@ -662,8 +662,8 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 
 			if (j->is_limit_enabled()) {
 				handles.resize(5);
-				handles.write[3] = j->get_anchor_a() + j->get_local_axis() * j->get_lower_limit();
-				handles.write[4] = j->get_anchor_a() + j->get_local_axis() * j->get_upper_limit();
+				handles.write[3] = j->get_anchor_a() + j->get_local_axis().normalized() * j->get_lower_limit();
+				handles.write[4] = j->get_anchor_a() + j->get_local_axis().normalized() * j->get_upper_limit();
 
 				// draw limit handles
 				p_overlay->draw_texture(handle_icon, gt.xform(handles[4]) - handle_hsize);
@@ -680,7 +680,7 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 			{
 				Color c = Color(1.0f, 0.5f, 0.5f);
 				p_overlay->draw_set_transform(gt.xform(j->get_anchor_a()), j->get_local_axis().angle(), Size2(1, 1));
-				const float radius = gt.basis_xform(Vector2(0, 25)).y;
+				const float radius = gt.basis_xform(j->get_local_axis()).length();
 				const float start_angle = 5.0f / MAX(1.0f, radius / (2.0f * 25.0f)) * (Math_PI / 180.0);
 				const float end_angle = 45.0f / MAX(1.0f, radius / (2.0f * 25.0f)) * (Math_PI / 180.0);
 

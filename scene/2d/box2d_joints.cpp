@@ -894,6 +894,8 @@ void Box2DPrismaticJoint::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_local_axis", "axis"), &Box2DPrismaticJoint::set_local_axis);
 	ClassDB::bind_method(D_METHOD("get_local_axis"), &Box2DPrismaticJoint::get_local_axis);
+	ClassDB::bind_method(D_METHOD("set_local_axis_angle_degrees", "degrees"), &Box2DPrismaticJoint::set_local_axis_angle_degrees);
+	ClassDB::bind_method(D_METHOD("get_local_axis_angle_degrees"), &Box2DPrismaticJoint::get_local_axis_angle_degrees);
 
 	ClassDB::bind_method(D_METHOD("set_anchor_a", "anchor_a"), &Box2DPrismaticJoint::set_anchor_a);
 	ClassDB::bind_method(D_METHOD("get_anchor_a"), &Box2DPrismaticJoint::get_anchor_a);
@@ -919,6 +921,7 @@ void Box2DPrismaticJoint::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_motor_force"), &Box2DPrismaticJoint::get_motor_force);
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "local_axis"), "set_local_axis", "get_local_axis");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "local_axis_angle_degrees"), "set_local_axis_angle_degrees", "get_local_axis_angle_degrees");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "limit_enabled"), "set_limit_enabled", "is_limit_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "upper_limit"), "set_upper_limit", "get_upper_limit");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "lower_limit"), "set_lower_limit", "get_lower_limit");
@@ -931,7 +934,7 @@ void Box2DPrismaticJoint::_bind_methods() {
 }
 
 void Box2DPrismaticJoint::init_b2JointDef(const b2Vec2 &p_joint_pos, bool p_soft_reset) {
-	Vector2 global_axis = get_global_transform().basis_xform(local_axis);
+	Vector2 global_axis = get_global_transform().basis_xform(local_axis).normalized(); // TODO use box2dworld-relative transform, not global
 
 	axis_body_ref_angle = jointDef.bodyA->GetAngle();
 
@@ -974,7 +977,7 @@ void Box2DPrismaticJoint::debug_draw(RID p_to_rid, Color p_color) {
 	const Point2 x1 = to_local(b2_to_gd(posA));
 	const Point2 x2 = to_local(b2_to_gd(posB));
 
-	Vector2 axis = get_local_axis();
+	Vector2 axis = get_local_axis().normalized();
 
 	// Draw anchor points
 	draw_rect(Rect2(p1 - Vector2(5, 5), Vector2(10, 10)), p_color, false, 2.0f);
@@ -989,16 +992,16 @@ void Box2DPrismaticJoint::debug_draw(RID p_to_rid, Color p_color) {
 		draw_set_transform(p1, -axis_body_ref_angle, Vector2(1, 1));
 
 	if (jointDef.enableLimit) {
-		// Draw prismatic limits and axis
+		// Draw axis
+		draw_line(Vector2(0, 0), get_local_axis(), Color(p_color.r, p_color.g, p_color.b, p_color.a * 0.5f));
+
+		// Draw prismatic limits
 		Vector2 start = axis * get_lower_limit();
 		Vector2 end = axis * get_upper_limit();
 		draw_line(start, end, p_color);
 		Vector2 tan = axis.rotated(Math_PI * 0.5f) * 5.0f;
 		draw_line(start + tan, start - tan, p_color);
 		draw_line(end + tan, end - tan, p_color);
-	} else {
-		// Draw axis
-		draw_line(Vector2(0, 0), axis * 25.0, p_color);
 	}
 	if (jointDef.enableMotor) {
 		float a = jointDef.referenceAngle;
@@ -1041,10 +1044,9 @@ real_t Box2DPrismaticJoint::get_joint_speed() const {
 }
 
 void Box2DPrismaticJoint::set_local_axis(const Vector2 &p_axis) {
-	const Vector2 axis_normed = p_axis.normalized();
-	const bool recreate = local_axis != axis_normed;
+	const bool recreate = local_axis.normalized() != p_axis.normalized();
 
-	local_axis = axis_normed;
+	local_axis = p_axis;
 
 	if (recreate && is_inside_tree())
 		recreate_joint(true);
@@ -1054,6 +1056,15 @@ void Box2DPrismaticJoint::set_local_axis(const Vector2 &p_axis) {
 
 Vector2 Box2DPrismaticJoint::get_local_axis() const {
 	return local_axis;
+}
+
+void Box2DPrismaticJoint::set_local_axis_angle_degrees(float p_degrees) {
+	const Vector2 axis = Vector2(1, 0).rotated(p_degrees * Math_PI / 180.0f) * local_axis.length();
+	set_local_axis(axis);
+}
+
+float Box2DPrismaticJoint::get_local_axis_angle_degrees() const {
+	return local_axis.angle() * 180.0f / Math_PI;
 }
 
 void Box2DPrismaticJoint::set_limit_enabled(bool p_enabled) {

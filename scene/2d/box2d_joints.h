@@ -220,7 +220,7 @@ class Box2DPrismaticJoint : public Box2DJoint {
 	// The relative angle between node A and this joint node. Used for debug drawing.
 	float axis_body_ref_angle = 0.0f;
 	// The prismatic axis to initialize the joint with. In joint-node-local coordinates.
-	Vector2 local_axis = Vector2(1.0f, 0);
+	Vector2 local_axis = Vector2(25.0f, 0);
 
 protected:
 	static void _bind_methods();
@@ -244,8 +244,12 @@ public:
 	real_t get_joint_translation() const;
 	real_t get_joint_speed() const;
 
+	// Changing axis length has no effect
 	void set_local_axis(const Vector2 &p_axis);
 	Vector2 get_local_axis() const;
+
+	void set_local_axis_angle_degrees(float p_degrees);
+	float get_local_axis_angle_degrees() const;
 
 	void set_limit_enabled(bool p_enabled);
 	bool is_limit_enabled() const;
