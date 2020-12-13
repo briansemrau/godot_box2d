@@ -688,9 +688,53 @@ void Box2DRevoluteJoint::debug_draw(RID p_to_rid, Color p_color) {
 
 	if (jointDef.enableLimit) {
 		// Angle limits
-		draw_line(p1, p1 + Point2(15, 0).rotated(jointDef.referenceAngle), p_color);
-		draw_line(p1, p1 + Point2(10, 0).rotated(jointDef.lowerAngle), p_color);
-		draw_line(p1, p1 + Point2(10, 0).rotated(jointDef.upperAngle), p_color);
+		const Point2 p_ref = p1 + Point2(25, 0).rotated(jointDef.referenceAngle);
+		const Point2 p_low = p1 + Point2(25, 0).rotated(jointDef.lowerAngle);
+		const Point2 p_up = p1 + Point2(25, 0).rotated(jointDef.upperAngle);
+		draw_line(p1, p_ref, p_color);
+		draw_line(p1, p_low, p_color);
+		draw_line(p1, p_up, p_color);
+
+		const Color arc_col = Color(p_color.r, p_color.g, p_color.b, p_color.a * 0.5f);
+
+		const float arclen = jointDef.upperAngle - jointDef.lowerAngle;
+		const int pt_count = arclen / (Math_PI / 8.0f) + 1;
+		if (jointDef.upperAngle - jointDef.lowerAngle < static_cast<float>(Math_TAU)) {
+			// TODO use this code, following closure of https://github.com/godotengine/godot/issues/44332
+			//draw_arc(p1, 20, jointDef.lowerAngle, jointDef.upperAngle, pt_count, arc_col);
+
+			Vector<Vector2> points;
+			Point2 p_prev = p1 + Point2(20.0f, 0).rotated(jointDef.lowerAngle);
+			for (int i = 1; i <= pt_count; i++) {
+				const float pct = static_cast<float>(i) / pt_count;
+				const Point2 p = p1 + Point2(20.0f, 0).rotated(jointDef.lowerAngle + arclen * pct);
+				points.append(p_prev);
+				points.append(p);
+				p_prev = p;
+			}
+			draw_multiline(points, arc_col);
+		} else {
+			const float spiral_d = 5.0f * MIN(1.0f, (arclen - Math_TAU) / (Math_PI / 16));
+			Vector<Vector2> points;
+
+			// TODO use this code, following closure of https://github.com/godotengine/godot/issues/44332
+			//for (int i = 0; i < pt_count; i++) {
+			//	const float pct = static_cast<float>(i) / pt_count;
+			//	const Point2 p = p1 + Point2(20.0f - spiral_d * 0.5f + pct * spiral_d, 0).rotated(jointDef.lowerAngle + arclen * pct);
+			//	points.append(p);
+			//}
+			//draw_polyline(points, arc_col);
+
+			Point2 p_prev = p1 + Point2(20.0f - spiral_d * 0.5f, 0).rotated(jointDef.lowerAngle);
+			for (int i = 1; i <= pt_count; i++) {
+				const float pct = static_cast<float>(i) / pt_count;
+				const Point2 p = p1 + Point2(20.0f - spiral_d * 0.5f + pct * spiral_d, 0).rotated(jointDef.lowerAngle + arclen * pct);
+				points.append(p_prev);
+				points.append(p);
+				p_prev = p;
+			}
+			draw_multiline(points, arc_col);
+		}
 	}
 	if (jointDef.enableMotor) {
 		float a = jointDef.referenceAngle;
@@ -699,12 +743,13 @@ void Box2DRevoluteJoint::debug_draw(RID p_to_rid, Color p_color) {
 		// Draw max speed
 		float arclen = jointDef.motorSpeed;
 		draw_arc(p1, 7, a, a + arclen, MAX(static_cast<int>(abs(5.0f * arclen)), 2), Color(c.r, c.g, c.b, c.a * 0.3), 2.0f);
-		// Draw current speed
-		arclen = get_joint_speed();
-		draw_arc(p1, 7, a, a + arclen, MAX(static_cast<int>(abs(5.0f * arclen)), 2), c, 2.0f);
 
-		// Draw torque applied
 		if (j) {
+			// Draw current speed
+			arclen = get_joint_speed();
+			draw_arc(p1, 7, a, a + arclen, MAX(static_cast<int>(abs(5.0f * arclen)), 2), c, 2.0f);
+
+			// Draw torque applied
 			float torqueUsage = abs(get_motor_torque() / get_max_motor_torque());
 			arclen = jointDef.motorSpeed * torqueUsage;
 			c = Color(1.0, 1.0, 0.0, 0.5);

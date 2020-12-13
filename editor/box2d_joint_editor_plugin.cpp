@@ -600,25 +600,51 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 
 			if (j->is_limit_enabled()) {
 				handles.resize(4);
-				handles.write[2] = j->get_anchor_a() + Point2(10, 0).rotated(j->get_lower_limit());
-				handles.write[3] = j->get_anchor_a() + Point2(10, 0).rotated(j->get_upper_limit());
+				handles.write[2] = j->get_anchor_a() + Point2(25, 0).rotated(j->get_lower_limit());
+				handles.write[3] = j->get_anchor_a() + Point2(25, 0).rotated(j->get_upper_limit());
 
 				handle_offsets.resize(4);
 				handle_offsets.write[2] = Point2();
 				handle_offsets.write[3] = Point2();
 
+				// rotation handles
 				p_overlay->draw_texture(handle_icon, gt.xform(handles[3]) - handle_hsize);
 				p_overlay->draw_texture(handle_icon, gt.xform(handles[2]) - handle_hsize);
+
+				// draw rotation handle arrows
+				float limits[] = { j->get_lower_limit(), j->get_upper_limit() };
+				for (const float limit : limits) {
+					Color c = Color(1.0f, 0.5f, 0.5f);
+					p_overlay->draw_set_transform(gt.xform(j->get_anchor_a()), limit, Size2(1, 1));
+					const float radius = gt.basis_xform(Vector2(0, 25)).y;
+					const float start_angle = 5.0f / MAX(1.0f, radius / (2.0f * 25.0f)) * (Math_PI / 180.0);
+					const float end_angle = 45.0f / MAX(1.0f, radius / (2.0f * 25.0f)) * (Math_PI / 180.0);
+
+					constexpr float arrow_tip_len = 8.0f;
+					p_overlay->draw_arc(Vector2(), radius, start_angle, end_angle, 4, c);
+					Point2 p = Vector2(radius, 0).rotated(end_angle);
+					p_overlay->draw_line(p, p + Vector2(-arrow_tip_len, -arrow_tip_len).rotated(end_angle), c);
+					p_overlay->draw_line(p, p + Vector2(arrow_tip_len, -arrow_tip_len).rotated(end_angle), c);
+
+					p_overlay->draw_arc(Vector2(), radius, -start_angle, -end_angle, 4, c);
+					p = Vector2(radius, 0).rotated(-end_angle);
+					p_overlay->draw_line(p, p + Vector2(-arrow_tip_len, arrow_tip_len).rotated(-end_angle), c);
+					p_overlay->draw_line(p, p + Vector2(arrow_tip_len, arrow_tip_len).rotated(-end_angle), c);
+
+					p_overlay->draw_set_transform_matrix(Transform2D());
+				}
 			}
 
-			// what the F i just want a rotated texture
-			Transform2D rot_xform = Transform2D(Math_PI * 0.5f, Vector2());
-			Transform2D xform = (rot_xform.inverse() * gt);
-			p_overlay->draw_set_transform_matrix(rot_xform);
-			p_overlay->draw_texture(anchor_icon, xform.xform(handles[1]) - anchor_size);
-			p_overlay->draw_set_transform_matrix(Transform2D());
+			// draw anchor handles
+			{
+				Transform2D rot_xform = Transform2D(Math_PI * 0.5f, Vector2());
+				Transform2D xform = (rot_xform.inverse() * gt);
+				p_overlay->draw_set_transform_matrix(rot_xform);
+				p_overlay->draw_texture(anchor_icon, xform.xform(handles[1]) - anchor_size);
+				p_overlay->draw_set_transform_matrix(Transform2D());
 
-			p_overlay->draw_texture(anchor_icon, gt.xform(handles[0]) - anchor_size);
+				p_overlay->draw_texture(anchor_icon, gt.xform(handles[0]) - anchor_size);
+			}
 		} break;
 
 		case JointType::PRISMATIC_JOINT: {
@@ -639,6 +665,7 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 				handles.write[3] = j->get_anchor_a() + j->get_local_axis() * j->get_lower_limit();
 				handles.write[4] = j->get_anchor_a() + j->get_local_axis() * j->get_upper_limit();
 
+				// draw limit handles
 				p_overlay->draw_texture(handle_icon, gt.xform(handles[4]) - handle_hsize);
 				p_overlay->draw_texture(handle_icon, gt.xform(handles[3]) - handle_hsize);
 
@@ -647,14 +674,38 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 				handle_offsets.write[4] = Point2();
 			}
 
+			// draw axis handle
 			p_overlay->draw_texture(handle_icon, gt.xform(handles[2]) - handle_hsize);
+			// and rotation indicators
+			{
+				Color c = Color(1.0f, 0.5f, 0.5f);
+				p_overlay->draw_set_transform(gt.xform(j->get_anchor_a()), j->get_local_axis().angle(), Size2(1, 1));
+				const float radius = gt.basis_xform(Vector2(0, 25)).y;
+				const float start_angle = 5.0f / MAX(1.0f, radius / (2.0f * 25.0f)) * (Math_PI / 180.0);
+				const float end_angle = 45.0f / MAX(1.0f, radius / (2.0f * 25.0f)) * (Math_PI / 180.0);
 
-			Transform2D rot_xform = Transform2D(Math_PI * 0.5f, Vector2());
-			Transform2D xform = (rot_xform.inverse() * gt);
-			p_overlay->draw_set_transform_matrix(rot_xform);
-			p_overlay->draw_texture(anchor_icon, xform.xform(handles[1]) - anchor_size);
-			p_overlay->draw_set_transform_matrix(Transform2D());
+				constexpr float arrow_tip_len = 8.0f;
+				p_overlay->draw_arc(Vector2(), radius, start_angle, end_angle, 4, c);
+				Point2 p = Vector2(radius, 0).rotated(end_angle);
+				p_overlay->draw_line(p, p + Vector2(-arrow_tip_len, -arrow_tip_len).rotated(end_angle), c);
+				p_overlay->draw_line(p, p + Vector2(arrow_tip_len, -arrow_tip_len).rotated(end_angle), c);
 
+				p_overlay->draw_arc(Vector2(), radius, -start_angle, -end_angle, 4, c);
+				p = Vector2(radius, 0).rotated(-end_angle);
+				p_overlay->draw_line(p, p + Vector2(-arrow_tip_len, arrow_tip_len).rotated(-end_angle), c);
+				p_overlay->draw_line(p, p + Vector2(arrow_tip_len, arrow_tip_len).rotated(-end_angle), c);
+
+				p_overlay->draw_set_transform_matrix(Transform2D());
+			}
+
+			// draw anchor handles
+			{
+				Transform2D rot_xform = Transform2D(Math_PI * 0.5f, Vector2());
+				Transform2D xform = (rot_xform.inverse() * gt);
+				p_overlay->draw_set_transform_matrix(rot_xform);
+				p_overlay->draw_texture(anchor_icon, xform.xform(handles[1]) - anchor_size);
+				p_overlay->draw_set_transform_matrix(Transform2D());
+			}
 			p_overlay->draw_texture(anchor_icon, gt.xform(handles[0]) - anchor_size);
 		} break;
 
