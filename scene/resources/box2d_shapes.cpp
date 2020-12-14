@@ -711,7 +711,7 @@ void Box2DCapsuleShape::set_height(real_t p_height) {
 	const float hy = p_height * GD_TO_B2 * 0.5f;
 	topCircleShape.m_p.y = -hy;
 	bottomCircleShape.m_p.y = hy;
-	rectShape.SetAsBox(radius, hy);
+	rectShape.SetAsBox(hy, hy);
 
 	emit_changed();
 }
@@ -726,7 +726,7 @@ void Box2DCapsuleShape::set_radius(real_t p_radius) {
 	const float r = MAX(p_radius * GD_TO_B2, b2_linearSlop);
 	topCircleShape.m_radius = r;
 	bottomCircleShape.m_radius = r;
-	rectShape.SetAsBox(radius, height * GD_TO_B2 * 0.5f);
+	rectShape.SetAsBox(r, height * GD_TO_B2 * 0.5f);
 
 	emit_changed();
 }

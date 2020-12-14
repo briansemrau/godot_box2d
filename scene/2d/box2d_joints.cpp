@@ -238,13 +238,11 @@ void Box2DJoint::_notification(int p_what) {
 				world_node = new_world;
 			}
 
-#ifdef TOOLS_ENABLED
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
 				// start drawing every frame for debug draw
 				set_process_internal(true);
 				set_notify_transform(true);
 			}
-#endif
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
@@ -265,10 +263,8 @@ void Box2DJoint::_notification(int p_what) {
 			destroy_b2Joint();
 
 			// stop debug drawing
-#ifdef TOOLS_ENABLED
 			set_process_internal(false);
 			set_notify_transform(false);
-#endif
 		} break;
 
 		case NOTIFICATION_POST_ENTER_TREE: {
@@ -280,12 +276,10 @@ void Box2DJoint::_notification(int p_what) {
 		case NOTIFICATION_TRANSFORM_CHANGED: {
 			// Changing transform only does anything if reinitialize_joint() is called
 
-#ifdef TOOLS_ENABLED
 			// Update in editor to represent what initialized state will look like
 			if (Engine::get_singleton()->is_editor_hint()) {
 				on_editor_transforms_changed();
 			}
-#endif
 		} break;
 
 		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
@@ -304,15 +298,13 @@ void Box2DJoint::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_INTERNAL_PROCESS: {
-#ifdef TOOLS_ENABLED
+			// Leaving on for now, but ideally we only want to update() when the actual display of something will change
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
 				update();
 			}
-#endif
 		} break;
 
 		case NOTIFICATION_DRAW: {
-#ifdef TOOLS_ENABLED
 			if (!Engine::get_singleton()->is_editor_hint() && !get_tree()->is_debugging_collisions_hint()) {
 				break;
 			}
@@ -347,7 +339,7 @@ void Box2DJoint::_notification(int p_what) {
 				debug_col = Color(1.0f, 0.0f, 0.0f);
 			}
 			debug_draw(get_canvas_item(), debug_col);
-#endif
+
 		} break;
 	}
 }
