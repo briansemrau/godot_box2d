@@ -86,7 +86,7 @@ private:
 	void update_mass(bool p_calc_reset = true);
 	void update_filterdata();
 
-	void state_changed();
+	void sync_state();
 
 protected:
 	void _notification(int p_what);

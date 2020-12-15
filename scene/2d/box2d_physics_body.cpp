@@ -133,7 +133,7 @@ void Box2DPhysicsBody::set_box2dworld_transform(const Transform2D &p_transform) 
 	set_transform(target_xform);
 }
 
-void Box2DPhysicsBody::state_changed() {
+void Box2DPhysicsBody::sync_state() {
 	set_block_transform_notify(true);
 	set_box2dworld_transform(b2_to_gd(body->GetTransform()));
 	set_block_transform_notify(false);
@@ -242,10 +242,7 @@ void Box2DPhysicsBody::_notification(int p_what) {
 			}
 		} break;
 
-		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
-			
-			// TODO figure out if this can instead be a callback from Box2D.
-			//		I don't think it can.
+		case Box2DWorld::NOTIFICATION_WORLD_STEPPED: {
 			if (body) {
 				const bool awake = body->IsAwake();
 				if (awake != prev_sleeping_state) {
@@ -257,9 +254,7 @@ void Box2DPhysicsBody::_notification(int p_what) {
 					emit_signal("enabled_state_changed");
 				}
 
-				if (awake) {
-					state_changed();
-				}
+				sync_state();
 			}
 		} break;
 
@@ -396,6 +391,7 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("body_entered", PropertyInfo(Variant::OBJECT, "body", PROPERTY_HINT_RESOURCE_TYPE, "Node")));
 	ADD_SIGNAL(MethodInfo("body_exited", PropertyInfo(Variant::OBJECT, "body", PROPERTY_HINT_RESOURCE_TYPE, "Node")));
 	ADD_SIGNAL(MethodInfo("sleeping_state_changed"));
+	ADD_SIGNAL(MethodInfo("enabled_state_changed"));
 
 	BIND_ENUM_CONSTANT(MODE_RIGID);
 	BIND_ENUM_CONSTANT(MODE_STATIC);

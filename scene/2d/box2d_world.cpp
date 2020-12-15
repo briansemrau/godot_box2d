@@ -453,7 +453,7 @@ void Box2DWorld::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "auto_step"), "set_auto_step", "get_auto_step");
 }
 
-void Box2DWorld::step(real_t p_step) {
+void Box2DWorld::step(float p_step) {
 	//print_line(("step: " + std::to_string(p_step)
 	//		+ ", gravity: ("
 	//		+ std::to_string(world->GetGravity().x) + ", "
@@ -471,6 +471,9 @@ void Box2DWorld::step(real_t p_step) {
 
 	world->Step(p_step, 8, 8);
 	flag_rescan_contacts_monitored = false;
+
+	// Notify our bodies in this world
+	propagate_notification(NOTIFICATION_WORLD_STEPPED);
 }
 
 void Box2DWorld::set_gravity(const Vector2 &p_gravity) {

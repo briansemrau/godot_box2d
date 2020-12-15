@@ -262,7 +262,7 @@ void Box2DJoint::_notification(int p_what) {
 			}
 		} break;
 
-		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
+		case Box2DWorld::NOTIFICATION_WORLD_STEPPED: {
 			if (breaking_enabled && joint) {
 				Vector2 force = get_reaction_force();
 				real_t torque = abs(get_reaction_torque());
