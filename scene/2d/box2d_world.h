@@ -176,7 +176,13 @@ protected:
 	static void _bind_methods();
 
 public:
-	void step(real_t p_step);
+
+
+	enum {
+		NOTIFICATION_WORLD_STEPPED = 42300, // special int that shouldn't clobber other notifications.  See node.h
+	};
+
+	void step(float p_step);
 
 	void set_gravity(const Vector2 &gravity);
 	Vector2 get_gravity() const;
