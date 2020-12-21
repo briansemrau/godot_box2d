@@ -891,8 +891,8 @@ void Box2DJointEditor::_notification(int p_what) {
 		case NOTIFICATION_READY: {
 			disable_anchor_modes(false, String());
 
-			button_anchor_local->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("AnchorsLocal", "EditorIcons"));
-			button_anchor_global->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("StickyAnchors", "EditorIcons"));
+			button_anchor_local->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("AnchorModeLocal", "EditorIcons"));
+			button_anchor_global->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("AnchorModeSticky", "EditorIcons"));
 			button_anchor_local->set_pressed(true);
 		} break;
 
