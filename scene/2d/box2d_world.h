@@ -14,6 +14,8 @@
 
 #include "../../util/box2d_types_converter.h"
 
+#include <list>
+
 /**
 * @author Brian Semrau
 */
@@ -123,6 +125,22 @@ private:
 		virtual bool ReportFixture(b2Fixture *fixture) override;
 	};
 
+	class GodotSignalCaller {
+		public:
+		String signal_name{""};
+		Node* obj_emitter{nullptr};
+		Node* obj_a{nullptr};
+		Node* obj_b{nullptr};
+
+		GodotSignalCaller(const String &p_signal_name, Node* p_obj_emitter, Node* p_obja, Node* p_objb) {
+			obj_emitter = p_obj_emitter;
+			signal_name = p_signal_name;
+			obj_a = p_obja;
+			obj_b = p_objb;
+		}
+
+	};
+
 	class IntersectPointCallback : public b2QueryCallback {
 	public:
 		Vector<b2Fixture *> results;
@@ -138,6 +156,8 @@ private:
 	Vector2 gravity;
 	bool auto_step{true};
 	b2World *world;
+
+	std::list<GodotSignalCaller> collision_callback_queue{};
 
 	Set<Box2DPhysicsBody *> bodies;
 	Set<Box2DJoint *> joints;
