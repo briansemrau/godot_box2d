@@ -29,11 +29,11 @@ bool Box2DWorld::ShouldCollide(b2Fixture *fixtureA, b2Fixture *fixtureB) {
 	const b2Filter &filterA = fixtureA->GetFilterData();
 	const b2Filter &filterB = fixtureB->GetFilterData();
 
-	if (filterA.groupIndex == filterB.groupIndex && filterA.groupIndex != 0) {
-		return filterA.groupIndex > 0;
-	}
-
 	bool collide = (filterA.maskBits & filterB.categoryBits) != 0 && (filterA.categoryBits & filterB.maskBits) != 0;
+
+	if (filterA.groupIndex == filterB.groupIndex && filterA.groupIndex != 0) {
+		collide = filterA.groupIndex > 0;
+	}
 
 	// Custom contact filtering
 
@@ -41,22 +41,24 @@ bool Box2DWorld::ShouldCollide(b2Fixture *fixtureA, b2Fixture *fixtureB) {
 		return false;
 	}
 
+	// TODO Most bodies won't use explicit exclusions. Can/should this be optimized?
+
 	// Check for fixture exclusions
 	Box2DFixture *const &ownerA = fixtureA->GetUserData().owner;
 	Box2DFixture *const &ownerB = fixtureB->GetUserData().owner;
 	if (ownerA->filtered.has(ownerB) || ownerB->filtered.has(ownerA)) {
 		return false;
-	} else {
-		// Check for body exclusions
-		Box2DPhysicsBody *const &bodyA = ownerA->body_node;
-		Box2DPhysicsBody *const &bodyB = ownerB->body_node;
-		if ((ownerA->accept_body_collision_exceptions && bodyA->filtered.has(bodyB)) || (ownerB->accept_body_collision_exceptions && bodyB->filtered.has(bodyA))) {
-			return false;
-		} else {
-			// TODO should we bother to let bodies exclude fixtures?
-			return true;
-		}
 	}
+
+	// Check for body exclusions
+	Box2DPhysicsBody *const &bodyA = ownerA->body_node;
+	Box2DPhysicsBody *const &bodyB = ownerB->body_node;
+	if ((ownerA->accept_body_collision_exceptions && bodyA->filtered.has(bodyB)) || (ownerB->accept_body_collision_exceptions && bodyB->filtered.has(bodyA))) {
+		return false;
+	}
+
+	// TODO should we bother to let bodies exclude fixtures?
+	return true;
 }
 
 inline void Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
