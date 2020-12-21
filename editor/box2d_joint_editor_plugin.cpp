@@ -118,7 +118,20 @@ Variant Box2DJointEditor::get_handle_value(int idx) const {
 		} break;
 
 		case JointType::DISTANCE_JOINT: {
-			// TODO
+			Box2DDistanceJoint *j = Object::cast_to<Box2DDistanceJoint>(node);
+
+			switch (idx) {
+				case 0:
+					return j->get_anchor_a();
+				case 1:
+					return j->get_anchor_b();
+				case 2:
+					return j->get_min_length();
+				case 3:
+					return j->get_rest_length();
+				case 4:
+					return j->get_max_length();
+			}
 		} break;
 
 		case JointType::PULLEY_JOINT:
@@ -129,7 +142,14 @@ Variant Box2DJointEditor::get_handle_value(int idx) const {
 		} break;
 
 		case JointType::WELD_JOINT: {
-			// TODO
+			Box2DWeldJoint *j = Object::cast_to<Box2DWeldJoint>(node);
+
+			switch (idx) {
+				case 0:
+					return j->get_anchor_a();
+				case 1:
+					return j->get_anchor_b();
+			}
 		} break;
 
 		case JointType::FRICTION_JOINT:
@@ -246,7 +266,25 @@ void Box2DJointEditor::set_handle(int idx, Point2 &p_point) {
 		} break;
 
 		case JointType::DISTANCE_JOINT: {
-			// TODO
+			Box2DDistanceJoint *j = Object::cast_to<Box2DDistanceJoint>(node);
+
+			Point2 offset_point = p_point - j->get_anchor_a(); // offset to match debug draw
+			Vector2 axis = (j->get_anchor_b() - j->get_anchor_a()).normalized();
+
+			switch (idx) {
+				case 0:
+					return j->set_anchor_a(p_point);
+				case 1:
+					return j->set_anchor_b(p_point);
+				case 2:
+					return j->set_min_length(offset_point.dot(axis));
+				case 3:
+					return j->set_rest_length(offset_point.dot(axis));
+				case 4:
+					return j->set_max_length(offset_point.dot(axis));
+			}
+
+			canvas_item_editor->update_viewport();
 		} break;
 
 		case JointType::PULLEY_JOINT:
@@ -257,7 +295,14 @@ void Box2DJointEditor::set_handle(int idx, Point2 &p_point) {
 		} break;
 
 		case JointType::WELD_JOINT: {
-			// TODO
+			Box2DWeldJoint *j = Object::cast_to<Box2DWeldJoint>(node);
+
+			switch (idx) {
+				case 0:
+					return j->set_anchor_a(p_point);
+				case 1:
+					return j->set_anchor_b(p_point);
+			}
 		} break;
 
 		case JointType::FRICTION_JOINT:
@@ -387,11 +432,40 @@ void Box2DJointEditor::commit_handle(int idx, Variant &p_org) {
 		} break;
 
 		case JointType::DISTANCE_JOINT: {
-			//undo_redo->add_do_method(j, "set_", j->get_());
-			//undo_redo->add_do_method(canvas_item_editor, "update_viewport");
-			//undo_redo->add_undo_method(j, "set_", p_org);
-			//undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
-			// TODO
+			Box2DDistanceJoint *j = Object::cast_to<Box2DDistanceJoint>(node);
+
+			switch (idx) {
+				case 0: {
+					undo_redo->add_do_method(j, "set_anchor_a", j->get_anchor_a());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_anchor_a", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+				case 1: {
+					undo_redo->add_do_method(j, "set_anchor_b", j->get_anchor_b());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_anchor_b", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+				case 2: {
+					undo_redo->add_do_method(j, "set_min_length", j->get_min_length());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_min_length", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+				case 3: {
+					undo_redo->add_do_method(j, "set_rest_length", j->get_rest_length());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_rest_length", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+				case 4: {
+					undo_redo->add_do_method(j, "set_max_length", j->get_max_length());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_max_length", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+			}
 		} break;
 
 		case JointType::PULLEY_JOINT:
@@ -402,7 +476,22 @@ void Box2DJointEditor::commit_handle(int idx, Variant &p_org) {
 		} break;
 
 		case JointType::WELD_JOINT: {
-			// TODO
+			Box2DWeldJoint *j = Object::cast_to<Box2DWeldJoint>(node);
+
+			switch (idx) {
+				case 0: {
+					undo_redo->add_do_method(j, "set_anchor_a", j->get_anchor_a());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_anchor_a", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+				case 1: {
+					undo_redo->add_do_method(j, "set_anchor_b", j->get_anchor_b());
+					undo_redo->add_do_method(canvas_item_editor, "update_viewport");
+					undo_redo->add_undo_method(j, "set_anchor_b", p_org);
+					undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
+				} break;
+			}
 		} break;
 
 		case JointType::FRICTION_JOINT:
@@ -530,9 +619,11 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 
 	Ref<Theme> theme = EditorNode::get_singleton()->get_editor_theme();
 	Ref<Texture2D> handle_icon = theme->get_icon("EditorHandle", "EditorIcons");
+	Ref<Texture2D> handle_limit_icon = theme->get_icon("EditorHandleLinearLimit", "EditorIcons");
 	Ref<Texture2D> anchor_icon = theme->get_icon("EditorControlAnchor", "EditorIcons");
-	Vector2 anchor_size = anchor_icon->get_size();
 	Vector2 handle_hsize = handle_icon->get_size() * 0.5;
+	Vector2 handle_limit_hsize = handle_limit_icon->get_size() * 0.5;
+	Vector2 anchor_size = anchor_icon->get_size();
 
 	handles.clear();
 	handle_offsets.clear();
@@ -710,7 +801,50 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 		} break;
 
 		case JointType::DISTANCE_JOINT: {
-			// TODO
+			Box2DDistanceJoint *j = Object::cast_to<Box2DDistanceJoint>(node);
+
+			Vector2 axis = (j->get_anchor_b() - j->get_anchor_a()).normalized();
+
+			handles.resize(5);
+			handles.write[0] = j->get_anchor_a();
+			handles.write[1] = j->get_anchor_b();
+			handles.write[2] = j->get_anchor_a() + axis * j->get_min_length();
+			handles.write[3] = j->get_anchor_a() + axis * j->get_rest_length();
+			handles.write[4] = j->get_anchor_a() + axis * j->get_max_length();
+
+			handle_offsets.resize(5);
+			handle_offsets.write[0] = (-anchor_size + handle_hsize);
+			handle_offsets.write[1] = (-anchor_size + handle_hsize) * Size2(-1, 1);
+			handle_offsets.write[2] = axis * -16.0f;
+			handle_offsets.write[3] = Point2();
+			handle_offsets.write[4] = axis * 16.0f;
+
+			// Draw limit/rest length handles
+			{
+				Transform2D rot_xform = Transform2D(axis.angle() + Math_PI * 0.5f, Vector2());
+				Transform2D xform = (rot_xform.inverse() * gt);
+				p_overlay->draw_set_transform_matrix(rot_xform);
+				p_overlay->draw_texture(handle_limit_icon, xform.xform(handles[4]) - handle_limit_hsize + rot_xform.basis_xform_inv(handle_offsets[4]));
+				p_overlay->draw_set_transform_matrix(Transform2D());
+			}
+			p_overlay->draw_texture(handle_icon, gt.xform(handles[3]) - handle_hsize);
+			{
+				Transform2D rot_xform = Transform2D(axis.angle() + Math_PI * 1.5f, Vector2());
+				Transform2D xform = (rot_xform.inverse() * gt);
+				p_overlay->draw_set_transform_matrix(rot_xform);
+				p_overlay->draw_texture(handle_limit_icon, xform.xform(handles[2]) - handle_limit_hsize + rot_xform.basis_xform_inv(handle_offsets[2]));
+				p_overlay->draw_set_transform_matrix(Transform2D());
+			}
+
+			// draw anchor handles
+			{
+				Transform2D rot_xform = Transform2D(Math_PI * 0.5f, Vector2());
+				Transform2D xform = (rot_xform.inverse() * gt);
+				p_overlay->draw_set_transform_matrix(rot_xform);
+				p_overlay->draw_texture(anchor_icon, xform.xform(handles[1]) - anchor_size);
+				p_overlay->draw_set_transform_matrix(Transform2D());
+			}
+			p_overlay->draw_texture(anchor_icon, gt.xform(handles[0]) - anchor_size);
 		} break;
 
 		case JointType::PULLEY_JOINT:
@@ -721,7 +855,25 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 		} break;
 
 		case JointType::WELD_JOINT: {
-			// TODO
+			Box2DWeldJoint *j = Object::cast_to<Box2DWeldJoint>(node);
+
+			handles.resize(2);
+			handles.write[0] = j->get_anchor_a();
+			handles.write[1] = j->get_anchor_b();
+
+			handle_offsets.resize(2);
+			handle_offsets.write[0] = (-anchor_size + handle_hsize);
+			handle_offsets.write[1] = (-anchor_size + handle_hsize) * Size2(-1, 1);
+
+			// draw anchor handles
+			{
+				Transform2D rot_xform = Transform2D(Math_PI * 0.5f, Vector2());
+				Transform2D xform = (rot_xform.inverse() * gt);
+				p_overlay->draw_set_transform_matrix(rot_xform);
+				p_overlay->draw_texture(anchor_icon, xform.xform(handles[1]) - anchor_size);
+				p_overlay->draw_set_transform_matrix(Transform2D());
+			}
+			p_overlay->draw_texture(anchor_icon, gt.xform(handles[0]) - anchor_size);
 		} break;
 
 		case JointType::FRICTION_JOINT:
@@ -767,8 +919,6 @@ void Box2DJointEditor::edit(Node *p_node) {
 
 		_menu_option(static_cast<int>(node->editor_anchor_mode));
 
-		prev_joint_xform = node->get_global_transform(); // TODO should this be box2d_global_transform?
-
 		switch (joint_type) {
 			// TODO I think certain joints don't use body anchors like the others (gear?)
 			case Box2DJointEditor::JointType::REVOLUTE_JOINT:
@@ -776,10 +926,10 @@ void Box2DJointEditor::edit(Node *p_node) {
 			case Box2DJointEditor::JointType::DISTANCE_JOINT:
 			case Box2DJointEditor::JointType::PULLEY_JOINT:
 			case Box2DJointEditor::JointType::MOUSE_JOINT:
-			case Box2DJointEditor::JointType::GEAR_JOINT:
+			case Box2DJointEditor::JointType::GEAR_JOINT: // <- TODO
 			case Box2DJointEditor::JointType::WHEEL_JOINT:
 			case Box2DJointEditor::JointType::WELD_JOINT:
-			case Box2DJointEditor::JointType::FRICTION_JOINT:
+			case Box2DJointEditor::JointType::FRICTION_JOINT: // <- TODO
 			case Box2DJointEditor::JointType::ROPE_JOINT:
 			case Box2DJointEditor::JointType::MOTOR_JOINT:
 			case Box2DJointEditor::JointType::INVALID_JOINT: {
@@ -805,7 +955,9 @@ void Box2DJointEditor::_bind_methods() {
 Box2DJointEditor::Box2DJointEditor(EditorNode *p_editor) :
 		editor(p_editor),
 		undo_redo(EditorNode::get_undo_redo()) {
+
 	add_child(memnew(VSeparator));
+
 	button_anchor_local = memnew(Button);
 	button_anchor_local->set_flat(true);
 	add_child(button_anchor_local);
@@ -818,7 +970,7 @@ Box2DJointEditor::Box2DJointEditor(EditorNode *p_editor) :
 	button_anchor_global->connect("pressed", callable_mp(this, &Box2DJointEditor::_menu_option), varray(static_cast<int>(AnchorMode::MODE_ANCHORS_STICKY)));
 	button_anchor_global->set_toggle_mode(true);
 
-	// [VSeparator]
+	//add_child(memnew(VSeparator));
 	// TODO add any additional buttons for other joints
 }
 

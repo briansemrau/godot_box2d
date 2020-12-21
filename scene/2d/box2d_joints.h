@@ -284,10 +284,11 @@ class Box2DDistanceJoint : public Box2DJoint {
 	real_t min_length = 50;
 	real_t max_length = 50;
 
-	// TODO move to joint editor plugin
-	bool editor_use_default_rest_length = true;
+	// TODO decide if there should be an editor toggle to lock relative limits
+	// with the the anchor or with the rest point
+	//bool editor_relative_limits = false;
 
-	virtual void on_editor_transforms_changed() override;
+	//virtual void on_editor_transforms_changed() override;
 
 protected:
 	static void _bind_methods();
@@ -305,9 +306,6 @@ public:
 	Vector2 get_anchor_a() const { return Box2DJoint::get_anchor_a(); }
 	void set_anchor_b(const Vector2 &p_anchor) { Box2DJoint::set_anchor_b(p_anchor); }
 	Vector2 get_anchor_b() const { return Box2DJoint::get_anchor_b(); }
-
-	void set_editor_use_default_rest_length(bool p_default);
-	bool get_editor_use_default_rest_length() const;
 
 	void set_rest_length(real_t p_length);
 	real_t get_rest_length() const;

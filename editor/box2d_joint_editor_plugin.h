@@ -48,7 +48,6 @@ public:
 
 private:
 	AnchorMode anchor_mode = AnchorMode::MODE_ANCHORS_LOCAL;
-	Transform2D prev_joint_xform;
 
 	Vector<Point2> handles;
 	Vector<Point2> handle_offsets;

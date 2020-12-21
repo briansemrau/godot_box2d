@@ -1160,7 +1160,7 @@ real_t Box2DPrismaticJoint::get_motor_force() const {
 Box2DPrismaticJoint::Box2DPrismaticJoint() :
 		Box2DJoint(&jointDef) {}
 
-void Box2DDistanceJoint::on_editor_transforms_changed() {
+//void Box2DDistanceJoint::on_editor_transforms_changed() {
 	// TODO
 	//if (editor_translate_anchors) {
 	//	// Update jointDef anchors to use our anchors
@@ -1178,12 +1178,9 @@ void Box2DDistanceJoint::on_editor_transforms_changed() {
 	//		_change_notify("anchor_b");
 	//	}
 	//}
-}
+//}
 
 void Box2DDistanceJoint::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_editor_use_default_rest_length", "default"), &Box2DDistanceJoint::set_editor_use_default_rest_length);
-	ClassDB::bind_method(D_METHOD("get_editor_use_default_rest_length"), &Box2DDistanceJoint::get_editor_use_default_rest_length);
-
 	ClassDB::bind_method(D_METHOD("set_anchor_a", "anchor_a"), &Box2DDistanceJoint::set_anchor_a);
 	ClassDB::bind_method(D_METHOD("get_anchor_a"), &Box2DDistanceJoint::get_anchor_a);
 	ClassDB::bind_method(D_METHOD("set_anchor_b", "anchor_b"), &Box2DDistanceJoint::set_anchor_b);
@@ -1203,7 +1200,6 @@ void Box2DDistanceJoint::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_current_length"), &Box2DDistanceJoint::get_current_length);
 
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_default_rest_length"), "set_editor_use_default_rest_length", "get_editor_use_default_rest_length");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rest_length"), "set_rest_length", "get_rest_length");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "min_length"), "set_min_length", "get_min_length");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_length"), "set_max_length", "get_max_length");
@@ -1275,17 +1271,6 @@ void Box2DDistanceJoint::debug_draw(RID p_to_rid, Color p_color) {
 	draw_line(x2, p2, c, 1.0f);
 }
 
-void Box2DDistanceJoint::set_editor_use_default_rest_length(bool p_default) {
-	editor_use_default_rest_length = p_default;
-	if (editor_use_default_rest_length) {
-		reset_rest_length();
-	}
-}
-
-bool Box2DDistanceJoint::get_editor_use_default_rest_length() const {
-	return editor_use_default_rest_length;
-}
-
 void Box2DDistanceJoint::set_rest_length(real_t p_length) {
 	rest_length = p_length;
 	float length = p_length * GD_TO_B2;
@@ -1293,12 +1278,15 @@ void Box2DDistanceJoint::set_rest_length(real_t p_length) {
 		static_cast<b2DistanceJoint *>(get_b2Joint())->SetLength(length);
 	jointDef.length = length;
 
+	// Shouldn't this be configurable? Or just removed?
 	if (rest_length < min_length) {
 		set_min_length(rest_length);
 	}
 	if (rest_length > max_length) {
 		set_max_length(rest_length);
 	}
+
+	_change_notify("rest_length");
 }
 
 real_t Box2DDistanceJoint::get_rest_length() const {
@@ -1317,14 +1305,20 @@ void Box2DDistanceJoint::reset_rest_length() {
 void Box2DDistanceJoint::set_min_length(real_t p_length) {
 	min_length = p_length;
 
-	if (rest_length < min_length) {
+	if (min_length > rest_length) { // Maybe users might want to violate this to create preloaded springs with a stop
 		min_length = rest_length;
+	}
+
+	if (min_length > max_length) {
+		min_length = max_length;
 	}
 
 	float length = p_length * GD_TO_B2;
 	if (get_b2Joint())
 		static_cast<b2DistanceJoint *>(get_b2Joint())->SetMinLength(length);
 	jointDef.length = length;
+
+	_change_notify("min_length");
 }
 
 real_t Box2DDistanceJoint::get_min_length() const {
@@ -1334,14 +1328,20 @@ real_t Box2DDistanceJoint::get_min_length() const {
 void Box2DDistanceJoint::set_max_length(real_t p_length) {
 	max_length = p_length;
 
-	if (rest_length > max_length) {
+	if (max_length < rest_length) { // might not want to keep this restriction
 		max_length = rest_length;
+	}
+
+	if (max_length < min_length) {
+		max_length = min_length;
 	}
 
 	float length = p_length * GD_TO_B2;
 	if (get_b2Joint())
 		static_cast<b2DistanceJoint *>(get_b2Joint())->SetMaxLength(length);
 	jointDef.length = length;
+
+	_change_notify("max_length");
 }
 
 real_t Box2DDistanceJoint::get_max_length() const {
