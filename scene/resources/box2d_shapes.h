@@ -21,16 +21,14 @@ class Box2DShape : public Resource {
 	GDCLASS(Box2DShape, Resource);
 	OBJ_SAVE_TYPE(Box2DShape);
 
-	friend class Box2DFixture;
-
-	virtual bool is_composite_shape() const;
-	virtual const Vector<const b2Shape *> get_shapes() const;
-	virtual const b2Shape *get_shape() const = 0;
-
 protected:
 	static void _bind_methods();
 
 public:
+	virtual bool is_composite_shape() const;
+	virtual const Vector<const b2Shape *> get_shapes() const;
+	virtual const b2Shape *get_shape() const = 0;
+
 	virtual bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const;
 
 	virtual void draw(const RID &p_to_rid, const Color &p_color) = 0;
@@ -44,12 +42,12 @@ class Box2DCircleShape : public Box2DShape {
 
 	b2CircleShape circleShape;
 
-	virtual const b2Shape *get_shape() const override { return &circleShape; }
-
 protected:
 	static void _bind_methods();
 
 public:
+	virtual const b2Shape *get_shape() const override { return &circleShape; }
+
 	void set_radius(real_t p_radius);
 	real_t get_radius() const;
 
@@ -66,12 +64,12 @@ class Box2DRectShape : public Box2DShape {
 	real_t height;
 	// TODO replace width/height with a Vector2 for consistency
 
-	virtual const b2Shape *get_shape() const override { return &shape; }
-
 protected:
 	static void _bind_methods();
 
 public:
+	virtual const b2Shape *get_shape() const override { return &shape; }
+
 	void set_size(const Vector2 &p_size);
 	Vector2 get_size() const;
 
@@ -91,12 +89,12 @@ class Box2DSegmentShape : public Box2DShape {
 
 	b2EdgeShape shape;
 
-	virtual const b2Shape *get_shape() const override { return &shape; }
-
 protected:
 	static void _bind_methods();
 
 public:
+	virtual const b2Shape *get_shape() const override { return &shape; }
+
 	void set_a(const Vector2 &p_a);
 	Vector2 get_a() const;
 
@@ -154,11 +152,11 @@ private:
 protected:
 	static void _bind_methods();
 
+public:
 	virtual bool is_composite_shape() const override;
 	virtual const Vector<const b2Shape *> get_shapes() const override;
 	virtual const b2Shape *get_shape() const override { return chain_shape; }
 
-public:
 	bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const override;
 
 	void set_point_cloud(const Vector<Vector2> &p_points);
@@ -190,17 +188,17 @@ class Box2DCapsuleShape : public Box2DShape {
 	real_t radius;
 	real_t height;
 
-	virtual bool is_composite_shape() const override { return true; };
-	virtual const Vector<const b2Shape *> get_shapes() const override;
-	virtual const b2Shape *get_shape() const override {
-		CRASH_NOW();
-		ERR_FAIL_V(&bottomCircleShape);
-	}
-
 protected:
 	static void _bind_methods();
 
 public:
+	virtual bool is_composite_shape() const override { return true; };
+	virtual const Vector<const b2Shape *> get_shapes() const override;
+	virtual const b2Shape *get_shape() const override {
+		CRASH_NOW_MSG("You can never call get_shape on a composite capsule.");
+		ERR_FAIL_V(&bottomCircleShape);
+	}
+
 	void set_height(real_t p_height);
 	real_t get_height() const;
 

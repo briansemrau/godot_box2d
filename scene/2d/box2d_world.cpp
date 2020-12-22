@@ -15,6 +15,106 @@
 * @author Brian Semrau
 */
 
+void Box2DShapeQueryParameters::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_shape", "shape"), &Box2DShapeQueryParameters::set_shape);
+	ClassDB::bind_method(D_METHOD("get_shape"), &Box2DShapeQueryParameters::get_shape);
+
+	ClassDB::bind_method(D_METHOD("set_transform", "transform"), &Box2DShapeQueryParameters::set_transform);
+	ClassDB::bind_method(D_METHOD("get_transform"), &Box2DShapeQueryParameters::get_transform);
+
+	ClassDB::bind_method(D_METHOD("set_motion", "motion"), &Box2DShapeQueryParameters::set_motion);
+	ClassDB::bind_method(D_METHOD("get_motion"), &Box2DShapeQueryParameters::get_motion);
+
+	ClassDB::bind_method(D_METHOD("set_collision_layer", "collision_layer"), &Box2DShapeQueryParameters::set_collision_mask);
+	ClassDB::bind_method(D_METHOD("get_collision_layer"), &Box2DShapeQueryParameters::get_collision_mask);
+
+	ClassDB::bind_method(D_METHOD("set_exclude", "exclude"), &Box2DShapeQueryParameters::set_exclude);
+	ClassDB::bind_method(D_METHOD("get_exclude"), &Box2DShapeQueryParameters::get_exclude);
+
+	ClassDB::bind_method(D_METHOD("set_collide_with_bodies", "enable"), &Box2DShapeQueryParameters::set_collide_with_bodies);
+	ClassDB::bind_method(D_METHOD("is_collide_with_bodies_enabled"), &Box2DShapeQueryParameters::is_collide_with_bodies_enabled);
+
+	ClassDB::bind_method(D_METHOD("set_collide_with_sensors", "enable"), &Box2DShapeQueryParameters::set_collide_with_sensors);
+	ClassDB::bind_method(D_METHOD("is_collide_with_sensors_enabled"), &Box2DShapeQueryParameters::is_collide_with_sensors_enabled);
+
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_layer", "get_collision_layer");
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "exclude", PROPERTY_HINT_NONE, itos(Variant::INT) + ":"), "set_exclude", "get_exclude");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "motion"), "set_motion", "get_motion");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shape", PROPERTY_HINT_RESOURCE_TYPE, "Box2DShape"), "set_shape", "get_shape");
+	ADD_PROPERTY(PropertyInfo(Variant::TRANSFORM2D, "transform"), "set_transform", "get_transform");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collide_with_bodies"), "set_collide_with_bodies", "is_collide_with_bodies_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collide_with_sensors"), "set_collide_with_sensors", "is_collide_with_sensors_enabled");
+}
+
+void Box2DShapeQueryParameters::set_shape(const RES &p_shape_ref) {
+	ERR_FAIL_COND(p_shape_ref.is_null());
+	shape_ref = p_shape_ref;
+}
+
+RES Box2DShapeQueryParameters::get_shape() const {
+	return shape_ref;
+}
+
+void Box2DShapeQueryParameters::set_transform(const Transform2D &p_transform) {
+	transform = p_transform;
+}
+
+Transform2D Box2DShapeQueryParameters::get_transform() const {
+	return transform;
+}
+
+void Box2DShapeQueryParameters::set_motion(const Vector2 &p_motion) {
+	motion = p_motion;
+}
+
+Vector2 Box2DShapeQueryParameters::get_motion() const {
+	return motion;
+}
+
+void Box2DShapeQueryParameters::set_collision_mask(int p_collision_mask) {
+	collision_mask = p_collision_mask;
+}
+
+int Box2DShapeQueryParameters::get_collision_mask() const {
+	return collision_mask;
+}
+
+void Box2DShapeQueryParameters::set_exclude(const Vector<int64_t> &p_exclude) {
+	exclude.clear();
+	for (int i = 0; i < p_exclude.size(); i++) {
+		Object *obj = ObjectDB::get_instance(ObjectID(p_exclude[i]));
+		Box2DPhysicsBody *node = Object::cast_to<Box2DPhysicsBody>(obj);
+		if (node)
+			exclude.insert(node);
+	}
+}
+
+Vector<int64_t> Box2DShapeQueryParameters::get_exclude() const {
+	Vector<int64_t> ret;
+	ret.resize(exclude.size());
+	int idx = 0;
+	for (Set<Box2DPhysicsBody *>::Element *E = exclude.front(); E; E = E->next()) {
+		ret.write[idx] = int64_t(E->get()->get_instance_id());
+	}
+	return ret;
+}
+
+void Box2DShapeQueryParameters::set_collide_with_bodies(bool p_enable) {
+	collide_with_bodies = p_enable;
+}
+
+bool Box2DShapeQueryParameters::is_collide_with_bodies_enabled() const {
+	return collide_with_bodies;
+}
+
+void Box2DShapeQueryParameters::set_collide_with_sensors(bool p_enable) {
+	collide_with_sensors = p_enable;
+}
+
+bool Box2DShapeQueryParameters::is_collide_with_sensors_enabled() const {
+	return collide_with_sensors;
+}
+
 void Box2DWorld::SayGoodbye(b2Joint *joint) {
 	joint->GetUserData().owner->on_b2Joint_destroyed();
 }
@@ -446,9 +546,13 @@ void Box2DWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_auto_step", "auto_setp"), &Box2DWorld::set_auto_step);
 	ClassDB::bind_method(D_METHOD("get_auto_step"), &Box2DWorld::get_auto_step);
 
-	//ClassDB::bind_method(D_METHOD("query_aabb", "bounds"), &Box2DWorld::query_aabb);
-	ClassDB::bind_method(D_METHOD("intersect_point", "point"), &Box2DWorld::intersect_point, DEFVAL(32));
-	//ClassDB::bind_method(D_METHOD("intersect_shape", "TODO"), &Box2DWorld::intersect_shape);
+	ClassDB::bind_method(D_METHOD("intersect_point", "point", "max_results", "exclude", "collision_layer", "collide_with_bodies", "collide_with_sensors"), &Box2DWorld::intersect_point, DEFVAL(32), DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false));
+	//ClassDB::bind_method(D_METHOD("intersect_ray", "from", "to", "exclude", "collision_layer", "collide_with_bodies", "collide_with_sensors"), &Box2DWorld::intersect_ray, DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("intersect_shape", "query", "max_results"), &Box2DWorld::intersect_shape, DEFVAL(32));
+	//ClassDB::bind_method(D_METHOD("cast_motion", "query"), &Box2DWorld::cast_motion);
+
+	//ClassDB::bind_method(D_METHOD("collide_shape", "shape", "max_results"), &PhysicsDirectSpaceState2D::_collide_shape, DEFVAL(32));
+
 	ClassDB::bind_method(D_METHOD("step", "delta"), &Box2DWorld::step);
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
@@ -508,27 +612,92 @@ bool Box2DWorld::get_auto_step() const {
 	return auto_step;
 }
 
-Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results) { //, const Vector<Ref<Box2DPhysicsBody> > &p_exclude/*, uint32_t p_layers*/) {
-	pointCallback.results.clear();
-	pointCallback.point = gd_to_b2(p_point);
-	//pointCallback.exclude.clear();
-	//for (int i = 0; i < p_exclude.size(); i++)
-	//	pointCallback.exclude.insert(p_exclude[i]);
-	world->QueryAABB(&pointCallback, gd_to_b2(Rect2(p_point, Size2(0, 0))));
+Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, const Vector<int64_t> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_sensors) {
+	point_callback.results.clear();
+	point_callback.point = gd_to_b2(p_point); // TODO this does not account for world node translation
+	point_callback.max_results = p_max_results;
 
-	int n = pointCallback.results.size();
+	point_callback.exclude.clear();
+	for (int i = 0; i < p_exclude.size(); i++) {
+		Object *obj = ObjectDB::get_instance(ObjectID(p_exclude[i]));
+		Box2DPhysicsBody *node = Object::cast_to<Box2DPhysicsBody>(obj);
+		if (node)
+			point_callback.exclude.insert(node);
+	}
+
+	point_callback.collision_mask = p_collision_mask;
+	point_callback.collide_with_bodies = p_collide_with_bodies;
+	point_callback.collide_with_sensors = p_collide_with_sensors;
+
+	world->QueryAABB(&point_callback, gd_to_b2(Rect2(p_point, Size2(0, 0))));
+
+	int n = point_callback.results.size();
 	Array arr;
 	arr.resize(n);
-	for (int i = 0; i < n; i++) {
-		b2Fixture *fixture = pointCallback.results.get(i);
+
+	if (n > 0)
+		ERR_PRINT_ONCE("hey we do have results tho");
+
+	int i = 0;
+	for (auto element = point_callback.results.front(); element; element = element->next()) {
+		Box2DFixture *fixture = element->get();
 
 		Dictionary d;
-		d["body"] = fixture->GetBody()->GetUserData().owner;
-		d["fixture"] = fixture->GetUserData().owner;
+		d["body"] = fixture->body_node;
+		d["fixture"] = fixture;
 		// TODO do we really need to return a dict, or can we just return an
 		//      array of Box2DFixture objects and let the user get data from just that?
 
 		arr[i] = d;
+		++i;
+	}
+
+	return arr;
+}
+
+Array Box2DWorld::intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results) {
+	shape_callback.results.clear();
+	shape_callback.params = p_query;
+	shape_callback.max_results = p_max_results;
+
+	// Calculate shape aabb
+	const Box2DShape *shape = p_query.ptr()->shape_ref.ptr();
+	b2AABB aabb;
+	if (shape->is_composite_shape()) {
+		const Vector<const b2Shape *> b2shapes = shape->get_shapes();
+		for (int i = 0; i < b2shapes.size(); ++i) {
+			const b2Shape *b2shape = b2shapes[i];
+			for (int j = 0; j < b2shape->GetChildCount(); ++j) {
+				b2AABB child_aabb;
+				b2shape->ComputeAABB(&child_aabb, gd_to_b2(p_query->transform), j); // TODO this does not account for world node translation
+				aabb.Combine(child_aabb);
+			}
+		}
+	} else {
+		const b2Shape *b2shape = shape->get_shape();
+		for (int i = 0; i < b2shape->GetChildCount(); ++i) {
+			b2AABB child_aabb;
+			b2shape->ComputeAABB(&child_aabb, gd_to_b2(p_query->transform), i); // TODO this does not account for world node translation
+			aabb.Combine(child_aabb);
+		}
+	}
+
+	world->QueryAABB(&shape_callback, aabb);
+
+	int n = point_callback.results.size();
+	Array arr;
+	arr.resize(n);
+
+	int i = 0;
+	for (auto element = point_callback.results.front(); element; element = element->next()) {
+		Box2DFixture *fixture = element->get();
+
+		Dictionary d;
+		d["body"] = fixture->body_node;
+		d["fixture"] = fixture;
+
+		arr[i] = d;
+		++i;
 	}
 
 	return arr;
@@ -556,8 +725,7 @@ Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results) { /
 //	return arr;
 //}
 
-Box2DWorld::Box2DWorld() :
-		world(NULL) {
+Box2DWorld::Box2DWorld() {
 	gravity = GLOBAL_GET("physics/2d/default_gravity_vector");
 	gravity *= real_t(GLOBAL_GET("physics/2d/default_gravity"));
 }
@@ -571,13 +739,79 @@ Box2DWorld::~Box2DWorld() {
 	}
 }
 
-bool Box2DWorld::QueryCallback::ReportFixture(b2Fixture *fixture) {
-	results.push_back(fixture);
-	return true;
+bool Box2DWorld::ShapeQueryCallback::ReportFixture(b2Fixture *fixture) {
+	// Check sensor flags
+	if (!(params->collide_with_sensors && fixture->IsSensor()) && !(params->collide_with_bodies && !fixture->IsSensor()))
+		return true;
+
+	// Check intersection
+	bool overlap = false;
+
+	Vector<const b2Shape *> query_b2shapes = params->shape_ref->get_shapes();
+	const b2Shape *fixture_b2shape = fixture->GetShape();
+	for (int index_A = 0; index_A < fixture_b2shape->GetChildCount(); ++index_A) {
+		for (int i = 0; i < query_b2shapes.size(); ++i) {
+			const b2Shape *query_b2shape = query_b2shapes[i];
+
+			for (int index_B = 0; index_B < query_b2shape->GetChildCount(); ++index_B) {
+				overlap = b2TestOverlap(fixture_b2shape, index_A, query_b2shape, index_B, fixture->GetBody()->GetTransform(), gd_to_b2(params->transform));
+				if (overlap)
+					goto endloop;
+			}
+		}
+	}
+endloop:
+
+	if (!overlap)
+		return true;
+
+	// Check filter
+	bool filtered = false;
+	const b2Filter filter = fixture->GetFilterData();
+	//if (filter.groupIndex == groupIndex && filter.groupIndex != 0) {
+	//	filtered = filterA.groupIndex < 0;
+	//}
+
+	filtered |= (filter.categoryBits & params->collision_mask) == 0;
+
+	if (filtered)
+		return true;
+
+	// Check exclusion
+	if (params->exclude.find(fixture->GetBody()->GetUserData().owner) > 0)
+		return true;
+
+	// Valid. Add to results
+	results.insert(fixture->GetUserData().owner);
+	return results.size() < max_results;
 }
 
-bool Box2DWorld::IntersectPointCallback::ReportFixture(b2Fixture *fixture) {
-	if (fixture->TestPoint(point)) // && exclude.find(fixture->GetBody()->GetUserData().owner) > 0)
-		results.push_back(fixture);
+bool Box2DWorld::PointQueryCallback::ReportFixture(b2Fixture *fixture) {
+	// Check sensor flags
+	if (!(collide_with_sensors && fixture->IsSensor()) && !(collide_with_bodies && !fixture->IsSensor()))
+		return true;
+
+	// Check intersection
+	if (!fixture->TestPoint(point))
+		return true;
+	
+	// Check filter
+	bool filtered = false;
+	const b2Filter filter = fixture->GetFilterData();
+	//if (filter.groupIndex == groupIndex && filter.groupIndex != 0) {
+	//	filtered = filterA.groupIndex < 0;
+	//}
+
+	filtered |= (filter.categoryBits & collision_mask) == 0;
+
+	if (filtered)
+		return true;
+	
+	// Check exclusion
+	if (exclude.find(fixture->GetBody()->GetUserData().owner) > 0)
+		return true;
+	
+	// Valid. Add to results
+	results.insert(fixture->GetUserData().owner);
 	return results.size() < max_results;
 }
