@@ -546,8 +546,9 @@ void Box2DWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_auto_step", "auto_setp"), &Box2DWorld::set_auto_step);
 	ClassDB::bind_method(D_METHOD("get_auto_step"), &Box2DWorld::get_auto_step);
 
+	// TODO should default collision_mask really be 0x7FFFFFFF? This is copied from Godot physics API
 	ClassDB::bind_method(D_METHOD("intersect_point", "point", "max_results", "exclude", "collision_layer", "collide_with_bodies", "collide_with_sensors"), &Box2DWorld::intersect_point, DEFVAL(32), DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false));
-	//ClassDB::bind_method(D_METHOD("intersect_ray", "from", "to", "exclude", "collision_layer", "collide_with_bodies", "collide_with_sensors"), &Box2DWorld::intersect_ray, DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("intersect_ray", "from", "to", "exclude", "collision_layer", "collide_with_bodies", "collide_with_sensors"), &Box2DWorld::intersect_ray, DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("intersect_shape", "query", "max_results"), &Box2DWorld::intersect_shape, DEFVAL(32));
 	//ClassDB::bind_method(D_METHOD("cast_motion", "query"), &Box2DWorld::cast_motion);
 
@@ -655,6 +656,37 @@ Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, con
 	return arr;
 }
 
+Dictionary Box2DWorld::intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Vector<int64_t> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_sensors) {
+	ray_callback.result.fixture = NULL;
+
+	ray_callback.exclude.clear();
+	for (int i = 0; i < p_exclude.size(); i++) {
+		Object *obj = ObjectDB::get_instance(ObjectID(p_exclude[i]));
+		Box2DPhysicsBody *node = Object::cast_to<Box2DPhysicsBody>(obj);
+		if (node)
+			ray_callback.exclude.insert(node);
+	}
+
+	ray_callback.collision_mask = p_collision_mask;
+	ray_callback.collide_with_bodies = p_collide_with_bodies;
+	ray_callback.collide_with_sensors = p_collide_with_sensors;
+
+	// TODO resolve possible bug introduction
+	// Does b2 RayCast behave differently than Godot space query raycast?
+	// Box2D does not report bodies that the ray starts inside. Does godot do the same?
+	// This can easily be fixed by adding an intersect_point check at p_from
+	world->RayCast(&ray_callback, gd_to_b2(p_from), gd_to_b2(p_to)); // TODO this does not account for world node translation
+
+	Dictionary dict;
+	if (ray_callback.result.fixture != NULL) {
+		dict["fixture"] = ray_callback.result.fixture->GetUserData().owner;
+		dict["position"] = b2_to_gd(ray_callback.result.point); // TODO this does not account for world node translation
+		dict["normal"] = b2_to_gd(ray_callback.result.normal);
+	}
+	
+	return dict;
+}
+
 Array Box2DWorld::intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results) {
 	shape_callback.results.clear();
 	shape_callback.params = p_query;
@@ -739,62 +771,12 @@ Box2DWorld::~Box2DWorld() {
 	}
 }
 
-bool Box2DWorld::ShapeQueryCallback::ReportFixture(b2Fixture *fixture) {
-	// Check sensor flags
-	if (!(params->collide_with_sensors && fixture->IsSensor()) && !(params->collide_with_bodies && !fixture->IsSensor()))
-		return true;
-
-	// Check intersection
-	bool overlap = false;
-
-	Vector<const b2Shape *> query_b2shapes = params->shape_ref->get_shapes();
-	const b2Shape *fixture_b2shape = fixture->GetShape();
-	for (int index_A = 0; index_A < fixture_b2shape->GetChildCount(); ++index_A) {
-		for (int i = 0; i < query_b2shapes.size(); ++i) {
-			const b2Shape *query_b2shape = query_b2shapes[i];
-
-			for (int index_B = 0; index_B < query_b2shape->GetChildCount(); ++index_B) {
-				overlap = b2TestOverlap(fixture_b2shape, index_A, query_b2shape, index_B, fixture->GetBody()->GetTransform(), gd_to_b2(params->transform));
-				if (overlap)
-					goto endloop;
-			}
-		}
-	}
-endloop:
-
-	if (!overlap)
-		return true;
-
-	// Check filter
-	bool filtered = false;
-	const b2Filter filter = fixture->GetFilterData();
-	//if (filter.groupIndex == groupIndex && filter.groupIndex != 0) {
-	//	filtered = filterA.groupIndex < 0;
-	//}
-
-	filtered |= (filter.categoryBits & params->collision_mask) == 0;
-
-	if (filtered)
-		return true;
-
-	// Check exclusion
-	if (params->exclude.find(fixture->GetBody()->GetUserData().owner) > 0)
-		return true;
-
-	// Valid. Add to results
-	results.insert(fixture->GetUserData().owner);
-	return results.size() < max_results;
-}
-
-bool Box2DWorld::PointQueryCallback::ReportFixture(b2Fixture *fixture) {
+// Are file-scoped inline functions (for duplicate code) good practice for code cleanliness?
+inline bool _query_should_ignore_fixture(b2Fixture *fixture, const bool collide_with_sensors, const bool collide_with_bodies, const uint32_t collision_mask, const Set<Box2DPhysicsBody*>& exclude) {
 	// Check sensor flags
 	if (!(collide_with_sensors && fixture->IsSensor()) && !(collide_with_bodies && !fixture->IsSensor()))
 		return true;
 
-	// Check intersection
-	if (!fixture->TestPoint(point))
-		return true;
-	
 	// Check filter
 	bool filtered = false;
 	const b2Filter filter = fixture->GetFilterData();
@@ -806,12 +788,71 @@ bool Box2DWorld::PointQueryCallback::ReportFixture(b2Fixture *fixture) {
 
 	if (filtered)
 		return true;
-	
+
 	// Check exclusion
 	if (exclude.find(fixture->GetBody()->GetUserData().owner) > 0)
 		return true;
-	
-	// Valid. Add to results
+
+	// This fixture should not be filtered
+	return false;
+}
+
+bool Box2DWorld::PointQueryCallback::ReportFixture(b2Fixture *fixture) {
+	if (_query_should_ignore_fixture(fixture, collide_with_sensors, collide_with_bodies, collision_mask, exclude))
+		return true;
+
+	// Check intersection
+	if (!fixture->TestPoint(point))
+		return true;
+
+	// Add to results
+	results.insert(fixture->GetUserData().owner);
+	return results.size() < max_results;
+}
+
+float Box2DWorld::RaycastQueryCallback::ReportFixture(b2Fixture *fixture, const b2Vec2 &point, const b2Vec2 &normal, float fraction) {
+	if (_query_should_ignore_fixture(fixture, collide_with_sensors, collide_with_bodies, collision_mask, exclude))
+		return -1;
+
+	// Record result
+	result.fixture = fixture;
+	result.point = point;
+	result.normal = normal;
+
+	// Keep clipping ray until we get the closest fixture
+	return fraction;
+}
+
+bool Box2DWorld::ShapeQueryCallback::ReportFixture(b2Fixture *fixture) {
+	if (_query_should_ignore_fixture(fixture, params->collide_with_sensors, params->collide_with_bodies, params->collision_mask, params->exclude))
+		return true;
+
+	// Check intersection
+	bool overlaps = false;
+
+	Vector<const b2Shape *> query_b2shapes = params->shape_ref->get_shapes();
+
+	const b2Shape *fixture_b2shape = fixture->GetShape();
+	for (int index_A = 0; index_A < fixture_b2shape->GetChildCount(); ++index_A) {
+
+		for (int i = 0; i < query_b2shapes.size(); ++i) {
+
+			const b2Shape *query_b2shape = query_b2shapes[i];
+			for (int index_B = 0; index_B < query_b2shape->GetChildCount(); ++index_B) {
+
+				if (b2TestOverlap(fixture_b2shape, index_A, query_b2shape, index_B, fixture->GetBody()->GetTransform(), gd_to_b2(params->transform))) {
+					overlaps = true;
+					goto endloop;
+				}
+			}
+		}
+	}
+endloop:
+
+	if (!overlaps)
+		return true;
+
+	// Add to results
 	results.insert(fixture->GetUserData().owner);
 	return results.size() < max_results;
 }

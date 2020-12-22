@@ -160,19 +160,9 @@ private:
 		}
 	};
 
-	class ShapeQueryCallback : public b2QueryCallback {
-	public:
-		Set<Box2DFixture *> results; // Use a set so composite fixtures don't double-count towards max_results
-
-		Ref<Box2DShapeQueryParameters> params;
-		int max_results;
-
-		virtual bool ReportFixture(b2Fixture *fixture) override;
-	};
-
 	class PointQueryCallback : public b2QueryCallback {
 	public:
-		Set<Box2DFixture *> results;
+		Set<Box2DFixture *> results; // Use a set so composite fixtures don't double-count towards max_results
 
 		b2Vec2 point;
 		int max_results;
@@ -183,6 +173,36 @@ private:
 		bool collide_with_sensors;
 
 		virtual bool ReportFixture(b2Fixture *fixture) override;
+	};
+
+	class ShapeQueryCallback : public b2QueryCallback {
+	public:
+		Set<Box2DFixture *> results;
+
+		Ref<Box2DShapeQueryParameters> params;
+		int max_results;
+
+		virtual bool ReportFixture(b2Fixture *fixture) override;
+	};
+
+	class RaycastQueryCallback : public b2RayCastCallback {
+	public:
+		struct Result {
+			b2Fixture *fixture = NULL;
+			b2Vec2 point;
+			b2Vec2 normal;
+			// float fraction;
+		};
+
+		Result result;
+
+		Set<Box2DPhysicsBody *> exclude;
+		uint32_t collision_mask;
+		// TODO include other b2Filter properties?
+		bool collide_with_bodies;
+		bool collide_with_sensors;
+
+		virtual float ReportFixture(b2Fixture *fixture, const b2Vec2 &point, const b2Vec2 &normal, float fraction) override;
 	};
 
 private:
@@ -218,8 +238,9 @@ private:
 	/// Note: this is only called for contacts that are touching, solid, and awake.
 	virtual void PostSolve(b2Contact *contact, const b2ContactImpulse *impulse) override;
 
-	ShapeQueryCallback shape_callback;
 	PointQueryCallback point_callback;
+	RaycastQueryCallback ray_callback;
+	ShapeQueryCallback shape_callback;
 
 	void create_b2World();
 	void destroy_b2World();
@@ -247,9 +268,10 @@ public:
 
 	// Godot space query API
 	//Array cast_motion(const Ref<Box2DShapeQueryParameters> &p_query);
+	// What is collide_shape? Does this return manifold points?
 	//Array collide_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
 	Array intersect_point(const Vector2 &p_point, int p_max_results = 32, const Vector<int64_t> &p_exclude = Vector<int64_t>(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false);
-	//Dictionary intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Vector<int64_t> &p_exclude = Vector<int64_t>(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false);
+	Dictionary intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Vector<int64_t> &p_exclude = Vector<int64_t>(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false);
 	Array intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
 
 	// Box2D space query API
