@@ -188,7 +188,7 @@ private:
 private:
 	Vector2 gravity;
 	bool auto_step{true};
-	b2World *world;
+	b2World *world = NULL;
 
 	std::list<GodotSignalCaller> collision_callback_queue{};
 
