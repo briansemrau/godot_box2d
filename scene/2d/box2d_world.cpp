@@ -35,8 +35,14 @@ void Box2DShapeQueryParameters::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_motion_local_center", "local_center"), &Box2DShapeQueryParameters::set_motion_local_center);
 	ClassDB::bind_method(D_METHOD("get_motion_local_center"), &Box2DShapeQueryParameters::get_motion_local_center);
 
-	ClassDB::bind_method(D_METHOD("set_collision_layer", "collision_layer"), &Box2DShapeQueryParameters::set_collision_mask);
-	ClassDB::bind_method(D_METHOD("get_collision_layer"), &Box2DShapeQueryParameters::get_collision_mask);
+	ClassDB::bind_method(D_METHOD("set_collision_layer", "collision_layer"), &Box2DShapeQueryParameters::set_collision_layer);
+	ClassDB::bind_method(D_METHOD("get_collision_layer"), &Box2DShapeQueryParameters::get_collision_layer);
+
+	ClassDB::bind_method(D_METHOD("set_collision_mask", "collision_mask"), &Box2DShapeQueryParameters::set_collision_mask);
+	ClassDB::bind_method(D_METHOD("get_collision_mask"), &Box2DShapeQueryParameters::get_collision_mask);
+
+	ClassDB::bind_method(D_METHOD("set_group_index", "group_index"), &Box2DShapeQueryParameters::set_group_index);
+	ClassDB::bind_method(D_METHOD("get_group_index"), &Box2DShapeQueryParameters::get_group_index);
 
 	ClassDB::bind_method(D_METHOD("set_exclude", "exclude"), &Box2DShapeQueryParameters::set_exclude);
 	ClassDB::bind_method(D_METHOD("get_exclude"), &Box2DShapeQueryParameters::get_exclude);
@@ -48,6 +54,8 @@ void Box2DShapeQueryParameters::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_collide_with_sensors_enabled"), &Box2DShapeQueryParameters::is_collide_with_sensors_enabled);
 
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_layer", "get_collision_layer");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_mask", "get_collision_mask");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "group_index"), "set_group_index", "get_group_index");
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "exclude", PROPERTY_HINT_NONE, itos(Variant::INT) + ":"), "set_exclude", "get_exclude");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "motion"), "set_motion", "get_motion");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "motion_rotation"), "set_motion_rotation", "get_motion_rotation");
@@ -57,6 +65,14 @@ void Box2DShapeQueryParameters::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::TRANSFORM2D, "transform"), "set_transform", "get_transform");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collide_with_bodies"), "set_collide_with_bodies", "is_collide_with_bodies_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collide_with_sensors"), "set_collide_with_sensors", "is_collide_with_sensors_enabled");
+}
+
+const b2Filter &Box2DShapeQueryParameters::_get_filter() const {
+	return filter;
+}
+
+Set<Box2DPhysicsBody *> Box2DShapeQueryParameters::_get_exclude() const {
+	return exclude;
 }
 
 void Box2DShapeQueryParameters::set_shape(const RES &p_shape_ref) {
@@ -111,12 +127,28 @@ Vector2 Box2DShapeQueryParameters::get_motion_local_center() const {
 	return local_center;
 }
 
+void Box2DShapeQueryParameters::set_collision_layer(int p_layer) {
+	filter.categoryBits = p_layer;
+}
+
+int Box2DShapeQueryParameters::get_collision_layer() const {
+	return filter.categoryBits;
+}
+
 void Box2DShapeQueryParameters::set_collision_mask(int p_collision_mask) {
-	collision_mask = p_collision_mask;
+	filter.maskBits = p_collision_mask;
 }
 
 int Box2DShapeQueryParameters::get_collision_mask() const {
-	return collision_mask;
+	return filter.maskBits;
+}
+
+void Box2DShapeQueryParameters::set_group_index(int p_group_index) {
+	filter.groupIndex = p_group_index;
+}
+
+int Box2DShapeQueryParameters::get_group_index() const {
+	return filter.groupIndex;
 }
 
 void Box2DShapeQueryParameters::set_exclude(const Vector<int64_t> &p_exclude) {
@@ -137,10 +169,6 @@ Vector<int64_t> Box2DShapeQueryParameters::get_exclude() const {
 		ret.write[idx] = int64_t(E->get()->get_instance_id());
 	}
 	return ret;
-}
-
-Set<Box2DPhysicsBody *> Box2DShapeQueryParameters::_get_exclude() const {
-	return exclude;
 }
 
 void Box2DShapeQueryParameters::set_collide_with_bodies(bool p_enable) {
@@ -591,8 +619,8 @@ void Box2DWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_auto_step"), &Box2DWorld::get_auto_step);
 
 	// TODO should default collision_mask really be 0x7FFFFFFF? This is copied from Godot physics API
-	ClassDB::bind_method(D_METHOD("intersect_point", "point", "max_results", "exclude", "collision_layer", "collide_with_bodies", "collide_with_sensors"), &Box2DWorld::intersect_point, DEFVAL(32), DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("intersect_ray", "from", "to", "exclude", "collision_layer", "collide_with_bodies", "collide_with_sensors"), &Box2DWorld::intersect_ray, DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("intersect_point", "point", "max_results", "exclude", "collision_mask", "collide_with_bodies", "collide_with_sensors", "collision_layer", "group"), &Box2DWorld::intersect_point, DEFVAL(32), DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false), DEFVAL(0x0), DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("intersect_ray", "from", "to", "exclude", "collision_mask", "collide_with_bodies", "collide_with_sensors", "collision_layer", "group"), &Box2DWorld::intersect_ray, DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false), DEFVAL(0x0), DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("intersect_shape", "query", "max_results"), &Box2DWorld::intersect_shape, DEFVAL(32));
 	ClassDB::bind_method(D_METHOD("cast_motion", "query"), &Box2DWorld::cast_motion);
 	//ClassDB::bind_method(D_METHOD("collide_shape", "shape", "max_results"), &PhysicsDirectSpaceState2D::_collide_shape, DEFVAL(32));
@@ -659,7 +687,7 @@ bool Box2DWorld::get_auto_step() const {
 	return auto_step;
 }
 
-Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, const Vector<int64_t> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_sensors) {
+Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, const Vector<int64_t> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_sensors, uint32_t p_collision_layer, int32_t p_group_index) {
 	point_callback.results.clear();
 	point_callback.point = gd_to_b2(p_point); // TODO this does not account for world node translation
 	point_callback.max_results = p_max_results;
@@ -672,7 +700,9 @@ Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, con
 			point_callback.exclude.insert(node);
 	}
 
-	point_callback.collision_mask = p_collision_mask;
+	point_callback.filter.maskBits = p_collision_mask;
+	point_callback.filter.categoryBits = p_collision_layer;
+	point_callback.filter.groupIndex = p_group_index;
 	point_callback.collide_with_bodies = p_collide_with_bodies;
 	point_callback.collide_with_sensors = p_collide_with_sensors;
 
@@ -702,7 +732,7 @@ Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, con
 	return arr;
 }
 
-Dictionary Box2DWorld::intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Vector<int64_t> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_sensors) {
+Dictionary Box2DWorld::intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Vector<int64_t> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_sensors, uint32_t p_collision_layer, int32_t p_group_index) {
 	ray_callback.result.fixture = NULL;
 
 	ray_callback.exclude.clear();
@@ -713,7 +743,9 @@ Dictionary Box2DWorld::intersect_ray(const Vector2 &p_from, const Vector2 &p_to,
 			ray_callback.exclude.insert(node);
 	}
 
-	ray_callback.collision_mask = p_collision_mask;
+	ray_callback.filter.maskBits = p_collision_mask;
+	ray_callback.filter.categoryBits = p_collision_layer;
+	ray_callback.filter.groupIndex = p_group_index;
 	ray_callback.collide_with_bodies = p_collide_with_bodies;
 	ray_callback.collide_with_sensors = p_collide_with_sensors;
 
@@ -782,19 +814,19 @@ Array Box2DWorld::intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query,
 }
 
 // Are file-scoped inline functions (for duplicate code) good practice for code cleanliness?
-inline bool _query_should_ignore_fixture(b2Fixture *fixture, const bool collide_with_sensors, const bool collide_with_bodies, const uint32_t collision_mask, const Set<Box2DPhysicsBody *> &exclude) {
+inline bool _query_should_ignore_fixture(b2Fixture *fixture, const bool collide_with_sensors, const bool collide_with_bodies, const b2Filter &filter, const Set<Box2DPhysicsBody *> &exclude) {
 	// Check sensor flags
 	if (!(collide_with_sensors && fixture->IsSensor()) && !(collide_with_bodies && !fixture->IsSensor()))
 		return true;
 
 	// Check filter
 	bool filtered = false;
-	const b2Filter filter = fixture->GetFilterData();
-	//if (filter.groupIndex == groupIndex && filter.groupIndex != 0) {
-	//	filtered = filterA.groupIndex < 0;
-	//}
+	const b2Filter filterB = fixture->GetFilterData();
+	if (filterB.groupIndex == filter.groupIndex && filterB.groupIndex != 0) {
+		filtered = filter.groupIndex < 0;
+	}
 
-	filtered |= (filter.categoryBits & collision_mask) == 0;
+	filtered |= (filterB.categoryBits & filter.maskBits) == 0 && (filter.categoryBits & filterB.maskBits) == 0;
 
 	if (filtered)
 		return true;
@@ -815,7 +847,7 @@ struct CastQueryWrapper {
 	bool QueryCallback(int32 proxyId) {
 		b2FixtureProxy *proxy = (b2FixtureProxy *)broadPhase->GetUserData(proxyId);
 
-		if (_query_should_ignore_fixture(proxy->fixture, params->is_collide_with_sensors_enabled(), params->is_collide_with_bodies_enabled(), params->get_collision_mask(), params->_get_exclude()))
+		if (_query_should_ignore_fixture(proxy->fixture, params->is_collide_with_sensors_enabled(), params->is_collide_with_bodies_enabled(), params->_get_filter(), params->_get_exclude()))
 			return true;
 
 		// There could be some optimization here for cast_motion.
@@ -882,7 +914,7 @@ Array Box2DWorld::cast_motion(const Ref<Box2DShapeQueryParameters> &p_query) {
 	input.sweepA.a0 = xform_t0.q.GetAngle();
 	input.sweepA.a = xform_t1.q.GetAngle();
 	input.sweepA.alpha0 = 0.0f;
-	
+
 	b2TOIOutput min_output;
 	min_output.state = b2TOIOutput::e_unknown;
 	min_output.t = input.tMax;
@@ -989,7 +1021,7 @@ Box2DWorld::~Box2DWorld() {
 }
 
 bool Box2DWorld::PointQueryCallback::ReportFixture(b2Fixture *fixture) {
-	if (_query_should_ignore_fixture(fixture, collide_with_sensors, collide_with_bodies, collision_mask, exclude))
+	if (_query_should_ignore_fixture(fixture, collide_with_sensors, collide_with_bodies, filter, exclude))
 		return true;
 
 	// Check intersection
@@ -1002,7 +1034,7 @@ bool Box2DWorld::PointQueryCallback::ReportFixture(b2Fixture *fixture) {
 }
 
 float Box2DWorld::RaycastQueryCallback::ReportFixture(b2Fixture *fixture, const b2Vec2 &point, const b2Vec2 &normal, float fraction) {
-	if (_query_should_ignore_fixture(fixture, collide_with_sensors, collide_with_bodies, collision_mask, exclude))
+	if (_query_should_ignore_fixture(fixture, collide_with_sensors, collide_with_bodies, filter, exclude))
 		return -1;
 
 	// Record result
@@ -1016,7 +1048,7 @@ float Box2DWorld::RaycastQueryCallback::ReportFixture(b2Fixture *fixture, const 
 }
 
 bool Box2DWorld::ShapeQueryCallback::ReportFixture(b2Fixture *fixture) {
-	if (_query_should_ignore_fixture(fixture, params->collide_with_sensors, params->collide_with_bodies, params->collision_mask, params->exclude))
+	if (_query_should_ignore_fixture(fixture, params->collide_with_sensors, params->collide_with_bodies, params->filter, params->exclude))
 		return true;
 
 	// Check intersection
