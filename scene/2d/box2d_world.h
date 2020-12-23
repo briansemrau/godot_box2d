@@ -222,6 +222,20 @@ private:
 		virtual float ReportFixture(b2Fixture *fixture, const b2Vec2 &point, const b2Vec2 &normal, float fraction) override;
 	};
 
+	class UserAABBQueryCallback : public b2QueryCallback {
+	public:
+		const Callable *callback = NULL;
+
+		virtual bool ReportFixture(b2Fixture *fixture) override;
+	};
+
+	class UserRaycastQueryCallback : public b2RayCastCallback {
+	public:
+		const Callable *callback = NULL;
+
+		virtual float ReportFixture(b2Fixture *fixture, const b2Vec2 &point, const b2Vec2 &normal, float fraction) override;
+	};
+
 private:
 	Vector2 gravity;
 	bool auto_step{true};
@@ -259,6 +273,9 @@ private:
 	RaycastQueryCallback ray_callback;
 	ShapeQueryCallback shape_callback;
 
+	UserAABBQueryCallback user_query_callback;
+	UserRaycastQueryCallback user_raycast_callback;
+
 	void create_b2World();
 	void destroy_b2World();
 
@@ -292,8 +309,8 @@ public:
 	Array cast_motion(const Ref<Box2DShapeQueryParameters> &p_query);
 
 	// Box2D space query API
-	//Array query_aabb(const Rect2 &p_bounds); // TODO add more parameters like Physics2DDirectSpaceState::_intersect_point
-	//Array raycast(); // Handled by Godot API
+	void query_aabb(const Rect2 &p_aabb, const Callable &p_callback);
+	void raycast(const Vector2 &p_from, const Vector2 &p_to, const Callable &p_callback);
 
 	Box2DWorld();
 	~Box2DWorld();

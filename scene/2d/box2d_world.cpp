@@ -595,8 +595,10 @@ void Box2DWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("intersect_ray", "from", "to", "exclude", "collision_layer", "collide_with_bodies", "collide_with_sensors"), &Box2DWorld::intersect_ray, DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("intersect_shape", "query", "max_results"), &Box2DWorld::intersect_shape, DEFVAL(32));
 	ClassDB::bind_method(D_METHOD("cast_motion", "query"), &Box2DWorld::cast_motion);
-
 	//ClassDB::bind_method(D_METHOD("collide_shape", "shape", "max_results"), &PhysicsDirectSpaceState2D::_collide_shape, DEFVAL(32));
+
+	ClassDB::bind_method(D_METHOD("query_aabb", "aabb", "callback"), &Box2DWorld::query_aabb);
+	ClassDB::bind_method(D_METHOD("raycast", "from", "to", "callback"), &Box2DWorld::raycast);
 
 	ClassDB::bind_method(D_METHOD("step", "delta"), &Box2DWorld::step);
 
@@ -917,7 +919,7 @@ Array Box2DWorld::cast_motion(const Ref<Box2DShapeQueryParameters> &p_query) {
 					b2TimeOfImpact(&output, &input);
 
 					switch (output.state) {
-						case b2TOIOutput::State::e_failed: // TODO failed gives a result, but do we always want it?
+						case b2TOIOutput::State::e_failed: // failed still gives a result, it just doesn't guarantee accuracy
 						case b2TOIOutput::State::e_overlapped:
 						case b2TOIOutput::State::e_touching: {
 							if (output.t < min_output.t) {
@@ -961,6 +963,16 @@ Array Box2DWorld::cast_motion(const Ref<Box2DShapeQueryParameters> &p_query) {
 //
 //	return arr;
 //}
+
+void Box2DWorld::query_aabb(const Rect2 &p_bounds, const Callable &p_callback) {
+	user_query_callback.callback = &p_callback;
+	world->QueryAABB(&user_query_callback, gd_to_b2(p_bounds)); // TODO this does not account for world node translation
+}
+
+void Box2DWorld::raycast(const Vector2 &p_from, const Vector2 &p_to, const Callable &p_callback) {
+	user_raycast_callback.callback = &p_callback;
+	world->RayCast(&user_raycast_callback, gd_to_b2(p_from), gd_to_b2(p_to)); // TODO this does not account for world node translation
+}
 
 Box2DWorld::Box2DWorld() {
 	gravity = GLOBAL_GET("physics/2d/default_gravity_vector");
@@ -1035,4 +1047,46 @@ endloop:
 	// Add to results
 	results.insert(fixture->GetUserData().owner);
 	return results.size() < max_results;
+}
+
+bool Box2DWorld::UserAABBQueryCallback::ReportFixture(b2Fixture *fixture) {
+	const int argcount = 1;
+	Variant args[argcount] = {
+		// TODO what arguments do we give? Box2DFixture? Maybe AABB too?
+		// hard to tell because of composite fixtures
+		// If we return Box2DFixture, the query may report the same fixture several times.
+		Variant(fixture->GetUserData().owner)
+	};
+	Variant ret;
+	Callable::CallError ce;
+	callback->call((const Variant **)&args, argcount, ret, ce);
+
+	if (ce.error != Callable::CallError::CALL_OK) {
+		String err = Variant::get_callable_error_text(*callback, (const Variant **)&args, argcount, ce);
+		ERR_PRINT("Error calling function from query_aabb: " + err);
+		return false;
+	}
+
+	return bool(ret);
+}
+
+float Box2DWorld::UserRaycastQueryCallback::ReportFixture(b2Fixture *fixture, const b2Vec2 &point, const b2Vec2 &normal, float fraction) {
+	const int argcount = 4;
+	Variant args[argcount] = {
+		Variant(fixture->GetUserData().owner), // TODO see comment above
+		Variant(b2_to_gd(point)),
+		Variant(Vector2(normal.x, normal.y)),
+		Variant(fraction)
+	};
+	Variant ret;
+	Callable::CallError ce;
+	callback->call((const Variant **)&args, argcount, ret, ce);
+
+	if (ce.error != Callable::CallError::CALL_OK) {
+		String err = Variant::get_callable_error_text(*callback, (const Variant **)&args, argcount, ce);
+		ERR_PRINT("Error calling function from raycast: " + err);
+		return false;
+	}
+
+	return float(ret);
 }
