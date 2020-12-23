@@ -1083,11 +1083,12 @@ endloop:
 
 bool Box2DWorld::UserAABBQueryCallback::ReportFixture(b2Fixture *fixture) {
 	const int argcount = 1;
-	Variant args[argcount] = {
+	Variant arg0 = Variant(fixture->GetUserData().owner);
+	Variant *args[argcount] = {
 		// TODO what arguments do we give? Box2DFixture? Maybe AABB too?
 		// hard to tell because of composite fixtures
 		// If we return Box2DFixture, the query may report the same fixture several times.
-		Variant(fixture->GetUserData().owner)
+		&arg0
 	};
 	Variant ret;
 	Callable::CallError ce;
@@ -1099,16 +1100,25 @@ bool Box2DWorld::UserAABBQueryCallback::ReportFixture(b2Fixture *fixture) {
 		return false;
 	}
 
-	return bool(ret);
+	if (ret.get_type() == Variant::Type::BOOL) {
+		return bool(ret);
+	} else {
+		ERR_PRINT("Error returning from query_aabb callback: Wrong return type. Was expecting bool but instead got " + ret.get_type_name(ret.get_type()) + ".");
+		return false;
+	}
 }
 
 float Box2DWorld::UserRaycastQueryCallback::ReportFixture(b2Fixture *fixture, const b2Vec2 &point, const b2Vec2 &normal, float fraction) {
 	const int argcount = 4;
-	Variant args[argcount] = {
-		Variant(fixture->GetUserData().owner), // TODO see comment above
-		Variant(b2_to_gd(point)),
-		Variant(Vector2(normal.x, normal.y)),
-		Variant(fraction)
+	Variant arg0 = Variant(fixture->GetUserData().owner); // TODO see comment above
+	Variant arg1 = Variant(b2_to_gd(point));
+	Variant arg2 = Variant(Vector2(normal.x, normal.y));
+	Variant arg3 = Variant(fraction);
+	Variant *args[argcount] = {
+		&arg0,
+		&arg1,
+		&arg2,
+		&arg3
 	};
 	Variant ret;
 	Callable::CallError ce;
@@ -1120,5 +1130,10 @@ float Box2DWorld::UserRaycastQueryCallback::ReportFixture(b2Fixture *fixture, co
 		return false;
 	}
 
-	return float(ret);
+	if (ret.get_type() == Variant::Type::FLOAT) {
+		return float(ret);
+	} else {
+		ERR_PRINT("Error returning from raycast callback: Wrong return type. Was expecting float but instead got " + ret.get_type_name(ret.get_type()) + ".");
+		return false;
+	}
 }
