@@ -812,7 +812,9 @@ struct CastQueryWrapper {
 
 	bool QueryCallback(int32 proxyId) {
 		b2FixtureProxy *proxy = (b2FixtureProxy *)broadPhase->GetUserData(proxyId);
+
 		if (_query_should_ignore_fixture(proxy->fixture, params->is_collide_with_sensors_enabled(), params->is_collide_with_bodies_enabled(), params->get_collision_mask(), params->_get_exclude()))
+			return true;
 
 		// There could be some optimization here for cast_motion.
 		// We could compute TOI here and store the minimum fraction of motion [0, 1].
