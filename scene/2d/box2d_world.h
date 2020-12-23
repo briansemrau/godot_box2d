@@ -17,6 +17,7 @@
 #include "../../util/box2d_types_converter.h"
 
 #include <list>
+#include <unordered_set>
 
 /**
 * @author Brian Semrau
@@ -214,7 +215,7 @@ private:
 			b2Fixture *fixture = NULL;
 			b2Vec2 point;
 			b2Vec2 normal;
-			// float fraction;
+			// float fraction; // TODO maybe we'll want this
 		};
 
 		Result result;
@@ -229,6 +230,7 @@ private:
 
 	class UserAABBQueryCallback : public b2QueryCallback {
 	public:
+		std::unordered_set<const Box2DFixture *> handled_fixtures;
 		const Callable *callback = NULL;
 
 		virtual bool ReportFixture(b2Fixture *fixture) override;
@@ -236,6 +238,7 @@ private:
 
 	class UserRaycastQueryCallback : public b2RayCastCallback {
 	public:
+		std::unordered_set<const Box2DFixture *> handled_fixtures;
 		const Callable *callback = NULL;
 
 		virtual float ReportFixture(b2Fixture *fixture, const b2Vec2 &point, const b2Vec2 &normal, float fraction) override;

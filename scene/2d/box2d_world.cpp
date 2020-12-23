@@ -292,8 +292,8 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 	const bool monitoringB = fnode_b->body_node->is_contact_monitor_enabled();
 
 	// Deliver signals to bodies with monitoring enabled
-	// Only emit body_entered once per body. Begin/EndContact are called for each *fixture*.
-	// Similar case for fixtures. One Box2DFixture may have several b2Fixtures.
+	// Only emit body_entered once per body. Begin/EndContact are called for each b2Fixture.
+	// Similar case for Box2DFixture nodes. One Box2DFixture may have several b2Fixtures.
 	if (monitoringA) {
 		int *body_count_ptr = body_a->contact_monitor->entered_objects.getptr(body_b->get_instance_id());
 		if (!body_count_ptr) {
@@ -688,8 +688,10 @@ bool Box2DWorld::get_auto_step() const {
 }
 
 Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, const Vector<int64_t> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_sensors, uint32_t p_collision_layer, int32_t p_group_index) {
+	// This function uses queries in Box2DWorld-local space, not global space
+
 	point_callback.results.clear();
-	point_callback.point = gd_to_b2(p_point); // TODO this does not account for world node translation
+	point_callback.point = gd_to_b2(p_point);
 	point_callback.max_results = p_max_results;
 
 	point_callback.exclude.clear();
@@ -730,6 +732,8 @@ Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, con
 }
 
 Dictionary Box2DWorld::intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Vector<int64_t> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_sensors, uint32_t p_collision_layer, int32_t p_group_index) {
+	// This function uses queries in Box2DWorld-local space, not global space
+
 	ray_callback.result.fixture = NULL;
 
 	ray_callback.exclude.clear();
@@ -750,12 +754,12 @@ Dictionary Box2DWorld::intersect_ray(const Vector2 &p_from, const Vector2 &p_to,
 	// Does b2 RayCast behave differently than Godot space query raycast?
 	// Box2D does not report bodies that the ray starts inside. Does godot do the same?
 	// This can easily be fixed by adding an intersect_point check at p_from
-	world->RayCast(&ray_callback, gd_to_b2(p_from), gd_to_b2(p_to)); // TODO this does not account for world node translation
+	world->RayCast(&ray_callback, gd_to_b2(p_from), gd_to_b2(p_to));
 
 	Dictionary dict;
 	if (ray_callback.result.fixture != NULL) {
 		dict["fixture"] = ray_callback.result.fixture->GetUserData().owner;
-		dict["position"] = b2_to_gd(ray_callback.result.point); // TODO this does not account for world node translation
+		dict["position"] = b2_to_gd(ray_callback.result.point);
 		dict["normal"] = b2_to_gd(ray_callback.result.normal);
 	}
 
@@ -763,6 +767,8 @@ Dictionary Box2DWorld::intersect_ray(const Vector2 &p_from, const Vector2 &p_to,
 }
 
 Array Box2DWorld::intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results) {
+	// This function uses queries in Box2DWorld-local space, not global space
+
 	shape_callback.results.clear();
 	shape_callback.params = p_query;
 	shape_callback.max_results = p_max_results;
@@ -776,7 +782,7 @@ Array Box2DWorld::intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query,
 			const b2Shape *b2shape = b2shapes[i];
 			for (int j = 0; j < b2shape->GetChildCount(); ++j) {
 				b2AABB child_aabb;
-				b2shape->ComputeAABB(&child_aabb, gd_to_b2(p_query->transform), j); // TODO this does not account for world node translation
+				b2shape->ComputeAABB(&child_aabb, gd_to_b2(p_query->transform), j);
 				aabb.Combine(child_aabb);
 			}
 		}
@@ -784,7 +790,7 @@ Array Box2DWorld::intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query,
 		const b2Shape *b2shape = shape->get_shape();
 		for (int i = 0; i < b2shape->GetChildCount(); ++i) {
 			b2AABB child_aabb;
-			b2shape->ComputeAABB(&child_aabb, gd_to_b2(p_query->transform), i); // TODO this does not account for world node translation
+			b2shape->ComputeAABB(&child_aabb, gd_to_b2(p_query->transform), i);
 			aabb.Combine(child_aabb);
 		}
 	}
@@ -817,6 +823,7 @@ inline bool _query_should_ignore_fixture(b2Fixture *fixture, const bool collide_
 		return true;
 
 	// Check filter
+	// TODO move this to a separate function for maintainability. This logic is duplicated from Box2DWorld::ShouldCollide
 	bool filtered = false;
 	const b2Filter filterB = fixture->GetFilterData();
 	if (filterB.groupIndex == filter.groupIndex && filterB.groupIndex != 0) {
@@ -847,10 +854,16 @@ struct CastQueryWrapper {
 		if (_query_should_ignore_fixture(proxy->fixture, params->is_collide_with_sensors_enabled(), params->is_collide_with_bodies_enabled(), params->_get_filter(), params->_get_exclude()))
 			return true;
 
-		// There could be some optimization here for cast_motion.
+		// There could be some optimization here for cast_motion in cases of large motion vectors.
 		// We could compute TOI here and store the minimum fraction of motion [0, 1].
 		// Using that fraction, we can discard results immediately by calculating the projected
 		// distance between AABB_queryt0 and AABB_callback. If the distance > min_fraction, discard.
+
+		// There is also potential optimization in the case of a large diagonal motion vector.
+		// We can filter AABBs in the irrelevant corners of the enlarged query AABB.
+		// First, measure the bounds of the query AABB tangent projection on the motion vector line.
+		// Then measure the closest point of each callback AABB to the motion vector line (tangential projection).
+		// If the measured distance is outside of our query shape bounds in tangent space, we can discard it.
 
 		results.append(proxy);
 
@@ -861,6 +874,8 @@ struct CastQueryWrapper {
 };
 
 Array Box2DWorld::cast_motion(const Ref<Box2DShapeQueryParameters> &p_query) {
+	// This function uses queries in Box2DWorld-local space, not global space
+
 	// Godot cast_motion does a binary search collision test
 	// It returns two values that it defines as:
 	//     the point before collision is triggered
@@ -899,7 +914,7 @@ Array Box2DWorld::cast_motion(const Ref<Box2DShapeQueryParameters> &p_query) {
 
 	world->GetContactManager().m_broadPhase.Query(&wrapper, query_aabb);
 
-	// Search for most immediate TOI
+	// Calculate TOIs and select the closest one
 	b2TOIInput input;
 	// if predict_other_body_motion:
 	//     input.tMax = motion_timedelta_for_prediction (i think)
@@ -971,36 +986,18 @@ Array Box2DWorld::cast_motion(const Ref<Box2DShapeQueryParameters> &p_query) {
 	return ret;
 }
 
-//Array Box2DWorld::query_aabb(const Rect2 &p_bounds) {
-//	aabbCallback.results.clear();
-//	world->QueryAABB(&aabbCallback, gd_to_b2(p_bounds));
-//
-//	int n = aabbCallback.results.size();
-//	Array arr;
-//	arr.resize(n);
-//	for (int i = 0; i < n; i++) {
-//		b2Fixture *fixture = aabbCallback.results.get(i);
-//
-//		Dictionary d;
-//		d["body"] = fixture->GetBody()->GetUserData().owner;
-//		d["fixture"] = fixture->GetUserData().owner;
-//		// TODO do we really need to return a dict, or can we just return an
-//		//      array of Box2DFixture objects and let the user get data from just that?
-//
-//		arr[i] = d;
-//	}
-//
-//	return arr;
-//}
-
 void Box2DWorld::query_aabb(const Rect2 &p_bounds, const Callable &p_callback) {
+	// This function uses queries in Box2DWorld-local space, not global space
+	user_query_callback.handled_fixtures.clear();
 	user_query_callback.callback = &p_callback;
-	world->QueryAABB(&user_query_callback, gd_to_b2(p_bounds)); // TODO this does not account for world node translation
+	world->QueryAABB(&user_query_callback, gd_to_b2(p_bounds));
 }
 
 void Box2DWorld::raycast(const Vector2 &p_from, const Vector2 &p_to, const Callable &p_callback) {
+	// This function uses queries in Box2DWorld-local space, not global space
+	user_raycast_callback.handled_fixtures.clear();
 	user_raycast_callback.callback = &p_callback;
-	world->RayCast(&user_raycast_callback, gd_to_b2(p_from), gd_to_b2(p_to)); // TODO this does not account for world node translation
+	world->RayCast(&user_raycast_callback, gd_to_b2(p_from), gd_to_b2(p_to));
 }
 
 Box2DWorld::Box2DWorld() {
@@ -1079,12 +1076,18 @@ endloop:
 }
 
 bool Box2DWorld::UserAABBQueryCallback::ReportFixture(b2Fixture *fixture) {
+	const Box2DFixture *fixture_node = fixture->GetUserData().owner;
+
+	if (handled_fixtures.find(fixture_node) == handled_fixtures.end()) {
+		handled_fixtures.insert(fixture_node);
+	} else {
+		// Box2DFixture is already handled. We're getting a report of another of its composite b2Fixtures.
+		return true;
+	}
+
 	const int argcount = 1;
-	Variant arg0 = Variant(fixture->GetUserData().owner);
+	Variant arg0 = Variant(fixture_node);
 	Variant *args[argcount] = {
-		// TODO what arguments do we give? Box2DFixture? Maybe AABB too?
-		// hard to tell because of composite fixtures
-		// If we return Box2DFixture, the query may report the same fixture several times.
 		&arg0
 	};
 	Variant ret;
@@ -1106,8 +1109,17 @@ bool Box2DWorld::UserAABBQueryCallback::ReportFixture(b2Fixture *fixture) {
 }
 
 float Box2DWorld::UserRaycastQueryCallback::ReportFixture(b2Fixture *fixture, const b2Vec2 &point, const b2Vec2 &normal, float fraction) {
+	const Box2DFixture *fixture_node = fixture->GetUserData().owner;
+
+	if (handled_fixtures.find(fixture_node) == handled_fixtures.end()) {
+		handled_fixtures.insert(fixture_node);
+	} else {
+		// Box2DFixture is already handled. We're getting a report of another of its composite b2Fixtures.
+		return true;
+	}
+
 	const int argcount = 4;
-	Variant arg0 = Variant(fixture->GetUserData().owner); // TODO see comment above
+	Variant arg0 = Variant(fixture_node);
 	Variant arg1 = Variant(b2_to_gd(point));
 	Variant arg2 = Variant(Vector2(normal.x, normal.y));
 	Variant arg3 = Variant(fraction);
