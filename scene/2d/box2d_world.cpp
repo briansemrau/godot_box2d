@@ -4,6 +4,7 @@
 #include <core/os/os.h>
 
 #include <box2d/b2_collision.h>
+#include <box2d/b2_time_of_impact.h>
 
 #include "box2d_fixtures.h"
 #include "box2d_joints.h"
@@ -25,6 +26,15 @@ void Box2DShapeQueryParameters::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_motion", "motion"), &Box2DShapeQueryParameters::set_motion);
 	ClassDB::bind_method(D_METHOD("get_motion"), &Box2DShapeQueryParameters::get_motion);
 
+	ClassDB::bind_method(D_METHOD("set_motion_rotation", "rotation"), &Box2DShapeQueryParameters::set_motion_rotation);
+	ClassDB::bind_method(D_METHOD("get_motion_rotation"), &Box2DShapeQueryParameters::get_motion_rotation);
+
+	ClassDB::bind_method(D_METHOD("set_motion_transform", "transform"), &Box2DShapeQueryParameters::set_motion_transform);
+	ClassDB::bind_method(D_METHOD("get_motion_transform"), &Box2DShapeQueryParameters::get_motion_transform);
+
+	ClassDB::bind_method(D_METHOD("set_motion_local_center", "local_center"), &Box2DShapeQueryParameters::set_motion_local_center);
+	ClassDB::bind_method(D_METHOD("get_motion_local_center"), &Box2DShapeQueryParameters::get_motion_local_center);
+
 	ClassDB::bind_method(D_METHOD("set_collision_layer", "collision_layer"), &Box2DShapeQueryParameters::set_collision_mask);
 	ClassDB::bind_method(D_METHOD("get_collision_layer"), &Box2DShapeQueryParameters::get_collision_mask);
 
@@ -40,6 +50,9 @@ void Box2DShapeQueryParameters::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_layer", "get_collision_layer");
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "exclude", PROPERTY_HINT_NONE, itos(Variant::INT) + ":"), "set_exclude", "get_exclude");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "motion"), "set_motion", "get_motion");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "motion_rotation"), "set_motion_rotation", "get_motion_rotation");
+	ADD_PROPERTY(PropertyInfo(Variant::TRANSFORM2D, "motion_transform"), "set_motion_transform", "get_motion_transform");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "local_center"), "set_motion_local_center", "get_motion_local_center");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shape", PROPERTY_HINT_RESOURCE_TYPE, "Box2DShape"), "set_shape", "get_shape");
 	ADD_PROPERTY(PropertyInfo(Variant::TRANSFORM2D, "transform"), "set_transform", "get_transform");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collide_with_bodies"), "set_collide_with_bodies", "is_collide_with_bodies_enabled");
@@ -56,6 +69,7 @@ RES Box2DShapeQueryParameters::get_shape() const {
 }
 
 void Box2DShapeQueryParameters::set_transform(const Transform2D &p_transform) {
+	ERR_FAIL_COND_MSG(p_transform.get_scale() != Size2(1, 1), "Box2DShapeQueryParameters does not support scaled transforms.");
 	transform = p_transform;
 }
 
@@ -69,6 +83,32 @@ void Box2DShapeQueryParameters::set_motion(const Vector2 &p_motion) {
 
 Vector2 Box2DShapeQueryParameters::get_motion() const {
 	return motion;
+}
+
+void Box2DShapeQueryParameters::set_motion_rotation(float p_rotation) {
+	rotation = p_rotation;
+}
+
+float Box2DShapeQueryParameters::get_motion_rotation() const {
+	return rotation;
+}
+
+void Box2DShapeQueryParameters::set_motion_transform(const Transform2D &p_transform) {
+	ERR_FAIL_COND_MSG(p_transform.get_scale() != Size2(1, 1), "Box2DShapeQueryParameters does not support scaled motion transforms.");
+	motion = p_transform.get_origin();
+	rotation = p_transform.get_rotation();
+}
+
+Transform2D Box2DShapeQueryParameters::get_motion_transform() const {
+	return Transform2D(rotation, motion);
+}
+
+void Box2DShapeQueryParameters::set_motion_local_center(const Vector2 &p_local_center) {
+	local_center = p_local_center;
+}
+
+Vector2 Box2DShapeQueryParameters::get_motion_local_center() const {
+	return local_center;
 }
 
 void Box2DShapeQueryParameters::set_collision_mask(int p_collision_mask) {
@@ -97,6 +137,10 @@ Vector<int64_t> Box2DShapeQueryParameters::get_exclude() const {
 		ret.write[idx] = int64_t(E->get()->get_instance_id());
 	}
 	return ret;
+}
+
+Set<Box2DPhysicsBody *> Box2DShapeQueryParameters::_get_exclude() const {
+	return exclude;
 }
 
 void Box2DShapeQueryParameters::set_collide_with_bodies(bool p_enable) {
@@ -550,7 +594,7 @@ void Box2DWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("intersect_point", "point", "max_results", "exclude", "collision_layer", "collide_with_bodies", "collide_with_sensors"), &Box2DWorld::intersect_point, DEFVAL(32), DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("intersect_ray", "from", "to", "exclude", "collision_layer", "collide_with_bodies", "collide_with_sensors"), &Box2DWorld::intersect_ray, DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("intersect_shape", "query", "max_results"), &Box2DWorld::intersect_shape, DEFVAL(32));
-	//ClassDB::bind_method(D_METHOD("cast_motion", "query"), &Box2DWorld::cast_motion);
+	ClassDB::bind_method(D_METHOD("cast_motion", "query"), &Box2DWorld::cast_motion);
 
 	//ClassDB::bind_method(D_METHOD("collide_shape", "shape", "max_results"), &PhysicsDirectSpaceState2D::_collide_shape, DEFVAL(32));
 
@@ -683,7 +727,7 @@ Dictionary Box2DWorld::intersect_ray(const Vector2 &p_from, const Vector2 &p_to,
 		dict["position"] = b2_to_gd(ray_callback.result.point); // TODO this does not account for world node translation
 		dict["normal"] = b2_to_gd(ray_callback.result.normal);
 	}
-	
+
 	return dict;
 }
 
@@ -735,6 +779,165 @@ Array Box2DWorld::intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query,
 	return arr;
 }
 
+// Are file-scoped inline functions (for duplicate code) good practice for code cleanliness?
+inline bool _query_should_ignore_fixture(b2Fixture *fixture, const bool collide_with_sensors, const bool collide_with_bodies, const uint32_t collision_mask, const Set<Box2DPhysicsBody *> &exclude) {
+	// Check sensor flags
+	if (!(collide_with_sensors && fixture->IsSensor()) && !(collide_with_bodies && !fixture->IsSensor()))
+		return true;
+
+	// Check filter
+	bool filtered = false;
+	const b2Filter filter = fixture->GetFilterData();
+	//if (filter.groupIndex == groupIndex && filter.groupIndex != 0) {
+	//	filtered = filterA.groupIndex < 0;
+	//}
+
+	filtered |= (filter.categoryBits & collision_mask) == 0;
+
+	if (filtered)
+		return true;
+
+	// Check exclusion
+	if (exclude.find(fixture->GetBody()->GetUserData().owner) > 0)
+		return true;
+
+	// This fixture should not be filtered
+	return false;
+}
+
+struct CastQueryWrapper {
+	Ref<Box2DShapeQueryParameters> params;
+
+	Vector<b2FixtureProxy *> results;
+
+	bool QueryCallback(int32 proxyId) {
+		b2FixtureProxy *proxy = (b2FixtureProxy *)broadPhase->GetUserData(proxyId);
+		if (_query_should_ignore_fixture(proxy->fixture, params->is_collide_with_sensors_enabled(), params->is_collide_with_bodies_enabled(), params->get_collision_mask(), params->_get_exclude()))
+
+		// There could be some optimization here for cast_motion.
+		// We could compute TOI here and store the minimum fraction of motion [0, 1].
+		// Using that fraction, we can discard results immediately by calculating the projected
+		// distance between AABB_queryt0 and AABB_callback. If the distance > min_fraction, discard.
+
+		results.append(proxy);
+
+		return true;
+	}
+
+	const b2BroadPhase *broadPhase;
+};
+
+Array Box2DWorld::cast_motion(const Ref<Box2DShapeQueryParameters> &p_query) {
+	// Godot cast_motion does a binary search collision test
+	// It returns two values that it defines as:
+	//     the point before collision is triggered
+	//     the point when collision occurs
+	// These values are just the low/high values of the binary search
+	// This also does nothing to avoid tunnelling.
+
+	// This function differs from the Godot API because we don't need to do
+	// nonsense like that. We can find the exact point of collision using TOI.
+	// To keep our API swappable, we return the motion fraction at the point
+	// of collision and a motion fraction a safe distance away (b2_linearSlop).
+
+	b2Transform xform_t0 = b2Transform(gd_to_b2(p_query->transform.get_origin()), b2Rot(p_query->transform.get_rotation()));
+	b2Transform xform_t1 = b2Transform(xform_t0.p + gd_to_b2(p_query->motion), b2Rot(p_query->transform.get_rotation() + p_query->rotation));
+
+	// Calc AABB with motion
+	b2AABB query_aabb;
+	const Vector<const b2Shape *> cast_b2shapes = p_query->shape_ref->get_shapes();
+	for (int i = 0; i < cast_b2shapes.size(); ++i) {
+		const b2Shape *cast_b2shape = cast_b2shapes[i];
+
+		for (int child_index = 0; child_index < cast_b2shape->GetChildCount(); ++child_index) {
+			b2AABB aabb_t0, aabb_t1;
+			cast_b2shape->ComputeAABB(&aabb_t0, xform_t0, child_index);
+			cast_b2shape->ComputeAABB(&aabb_t1, xform_t1, child_index);
+
+			query_aabb.Combine(aabb_t0);
+			query_aabb.Combine(aabb_t1);
+		}
+	}
+
+	// Query broadphase
+	CastQueryWrapper wrapper;
+	wrapper.broadPhase = &world->GetContactManager().m_broadPhase;
+	wrapper.params = p_query;
+
+	world->GetContactManager().m_broadPhase.Query(&wrapper, query_aabb);
+
+	// Search for most immediate TOI
+	b2TOIInput input;
+	// if predict_other_body_motion:
+	//     input.tMax = motion_timedelta_for_prediction (i think)
+	// else:
+	input.tMax = 1.0f;
+	input.sweepA.localCenter = gd_to_b2(p_query->local_center);
+	input.sweepA.c0 = xform_t0.p;
+	input.sweepA.c = xform_t1.p;
+	input.sweepA.a0 = xform_t0.q.GetAngle();
+	input.sweepA.a = xform_t1.q.GetAngle();
+	input.sweepA.alpha0 = 0.0f;
+	
+	b2TOIOutput min_output;
+	min_output.state = b2TOIOutput::e_unknown;
+	min_output.t = input.tMax;
+
+	b2TOIOutput output;
+
+	// TODO optimize this
+	// With longer motion casts, especially in the diagonal direction, there will
+	// be many irrelevant shapes being tested using TOI.
+	for (int i = 0; i < cast_b2shapes.size(); ++i) {
+		const b2Shape *cast_b2shape = cast_b2shapes[i];
+		for (int child_index_A = 0; child_index_A < cast_b2shape->GetChildCount(); ++child_index_A) {
+
+			input.proxyA.Set(cast_b2shape, child_index_A);
+
+			for (int i = 0; i < wrapper.results.size(); ++i) {
+				const b2FixtureProxy *proxy = wrapper.results[i];
+				const b2Body *body = proxy->fixture->GetBody();
+				const b2Shape *b2shape = proxy->fixture->GetShape();
+				for (int child_index_B = 0; child_index_B < b2shape->GetChildCount(); ++child_index_B) {
+
+					input.proxyB.Set(b2shape, child_index_B);
+					input.sweepB.localCenter = body->GetLocalCenter();
+					input.sweepB.alpha0 = 0.0f;
+					// if predict_other_body_motion:
+					//     calculate sweepB from body
+					// else:
+					input.sweepB.c = body->GetWorldCenter();
+					input.sweepB.c0 = input.sweepB.c;
+					input.sweepB.a = body->GetAngle();
+					input.sweepB.a0 = input.sweepB.a;
+					
+
+					b2TimeOfImpact(&output, &input);
+
+					switch (output.state) {
+						case b2TOIOutput::State::e_failed: // TODO failed gives a result, but do we always want it?
+						case b2TOIOutput::State::e_overlapped:
+						case b2TOIOutput::State::e_touching: {
+							if (output.t < min_output.t) {
+								min_output = output;
+							}
+						} break;
+					}
+				}
+			}
+		}
+	}
+
+	const float t_norm = min_output.t / input.tMax;
+	const real_t motion_len = p_query->motion.length();
+	const float t_safe = MAX(0, t_norm - (b2_linearSlop * B2_TO_GD / motion_len));
+
+	Array ret;
+	ret.append(t_norm);
+	ret.append(t_safe);
+	return ret;
+}
+
 //Array Box2DWorld::query_aabb(const Rect2 &p_bounds) {
 //	aabbCallback.results.clear();
 //	world->QueryAABB(&aabbCallback, gd_to_b2(p_bounds));
@@ -771,32 +974,6 @@ Box2DWorld::~Box2DWorld() {
 	}
 }
 
-// Are file-scoped inline functions (for duplicate code) good practice for code cleanliness?
-inline bool _query_should_ignore_fixture(b2Fixture *fixture, const bool collide_with_sensors, const bool collide_with_bodies, const uint32_t collision_mask, const Set<Box2DPhysicsBody*>& exclude) {
-	// Check sensor flags
-	if (!(collide_with_sensors && fixture->IsSensor()) && !(collide_with_bodies && !fixture->IsSensor()))
-		return true;
-
-	// Check filter
-	bool filtered = false;
-	const b2Filter filter = fixture->GetFilterData();
-	//if (filter.groupIndex == groupIndex && filter.groupIndex != 0) {
-	//	filtered = filterA.groupIndex < 0;
-	//}
-
-	filtered |= (filter.categoryBits & collision_mask) == 0;
-
-	if (filtered)
-		return true;
-
-	// Check exclusion
-	if (exclude.find(fixture->GetBody()->GetUserData().owner) > 0)
-		return true;
-
-	// This fixture should not be filtered
-	return false;
-}
-
 bool Box2DWorld::PointQueryCallback::ReportFixture(b2Fixture *fixture) {
 	if (_query_should_ignore_fixture(fixture, collide_with_sensors, collide_with_bodies, collision_mask, exclude))
 		return true;
@@ -818,6 +995,7 @@ float Box2DWorld::RaycastQueryCallback::ReportFixture(b2Fixture *fixture, const 
 	result.fixture = fixture;
 	result.point = point;
 	result.normal = normal;
+	//result.fraction = fraction;
 
 	// Keep clipping ray until we get the closest fixture
 	return fraction;

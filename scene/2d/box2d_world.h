@@ -5,6 +5,7 @@
 #include <core/object/object.h>
 #include <core/object/reference.h>
 #include <core/templates/set.h>
+#include <core/templates/vset.h>
 #include <scene/2d/node_2d.h>
 
 #include <box2d/b2_contact.h>
@@ -102,7 +103,7 @@ class Box2DShapeQueryParameters : public Reference {
 
 	Ref<Box2DShape> shape_ref;
 	Transform2D transform = Transform2D();
-	Vector2 motion = Vector2(0, 0);
+
 	Set<Box2DPhysicsBody *> exclude;
 	// potential addition: exclude fixtures
 	uint32_t collision_mask = 0xFFFFFFFF; // TODO fix: b2 uses uint16
@@ -110,11 +111,17 @@ class Box2DShapeQueryParameters : public Reference {
 	bool collide_with_bodies = true; // TODO might be better named as "collide_with_solids"
 	bool collide_with_sensors = false;
 
+	// Properties exclusive for cast_motion
+	Vector2 motion = Vector2(0, 0);
+	float rotation = 0.0f;
+	Vector2 local_center = Vector2(0, 0);
+	//bool predict_other_body_motion = false;
+	//float motion_timedelta_for_prediction = 1/60;
+
 protected:
 	static void _bind_methods();
 
 public:
-	// TODO accessors/method binding
 	void set_shape(const RES &p_shape_ref);
 	RES get_shape() const;
 
@@ -123,6 +130,15 @@ public:
 
 	void set_motion(const Vector2 &p_motion);
 	Vector2 get_motion() const;
+
+	void set_motion_rotation(float p_rotation);
+	float get_motion_rotation() const;
+
+	void set_motion_transform(const Transform2D &p_transform);
+	Transform2D get_motion_transform() const;
+
+	void set_motion_local_center(const Vector2 &p_local_center);
+	Vector2 get_motion_local_center() const;
 
 	void set_collision_mask(int p_collision_mask);
 	int get_collision_mask() const;
@@ -133,9 +149,10 @@ public:
 	void set_collide_with_sensors(bool p_enable);
 	bool is_collide_with_sensors_enabled() const;
 
-	// Using ObjectID instead of RID because we don't use RIDs (comparing to Godot API)
+	// Using ObjectIDs as int64_t so that we can bind these methods
 	void set_exclude(const Vector<int64_t> &p_exclude);
 	Vector<int64_t> get_exclude() const;
+	Set<Box2DPhysicsBody *> _get_exclude() const;
 };
 
 class Box2DWorld : public Node2D, public virtual b2DestructionListener, public virtual b2ContactFilter, public virtual b2ContactListener {
@@ -267,12 +284,12 @@ public:
 	//void shiftOrigin(const Vector2 &newOrigin);
 
 	// Godot space query API
-	//Array cast_motion(const Ref<Box2DShapeQueryParameters> &p_query);
 	// What is collide_shape? Does this return manifold points?
 	//Array collide_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
 	Array intersect_point(const Vector2 &p_point, int p_max_results = 32, const Vector<int64_t> &p_exclude = Vector<int64_t>(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false);
 	Dictionary intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Vector<int64_t> &p_exclude = Vector<int64_t>(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false);
 	Array intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
+	Array cast_motion(const Ref<Box2DShapeQueryParameters> &p_query);
 
 	// Box2D space query API
 	//Array query_aabb(const Rect2 &p_bounds); // TODO add more parameters like Physics2DDirectSpaceState::_intersect_point
