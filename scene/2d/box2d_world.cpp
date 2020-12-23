@@ -712,9 +712,6 @@ Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, con
 	Array arr;
 	arr.resize(n);
 
-	if (n > 0)
-		ERR_PRINT_ONCE("hey we do have results tho");
-
 	int i = 0;
 	for (auto element = point_callback.results.front(); element; element = element->next()) {
 		Box2DFixture *fixture = element->get();
