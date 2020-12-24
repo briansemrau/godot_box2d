@@ -231,11 +231,14 @@ void Box2DJoint::_notification(int p_what) {
 			// Will attempt to recreate in POST_ENTER_TREE.
 			if (new_world != world_node) {
 				if (world_node) {
-					world_node->joints.erase(this);
+					world_node->joint_owners.erase(this);
 				}
 				destroy_b2Joint();
 
 				world_node = new_world;
+				if (world_node) {
+					world_node->joint_owners.insert(this);
+				}
 			}
 
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {

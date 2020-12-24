@@ -2,6 +2,8 @@
 
 #include <core/config/engine.h>
 
+#include "box2d_physics_body.h"
+
 /**
 * @author Brian Semrau
 */
@@ -23,7 +25,7 @@ void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDe
 	if (override_body_filterdata) {
 		finalDef.filter = filterDef;
 	} else {
-		finalDef.filter = body_node->filterDef;
+		finalDef.filter = owner_node->filterDef;
 	}
 
 	// Transform shape with local transform
@@ -32,7 +34,7 @@ void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDe
 			b2CircleShape shp = b2CircleShape(*dynamic_cast<const b2CircleShape *>(p_def.shape));
 			shp.m_p = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_p)));
 			finalDef.shape = &shp;
-			p_fixture_out = body_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
+			p_fixture_out = owner_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
 		} break;
 		case b2Shape::Type::e_edge: {
 			b2EdgeShape shp = b2EdgeShape(*dynamic_cast<const b2EdgeShape *>(p_def.shape));
@@ -41,7 +43,7 @@ void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDe
 			shp.m_vertex2 = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertex2)));
 			shp.m_vertex3 = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertex3)));
 			finalDef.shape = &shp;
-			p_fixture_out = body_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
+			p_fixture_out = owner_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
 		} break;
 		case b2Shape::Type::e_polygon: {
 			b2PolygonShape shp = b2PolygonShape(*dynamic_cast<const b2PolygonShape *>(p_def.shape));
@@ -51,7 +53,7 @@ void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDe
 			}
 			shp.m_centroid = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_centroid)));
 			finalDef.shape = &shp;
-			p_fixture_out = body_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
+			p_fixture_out = owner_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
 		} break;
 		case b2Shape::Type::e_chain: {
 			const b2ChainShape *p_def_chain_shape = dynamic_cast<const b2ChainShape *>(p_def.shape);
@@ -61,7 +63,7 @@ void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDe
 				shp.m_vertices[i] = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertices[i])));
 			}
 			finalDef.shape = &shp;
-			p_fixture_out = body_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
+			p_fixture_out = owner_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
 		} break;
 		default: {
 			ERR_FAIL();
@@ -69,13 +71,15 @@ void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDe
 	}
 
 	p_fixture_out->GetUserData().owner = this;
-	body_node->update_mass();
+	Box2DPhysicsBody *body_node = dynamic_cast<Box2DPhysicsBody *>(owner_node);
+	if (body_node)
+		body_node->update_mass();
 }
 
 bool Box2DFixture::create_b2() {
 	if (fixtures.size() <= 0) {
-		ERR_FAIL_COND_V(!body_node, false);
-		ERR_FAIL_COND_V(!body_node->body, false);
+		ERR_FAIL_COND_V(!owner_node, false);
+		ERR_FAIL_COND_V(!owner_node->body, false);
 		ERR_FAIL_COND_V(!shape.is_valid(), false);
 
 		if (shape->is_composite_shape()) {
@@ -107,10 +111,10 @@ bool Box2DFixture::create_b2() {
 
 bool Box2DFixture::destroy_b2() {
 	if (fixtures.size() > 0) {
-		ERR_FAIL_COND_V(!body_node, false);
-		if (body_node->body) {
+		ERR_FAIL_COND_V(!owner_node, false);
+		if (owner_node->body) {
 			for (int i = 0; i < fixtures.size(); i++) {
-				body_node->body->DestroyFixture(fixtures[i]);
+				owner_node->body->DestroyFixture(fixtures[i]);
 			}
 			fixtures.clear();
 			//print_line("fixture destroyed");
@@ -136,22 +140,22 @@ void Box2DFixture::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_ENTER_TREE: {
-			Box2DPhysicsBody *new_body = Object::cast_to<Box2DPhysicsBody>(get_parent());
+			Box2DCollisionObject *new_body = Object::cast_to<Box2DCollisionObject>(get_parent());
 
 			// If new parent, recreate fixture
-			if (body_node != new_body) {
-				if(body_node) {
-					body_node->disconnect("sleeping_state_changed", Callable(this, "update"));
-					body_node->disconnect("enabled_state_changed", Callable(this, "update"));
+			if (owner_node != new_body) {
+				if (owner_node) {
+					owner_node->disconnect("sleeping_state_changed", Callable(this, "update"));
+					owner_node->disconnect("enabled_state_changed", Callable(this, "update"));
 				}
 				destroy_b2();
 
-				body_node = new_body;
+				owner_node = new_body;
 
-				body_node->connect("sleeping_state_changed", Callable(this, "update"));
-				body_node->connect("enabled_state_changed", Callable(this, "update"));
+				owner_node->connect("sleeping_state_changed", Callable(this, "update"));
+				owner_node->connect("enabled_state_changed", Callable(this, "update"));
 
-				if (body_node && body_node->body && shape.is_valid()) {
+				if (owner_node && owner_node->body && shape.is_valid()) {
 					create_b2();
 				}
 			}
@@ -182,18 +186,27 @@ void Box2DFixture::_notification(int p_what) {
 			}
 
 			Color draw_col;
-			if (!body_node || (body_node->get_type() == Box2DPhysicsBody::MODE_RIGID && body_node->get_mass() <= 0.0f)) {
+			Box2DPhysicsBody *body_node = dynamic_cast<Box2DPhysicsBody *>(owner_node);
+			//Box2DArea *area_node = dynamic_cast<Box2DArea *>(owner_node);
+
+			if (!owner_node) {
 				draw_col = Color(1.0f, 0.0f, 0.0f);
-			} else if (body_node->is_enabled() == false) {
-				draw_col = Color(0.5f, 0.5f, 0.3f);
-			} else if (body_node->get_type() == Box2DPhysicsBody::MODE_STATIC) {
-				draw_col = Color(0.5f, 0.9f, 0.5f);
-			} else if (body_node->get_type() == Box2DPhysicsBody::MODE_KINEMATIC) {
-				draw_col = Color(0.5f, 0.5f, 0.9f);
-			} else if (body_node->is_awake() == false) {
-				draw_col = Color(0.6f, 0.6f, 0.6f);
-			} else {
-				draw_col = Color(0.9f, 0.7f, 0.7f);
+			} else if (body_node) {
+				if (body_node->get_type() == Box2DPhysicsBody::MODE_RIGID && body_node->get_mass() <= 0.0f) {
+					draw_col = Color(1.0f, 0.0f, 0.0f);
+				} else if (body_node->is_enabled() == false) {
+					draw_col = Color(0.5f, 0.5f, 0.3f);
+				} else if (body_node->get_type() == Box2DPhysicsBody::MODE_STATIC) {
+					draw_col = Color(0.5f, 0.9f, 0.5f);
+				} else if (body_node->get_type() == Box2DPhysicsBody::MODE_KINEMATIC) {
+					draw_col = Color(0.5f, 0.5f, 0.9f);
+				} else if (body_node->is_awake() == false) {
+					draw_col = Color(0.6f, 0.6f, 0.6f);
+				} else {
+					draw_col = Color(0.9f, 0.7f, 0.7f);
+				}
+			} else { // area_node
+				// TODO
 			}
 
 			if (is_sensor()) {
@@ -254,7 +267,7 @@ void Box2DFixture::_bind_methods() {
 }
 
 void Box2DFixture::update_shape() {
-	if (body_node && body_node->body) {
+	if (owner_node && owner_node->body) {
 		// If shape has changed, the fixture must be completely recreated
 		destroy_b2();
 		create_b2();
@@ -424,7 +437,7 @@ void Box2DFixture::set_density(real_t p_density) {
 
 	for (int i = 0; i < fixtures.size(); i++) {
 		fixtures[i]->SetDensity(density);
-		body_node->body->ResetMassData();
+		owner_node->body->ResetMassData();
 	}
 	fixtureDef.density = density;
 }
@@ -467,7 +480,7 @@ Box2DFixture::Box2DFixture() {
 };
 
 Box2DFixture::~Box2DFixture() {
-	if (body_node && fixtures.size() > 0) {
+	if (owner_node && fixtures.size() > 0) {
 		WARN_PRINT("b2Fixture is being deleted in destructor, not NOTIFICATION_PREDELETE.");
 		destroy_b2();
 	}

@@ -6,6 +6,7 @@
 #include <box2d/b2_collision.h>
 #include <box2d/b2_time_of_impact.h>
 
+#include "box2d_collision_object.h"
 #include "box2d_fixtures.h"
 #include "box2d_joints.h"
 
@@ -223,10 +224,12 @@ bool Box2DWorld::ShouldCollide(b2Fixture *fixtureA, b2Fixture *fixtureB) {
 	}
 
 	// Check for body exclusions
-	Box2DPhysicsBody *const &bodyA = ownerA->body_node;
-	Box2DPhysicsBody *const &bodyB = ownerB->body_node;
-	if ((ownerA->accept_body_collision_exceptions && bodyA->filtered.has(bodyB)) || (ownerB->accept_body_collision_exceptions && bodyB->filtered.has(bodyA))) {
-		return false;
+	Box2DPhysicsBody *const &bodyA = dynamic_cast<Box2DPhysicsBody *>(ownerA->owner_node);
+	Box2DPhysicsBody *const &bodyB = dynamic_cast<Box2DPhysicsBody *>(ownerB->owner_node);
+	if (bodyA && bodyB) {
+		if ((ownerA->accept_body_collision_exceptions && bodyA->filtered.has(bodyB)) || (ownerB->accept_body_collision_exceptions && bodyB->filtered.has(bodyA))) {
+			return false;
+		}
 	}
 
 	// TODO should we bother to let bodies exclude fixtures?
@@ -240,11 +243,11 @@ inline void Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
 
 	Box2DFixture *fnode_a = contact->GetFixtureA()->GetUserData().owner;
 	Box2DFixture *fnode_b = contact->GetFixtureB()->GetUserData().owner;
-	Box2DPhysicsBody *body_a = fnode_a->body_node;
-	Box2DPhysicsBody *body_b = fnode_b->body_node;
+	Box2DCollisionObject *body_a = fnode_a->owner_node;
+	Box2DCollisionObject *body_b = fnode_b->owner_node;
 
-	const bool monitoringA = fnode_a->body_node->is_contact_monitor_enabled();
-	const bool monitoringB = fnode_b->body_node->is_contact_monitor_enabled();
+	const bool monitoringA = fnode_a->owner_node->_is_contact_monitor_enabled();
+	const bool monitoringB = fnode_b->owner_node->_is_contact_monitor_enabled();
 
 	// Only buffer contacts that are being monitored, if contact monitor report count isn't exceeded
 
@@ -272,11 +275,11 @@ inline void Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
 
 		// Buffer again into monitoring node
 		if (hasCapacityA) {
-			auto contacts = &fnode_a->body_node->contact_monitor->contacts;
+			auto contacts = &fnode_a->owner_node->contact_monitor->contacts;
 			contacts->insert(c);
 		}
 		if (hasCapacityB) {
-			auto contacts = &fnode_b->body_node->contact_monitor->contacts;
+			auto contacts = &fnode_b->owner_node->contact_monitor->contacts;
 			contacts->insert(c);
 		}
 	}
@@ -285,11 +288,11 @@ inline void Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
 void Box2DWorld::BeginContact(b2Contact *contact) {
 	Box2DFixture *fnode_a = contact->GetFixtureA()->GetUserData().owner;
 	Box2DFixture *fnode_b = contact->GetFixtureB()->GetUserData().owner;
-	Box2DPhysicsBody *body_a = fnode_a->body_node;
-	Box2DPhysicsBody *body_b = fnode_b->body_node;
+	Box2DCollisionObject *body_a = fnode_a->owner_node;
+	Box2DCollisionObject *body_b = fnode_b->owner_node;
 
-	const bool monitoringA = fnode_a->body_node->is_contact_monitor_enabled();
-	const bool monitoringB = fnode_b->body_node->is_contact_monitor_enabled();
+	const bool monitoringA = fnode_a->owner_node->_is_contact_monitor_enabled();
+	const bool monitoringB = fnode_b->owner_node->_is_contact_monitor_enabled();
 
 	// Deliver signals to bodies with monitoring enabled
 	// Only emit body_entered once per body. Begin/EndContact are called for each b2Fixture.
@@ -302,6 +305,8 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 		++(*body_count_ptr);
 
 		if (*body_count_ptr == 1) {
+			// TODO replace with callable_mp to Box2DCollisionObject virtual func `object_entered`
+			// This func can then call signals "body/area_entered"
 			collision_callback_queue.push_back(GodotSignalCaller("body_entered", body_a, body_b, nullptr));
 		}
 
@@ -341,11 +346,11 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 void Box2DWorld::EndContact(b2Contact *contact) {
 	Box2DFixture *fnode_a = contact->GetFixtureA()->GetUserData().owner;
 	Box2DFixture *fnode_b = contact->GetFixtureB()->GetUserData().owner;
-	Box2DPhysicsBody *body_a = fnode_a->body_node;
-	Box2DPhysicsBody *body_b = fnode_b->body_node;
+	Box2DCollisionObject *body_a = fnode_a->owner_node;
+	Box2DCollisionObject *body_b = fnode_b->owner_node;
 
-	const bool monitoringA = fnode_a->body_node->is_contact_monitor_enabled();
-	const bool monitoringB = fnode_b->body_node->is_contact_monitor_enabled();
+	const bool monitoringA = fnode_a->owner_node->_is_contact_monitor_enabled();
+	const bool monitoringB = fnode_b->owner_node->_is_contact_monitor_enabled();
 
 	// Deliver signals to bodies with contact monitoring enabled
 	if (monitoringA) {
@@ -390,13 +395,13 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 		for (int i = 0; i < buffer_manifold->count; ++i) {
 			Box2DContactPoint *c_ptr = &buffer_manifold->points[i];
 
-			if (c_ptr->fixture_a->body_node->is_contact_monitor_enabled()) {
+			if (c_ptr->fixture_a->owner_node->_is_contact_monitor_enabled()) {
 				// TODO lock/unlock
-				c_ptr->fixture_a->body_node->contact_monitor->contacts.erase(*c_ptr);
+				c_ptr->fixture_a->owner_node->contact_monitor->contacts.erase(*c_ptr);
 			}
-			if (c_ptr->fixture_b->body_node->is_contact_monitor_enabled()) {
+			if (c_ptr->fixture_b->owner_node->_is_contact_monitor_enabled()) {
 				// TODO lock/unlock
-				c_ptr->fixture_b->body_node->contact_monitor->contacts.erase(*c_ptr);
+				c_ptr->fixture_b->owner_node->contact_monitor->contacts.erase(*c_ptr);
 			}
 		}
 
@@ -430,13 +435,13 @@ void Box2DWorld::PreSolve(b2Contact *contact, const b2Manifold *oldManifold) {
 			if (buffer_manifold && i < buffer_manifold->count) {
 				Box2DContactPoint *c_ptr = &buffer_manifold->points[i];
 
-				if (c_ptr->fixture_a->body_node->is_contact_monitor_enabled()) {
+				if (c_ptr->fixture_a->owner_node->_is_contact_monitor_enabled()) {
 					// TODO lock/unlock
-					c_ptr->fixture_a->body_node->contact_monitor->contacts.erase(*c_ptr);
+					c_ptr->fixture_a->owner_node->contact_monitor->contacts.erase(*c_ptr);
 				}
-				if (c_ptr->fixture_b->body_node->is_contact_monitor_enabled()) {
+				if (c_ptr->fixture_b->owner_node->_is_contact_monitor_enabled()) {
 					// TODO lock/unlock
-					c_ptr->fixture_b->body_node->contact_monitor->contacts.erase(*c_ptr);
+					c_ptr->fixture_b->owner_node->contact_monitor->contacts.erase(*c_ptr);
 				}
 
 				buffer_manifold->remove(i);
@@ -486,8 +491,8 @@ void Box2DWorld::PostSolve(b2Contact *contact, const b2ContactImpulse *impulse) 
 	const Box2DFixture *fnode_a = contact->GetFixtureA()->GetUserData().owner;
 	const Box2DFixture *fnode_b = contact->GetFixtureB()->GetUserData().owner;
 
-	const bool monitoringA = fnode_a->body_node->is_contact_monitor_enabled();
-	const bool monitoringB = fnode_b->body_node->is_contact_monitor_enabled();
+	const bool monitoringA = fnode_a->owner_node->_is_contact_monitor_enabled();
+	const bool monitoringB = fnode_b->owner_node->_is_contact_monitor_enabled();
 	if (monitoringA || monitoringB) {
 		b2WorldManifold worldManifold;
 		contact->GetWorldManifold(&worldManifold);
@@ -506,7 +511,7 @@ void Box2DWorld::PostSolve(b2Contact *contact, const b2ContactImpulse *impulse) 
 				// Update contacts buffered in listening nodes
 				if (monitoringA) {
 					//fnode_a->body_node->contact_monitor.locked = true; TODO
-					auto contacts = &fnode_a->body_node->contact_monitor->contacts;
+					auto contacts = &fnode_a->owner_node->contact_monitor->contacts;
 					int idx = contacts->find(*c_ptr);
 					if (idx >= 0)
 						(*contacts)[idx] = (*c_ptr);
@@ -517,7 +522,7 @@ void Box2DWorld::PostSolve(b2Contact *contact, const b2ContactImpulse *impulse) 
 					Box2DContactPoint cB = c_ptr->flipped_a_b();
 
 					//fnode_b->body_node->contact_monitor.locked = true; TODO
-					auto contacts = &fnode_b->body_node->contact_monitor->contacts;
+					auto contacts = &fnode_b->owner_node->contact_monitor->contacts;
 					int idx = contacts->find(cB);
 					if (idx >= 0)
 						(*contacts)[idx] = (cB);
@@ -536,12 +541,12 @@ void Box2DWorld::create_b2World() {
 		world->SetContactFilter(this);
 		world->SetContactListener(this);
 
-		Set<Box2DPhysicsBody *>::Element *body = bodies.front();
+		Set<Box2DCollisionObject *>::Element *body = body_owners.front();
 		while (body) {
 			body->get()->on_parent_created(this);
 			body = body->next();
 		}
-		Set<Box2DJoint *>::Element *joint = joints.front();
+		Set<Box2DJoint *>::Element *joint = joint_owners.front();
 		while (joint) {
 			joint->get()->on_parent_created(this);
 			joint = joint->next();
@@ -719,10 +724,12 @@ Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, con
 		Box2DFixture *fixture = element->get();
 
 		Dictionary d;
-		d["body"] = fixture->body_node;
+		d["body"] = fixture->owner_node;
 		d["fixture"] = fixture;
 		// TODO do we really need to return a dict, or can we just return an
 		//      array of Box2DFixture objects and let the user get data from just that?
+
+		// TODO don't return a dictionary... The "body" element is just too strange after the refactor
 
 		arr[i] = d;
 		++i;
@@ -806,7 +813,7 @@ Array Box2DWorld::intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query,
 		Box2DFixture *fixture = element->get();
 
 		Dictionary d;
-		d["body"] = fixture->body_node;
+		d["body"] = fixture->owner_node;
 		d["fixture"] = fixture;
 
 		arr[i] = d;
@@ -836,7 +843,7 @@ inline bool _query_should_ignore_fixture(b2Fixture *fixture, const bool collide_
 		return true;
 
 	// Check exclusion
-	if (exclude.find(fixture->GetBody()->GetUserData().owner) > 0)
+	if (exclude.find(dynamic_cast<Box2DPhysicsBody *>(fixture->GetBody()->GetUserData().owner)) > 0)
 		return true;
 
 	// This fixture should not be filtered

@@ -3,6 +3,8 @@
 #include "editor/box2d_joint_editor_plugin.h"
 #include "editor/box2d_polygon_editor_plugin.h"
 #include "editor/box2d_shape_editor_plugin.h"
+//#include "scene/2d/box2d_area.h"
+#include "scene/2d/box2d_collision_object.h"
 #include "scene/2d/box2d_fixtures.h"
 #include "scene/2d/box2d_joints.h"
 #include "scene/2d/box2d_physics_body.h"
@@ -19,7 +21,9 @@ void register_godot_box2d_types() {
 
 	ClassDB::register_class<Box2DShapeQueryParameters>();
 	ClassDB::register_class<Box2DWorld>();
+	ClassDB::register_virtual_class<Box2DCollisionObject>();
 	ClassDB::register_class<Box2DPhysicsBody>();
+	//ClassDB::register_class<Box2DArea>();
 	ClassDB::register_class<Box2DFixture>();
 	ClassDB::register_virtual_class<Box2DShape>();
 	ClassDB::register_class<Box2DCircleShape>();

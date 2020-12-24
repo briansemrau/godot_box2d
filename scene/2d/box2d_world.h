@@ -95,6 +95,7 @@ struct ContactBufferManifold {
 };
 
 class Box2DWorld;
+class Box2DCollisionObject;
 class Box2DPhysicsBody;
 
 class Box2DShapeQueryParameters : public Reference {
@@ -166,7 +167,7 @@ public:
 class Box2DWorld : public Node2D, public virtual b2DestructionListener, public virtual b2ContactFilter, public virtual b2ContactListener {
 	GDCLASS(Box2DWorld, Node2D);
 
-	friend class Box2DPhysicsBody;
+	friend class Box2DCollisionObject;
 	friend class Box2DJoint;
 
 private:
@@ -251,8 +252,8 @@ private:
 
 	std::list<GodotSignalCaller> collision_callback_queue{};
 
-	Set<Box2DPhysicsBody *> bodies;
-	Set<Box2DJoint *> joints;
+	Set<Box2DCollisionObject *> body_owners;
+	Set<Box2DJoint *> joint_owners;
 
 	virtual void SayGoodbye(b2Joint *joint) override;
 	virtual void SayGoodbye(b2Fixture *fixture) override;

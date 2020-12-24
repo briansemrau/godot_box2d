@@ -27,7 +27,7 @@
 
 // User data
 
-class Box2DPhysicsBody;
+class Box2DCollisionObject;
 class Box2DFixture;
 class Box2DJoint;
 
@@ -35,7 +35,8 @@ struct B2_API b2BodyUserData {
 	b2BodyUserData() :
 			owner(NULL) {}
 
-	Box2DPhysicsBody *owner;
+	Box2DCollisionObject *owner;
+	//bool is_area;
 };
 
 struct B2_API b2FixtureUserData {
