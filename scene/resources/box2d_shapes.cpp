@@ -70,7 +70,14 @@ bool Box2DShape::is_composite_shape() const {
 }
 
 const Vector<const b2Shape *> Box2DShape::get_shapes() const {
-	ERR_FAIL_V(Vector<const b2Shape *>());
+	if (is_composite_shape()) {
+		CRASH_NOW_MSG("Box2DShape::get_shapes must be overridden by all composite shapes.");
+		ERR_FAIL_V(Vector<const b2Shape *>());
+	} else {
+		Vector<const b2Shape *> vec;
+		vec.append(get_shape());
+		return vec;
+	}
 }
 
 bool Box2DShape::_edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const {
