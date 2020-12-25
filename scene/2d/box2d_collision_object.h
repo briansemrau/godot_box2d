@@ -68,6 +68,11 @@ protected:
 	void _set_contact_monitor(bool p_enabled);
 	bool _is_contact_monitor_enabled() const;
 
+	virtual void _on_object_entered(Box2DCollisionObject *p_object) = 0;
+	virtual void _on_object_exited(Box2DCollisionObject *p_object) = 0;
+	virtual void _on_fixture_entered(Box2DFixture *p_fixture) = 0;
+	virtual void _on_fixture_exited(Box2DFixture *p_fixture) = 0;
+
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();

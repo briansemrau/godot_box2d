@@ -59,6 +59,8 @@ protected:
 	static void _bind_methods();
 
 public:
+	inline const Box2DCollisionObject *_get_owner_node() const { return owner_node; }
+
 	virtual bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const override;
 
 	virtual String get_configuration_warning() const override;

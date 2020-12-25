@@ -1,9 +1,9 @@
 #ifndef BOX2D_PHYSICS_BODY_H
 #define BOX2D_PHYSICS_BODY_H
 
+#include <core/io/resource.h>
 #include <core/object/object.h>
 #include <core/object/reference.h>
-#include <core/io/resource.h>
 #include <core/templates/vset.h>
 #include <scene/2d/node_2d.h>
 
@@ -12,8 +12,10 @@
 #include <box2d/b2_world.h>
 
 #include "../../util/box2d_types_converter.h"
-#include "box2d_world.h"
+
+#include "box2d_area.h"
 #include "box2d_collision_object.h"
+#include "box2d_world.h"
 
 /**
 * @author Brian Semrau
@@ -46,7 +48,20 @@ private:
 	Set<Box2DJoint *> joints;
 
 	Transform2D last_valid_xform;
-	
+
+	// For sorting areas
+	struct Box2DAreaItem {
+		const Box2DArea *area = NULL;
+		inline bool operator==(const Box2DAreaItem &p_item) const { return area == p_item.area; }
+		inline bool operator<(const Box2DAreaItem &p_item) const { return area->get_priority() < p_item.area->get_priority(); }
+		inline Box2DAreaItem() {}
+		inline Box2DAreaItem(const Box2DArea *p_area) {
+			area = p_area;
+		}
+	};
+
+	Vector<Box2DAreaItem> colliding_areas;
+
 	// TODO maybe keep a list of local state we want this class to track wrt a b2body parameter or field
 	// are there any others?  enabled for example can bet set on the fly in code
 	bool prev_sleeping_state = true;
@@ -59,6 +74,14 @@ private:
 
 	void sync_state();
 
+	void _compute_area_effects(const Box2DArea *p_area, b2Vec2 &p_gravity, float &p_lin_damp, float &p_ang_damp);
+	void _update_area_effects();
+
+	virtual void _on_object_entered(Box2DCollisionObject *p_object) override;
+	virtual void _on_object_exited(Box2DCollisionObject *p_object) override;
+	virtual void _on_fixture_entered(Box2DFixture *p_fixture) override;
+	virtual void _on_fixture_exited(Box2DFixture *p_fixture) override;
+
 protected:
 	virtual void on_b2Body_created() override;
 
@@ -67,6 +90,9 @@ protected:
 	static void _bind_methods();
 
 public:
+	void _add_area(Box2DArea *p_area);
+	void _remove_area(Box2DArea *p_area);
+
 	virtual String get_configuration_warning() const override;
 
 	void set_linear_velocity(const Vector2 &p_vel);
@@ -112,7 +138,7 @@ public:
 
 	void set_fixed_rotation(bool p_fixed);
 	bool is_fixed_rotation() const;
-	
+
 	Array get_collision_exceptions();
 	void add_collision_exception_with(Node *p_node);
 	void remove_collision_exception_with(Node *p_node);
