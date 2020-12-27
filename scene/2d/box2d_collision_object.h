@@ -12,11 +12,13 @@
 #include <box2d/b2_world.h>
 
 #include "../../util/box2d_types_converter.h"
-#include "box2d_world.h"
 
 /**
 * @author Brian Semrau
 */
+
+class Box2DWorld;
+struct Box2DContactPoint;
 
 class Box2DCollisionObject : public Node2D {
 	GDCLASS(Box2DCollisionObject, Node2D);
