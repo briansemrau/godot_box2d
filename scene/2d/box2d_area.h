@@ -91,13 +91,11 @@ public:
 	//void set_collision_layer_bit(int p_bit, bool p_value);
 	//bool get_collision_layer_bit(int p_bit) const;
 
-	// TODO
-	//TypedArray<Node2D> get_overlapping_bodies() const;
-	//TypedArray<Box2DArea> get_overlapping_areas() const;
+	TypedArray<Node2D> get_overlapping_bodies() const; // TODO should the return type be Box2DPhysicsObject?
+	TypedArray<Box2DArea> get_overlapping_areas() const;
 
-	// TODO
-	//bool overlaps_area(Node *p_area) const;
-	//bool overlaps_body(Node *p_body) const;
+	bool overlaps_area(Node *p_area) const;
+	bool overlaps_body(Node *p_body) const;
 
 	void set_audio_bus_override(bool p_override);
 	bool is_overriding_audio_bus() const;

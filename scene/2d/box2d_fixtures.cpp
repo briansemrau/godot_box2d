@@ -2,6 +2,7 @@
 
 #include <core/config/engine.h>
 
+#include "box2d_collision_object.h"
 #include "box2d_physics_body.h"
 
 /**
@@ -145,14 +146,16 @@ void Box2DFixture::_notification(int p_what) {
 			// If new parent, recreate fixture
 			if (owner_node != new_body) {
 				if (owner_node) {
-					owner_node->disconnect("sleeping_state_changed", Callable(this, "update"));
+					if (owner_node->has_signal("sleeping_state_changed"))
+						owner_node->disconnect("sleeping_state_changed", Callable(this, "update"));
 					owner_node->disconnect("enabled_state_changed", Callable(this, "update"));
 				}
 				destroy_b2();
 
 				owner_node = new_body;
 
-				owner_node->connect("sleeping_state_changed", Callable(this, "update"));
+				if (owner_node->has_signal("sleeping_state_changed"))
+					owner_node->connect("sleeping_state_changed", Callable(this, "update"));
 				owner_node->connect("enabled_state_changed", Callable(this, "update"));
 
 				if (owner_node && owner_node->body && shape.is_valid()) {
@@ -298,11 +301,11 @@ bool Box2DFixture::_edit_is_selected_on_click(const Point2 &p_point, double p_to
 String Box2DFixture::get_configuration_warning() const {
 	String warning = Node2D::get_configuration_warning();
 
-	if (!Object::cast_to<Box2DPhysicsBody>(get_parent())) {
+	if (!Object::cast_to<Box2DCollisionObject>(get_parent())) {
 		if (warning != String()) {
 			warning += "\n\n";
 		}
-		warning += TTR("Box2DFixture subtypes only serve to provide collision fixtures to a Box2DPhysicsBody node. Please use it as a child of Box2DPhysicsBody to give it collision.");
+		warning += TTR("Box2DFixture subtypes only serve to provide collision fixtures to a Box2DCollisionObject node. Please use it as a child of Box2DPhysicsBody or Box2DArea to give it collision.");
 	}
 
 	return warning;

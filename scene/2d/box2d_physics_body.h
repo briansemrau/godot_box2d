@@ -92,6 +92,7 @@ protected:
 public:
 	void _add_area(Box2DArea *p_area);
 	void _remove_area(Box2DArea *p_area);
+	void _remove_area_variant(const Variant &p_area);
 
 	virtual String get_configuration_warning() const override;
 

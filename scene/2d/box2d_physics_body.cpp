@@ -1,6 +1,7 @@
 #include "box2d_physics_body.h"
 
 #include <core/config/engine.h>
+#include <scene/scene_string_names.h>
 
 #include "box2d_area.h"
 #include "box2d_fixtures.h"
@@ -133,15 +134,22 @@ void Box2DPhysicsBody::_update_area_effects() {
 			Box2DArea::SpaceOverride mode = area_arr[i].area->get_space_override_mode();
 			switch (mode) {
 				case Box2DArea::SpaceOverride::SPACE_OVERRIDE_COMBINE_REPLACE: {
+					_compute_area_effects(area_arr[i].area, gravity, linear_damp, angular_damp);
 					stopped = true;
-				} // don't break;
+				} break;
+
 				case Box2DArea::SpaceOverride::SPACE_OVERRIDE_COMBINE: {
 					_compute_area_effects(area_arr[i].area, gravity, linear_damp, angular_damp);
 				} break;
 
 				case Box2DArea::SpaceOverride::SPACE_OVERRIDE_REPLACE: {
+					gravity = b2Vec2_zero;
+					angular_damp = 0;
+					linear_damp = 0;
+					_compute_area_effects(area_arr[i].area, gravity, linear_damp, angular_damp);
 					stopped = true;
-				} // don't break;
+				} break;
+
 				case Box2DArea::SpaceOverride::SPACE_OVERRIDE_REPLACE_COMBINE: {
 					gravity = b2Vec2_zero;
 					angular_damp = 0;
@@ -156,6 +164,7 @@ void Box2DPhysicsBody::_update_area_effects() {
 		}
 	}
 	if (!stopped) {
+		// Apply default area effects
 		//_compute_area_effects(def_area, gravity, linear_damp, angular_damp);
 		gravity += body->GetWorld()->GetGravity();
 		linear_damp += body->GetLinearDamping();
@@ -391,21 +400,22 @@ void Box2DPhysicsBody::_bind_methods() {
 void Box2DPhysicsBody::_add_area(Box2DArea *p_area) {
 	Box2DAreaItem item = Box2DAreaItem(p_area);
 	const int index = colliding_areas.find(item);
-	if (index > -1) {
-		//areas.write[index].count += 1;
-	} else {
+	if (index == -1) {
 		colliding_areas.ordered_insert(item);
+		p_area->connect(SceneStringNames::get_singleton()->tree_exited, callable_mp(this, &Box2DPhysicsBody::_remove_area_variant), { Variant(p_area) }, Object::ConnectFlags::CONNECT_ONESHOT);
 	}
 }
 
 void Box2DPhysicsBody::_remove_area(Box2DArea *p_area) {
 	const int index = colliding_areas.find(Box2DAreaItem(p_area));
 	if (index > -1) {
-		//colliding_areas.write[index].refCount -= 1;
-		//if (colliding_areas[index].refCount < 1) {
 		colliding_areas.remove(index);
-		//}
+		p_area->disconnect(SceneStringNames::get_singleton()->tree_exited, callable_mp(this, &Box2DPhysicsBody::_remove_area_variant));
 	}
+}
+
+void Box2DPhysicsBody::_remove_area_variant(const Variant &p_area) {
+	_remove_area(dynamic_cast<Box2DArea *>(static_cast<Object *>(p_area)));
 }
 
 String Box2DPhysicsBody::get_configuration_warning() const {

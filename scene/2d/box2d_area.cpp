@@ -103,11 +103,11 @@ void Box2DArea::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_monitorable"), &Box2DArea::is_monitorable);
 
 	// TODO
-	//ClassDB::bind_method(D_METHOD("get_overlapping_bodies"), &Box2DArea::get_overlapping_bodies);
-	//ClassDB::bind_method(D_METHOD("get_overlapping_areas"), &Box2DArea::get_overlapping_areas);
+	ClassDB::bind_method(D_METHOD("get_overlapping_bodies"), &Box2DArea::get_overlapping_bodies);
+	ClassDB::bind_method(D_METHOD("get_overlapping_areas"), &Box2DArea::get_overlapping_areas);
 
-	//ClassDB::bind_method(D_METHOD("overlaps_body", "body"), &Box2DArea::overlaps_body);
-	//ClassDB::bind_method(D_METHOD("overlaps_area", "area"), &Box2DArea::overlaps_area);
+	ClassDB::bind_method(D_METHOD("overlaps_body", "body"), &Box2DArea::overlaps_body);
+	ClassDB::bind_method(D_METHOD("overlaps_area", "area"), &Box2DArea::overlaps_area);
 
 	ClassDB::bind_method(D_METHOD("set_audio_bus_name", "name"), &Box2DArea::set_audio_bus_name);
 	ClassDB::bind_method(D_METHOD("get_audio_bus_name"), &Box2DArea::get_audio_bus_name);
@@ -252,6 +252,48 @@ void Box2DArea::set_monitorable(bool p_enable) {
 
 bool Box2DArea::is_monitorable() const {
 	return monitorable;
+}
+
+TypedArray<Node2D> Box2DArea::get_overlapping_bodies() const {
+	ERR_FAIL_COND_V_MSG(!monitoring, Array(), "Can't find overlapping bodies when monitoring is off.");
+	TypedArray<Node2D> ret;
+	ret.resize(contact_monitor->entered_objects.size()); // this is too big but better to allocate than resize N times
+
+	int idx = 0;
+	for (const ObjectID *key = contact_monitor->entered_objects.next(NULL); key; key = contact_monitor->entered_objects.next(key)) {
+		const Object *obj = ObjectDB::get_instance(*key);
+		const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(obj);
+		if (body)
+			ret[idx++] = body;
+	}
+	ret.resize(idx);
+
+	return ret;
+}
+
+TypedArray<Box2DArea> Box2DArea::get_overlapping_areas() const {
+	ERR_FAIL_COND_V_MSG(!monitoring, Array(), "Can't find overlapping areas when monitoring is off.");
+	TypedArray<Box2DArea> ret;
+	ret.resize(contact_monitor->entered_objects.size()); // this is too big but better to allocate than resize N times
+
+	int idx = 0;
+	for (const ObjectID *key = contact_monitor->entered_objects.next(NULL); key; key = contact_monitor->entered_objects.next(key)) {
+		const Object *obj = ObjectDB::get_instance(*key);
+		const Box2DArea *area = dynamic_cast<const Box2DArea *>(obj);
+		if (area)
+			ret[idx++] = area;
+	}
+	ret.resize(idx);
+
+	return ret;
+}
+
+bool Box2DArea::overlaps_area(Node *p_area) const {
+	return contact_monitor->entered_objects.has(p_area->get_instance_id());
+}
+
+bool Box2DArea::overlaps_body(Node *p_body) const {
+	return contact_monitor->entered_objects.has(p_body->get_instance_id());
 }
 
 void Box2DArea::set_audio_bus_override(bool p_override) {
