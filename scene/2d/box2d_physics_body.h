@@ -1,9 +1,9 @@
 #ifndef BOX2D_PHYSICS_BODY_H
 #define BOX2D_PHYSICS_BODY_H
 
+#include <core/io/resource.h>
 #include <core/object/object.h>
 #include <core/object/reference.h>
-#include <core/io/resource.h>
 #include <core/templates/vset.h>
 #include <scene/2d/node_2d.h>
 
@@ -12,8 +12,9 @@
 #include <box2d/b2_world.h>
 
 #include "../../util/box2d_types_converter.h"
-#include "box2d_world.h"
+
 #include "box2d_collision_object.h"
+#include "box2d_world.h"
 
 /**
 * @author Brian Semrau
@@ -58,6 +59,11 @@ private:
 	void update_mass(bool p_calc_reset = true);
 
 	void sync_state();
+
+	virtual void _on_object_entered(Box2DCollisionObject *p_object) override;
+	virtual void _on_object_exited(Box2DCollisionObject *p_object) override;
+	virtual void _on_fixture_entered(Box2DFixture *p_fixture) override;
+	virtual void _on_fixture_exited(Box2DFixture *p_fixture) override;
 
 protected:
 	virtual void on_b2Body_created() override;
@@ -112,7 +118,7 @@ public:
 
 	void set_fixed_rotation(bool p_fixed);
 	bool is_fixed_rotation() const;
-	
+
 	Array get_collision_exceptions();
 	void add_collision_exception_with(Node *p_node);
 	void remove_collision_exception_with(Node *p_node);

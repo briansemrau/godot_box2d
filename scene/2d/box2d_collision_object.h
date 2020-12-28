@@ -12,11 +12,13 @@
 #include <box2d/b2_world.h>
 
 #include "../../util/box2d_types_converter.h"
-#include "box2d_world.h"
 
 /**
 * @author Brian Semrau
 */
+
+class Box2DWorld;
+struct Box2DContactPoint;
 
 class Box2DCollisionObject : public Node2D {
 	GDCLASS(Box2DCollisionObject, Node2D);
@@ -67,6 +69,11 @@ protected:
 
 	void _set_contact_monitor(bool p_enabled);
 	bool _is_contact_monitor_enabled() const;
+
+	virtual void _on_object_entered(Box2DCollisionObject *p_object) = 0;
+	virtual void _on_object_exited(Box2DCollisionObject *p_object) = 0;
+	virtual void _on_fixture_entered(Box2DFixture *p_fixture) = 0;
+	virtual void _on_fixture_exited(Box2DFixture *p_fixture) = 0;
 
 protected:
 	void _notification(int p_what);

@@ -305,9 +305,7 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 		++(*body_count_ptr);
 
 		if (*body_count_ptr == 1) {
-			// TODO replace with callable_mp to Box2DCollisionObject virtual func `object_entered`
-			// This func can then call signals "body/area_entered"
-			collision_callback_queue.push_back(GodotSignalCaller("body_entered", body_a, body_b, nullptr));
+			object_entered_queue.enqueue(body_a, body_b);
 		}
 
 		int *fix_count_ptr = body_a->contact_monitor->entered_objects.getptr(fnode_b->get_instance_id());
@@ -317,7 +315,7 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 		++(*fix_count_ptr);
 
 		if (*fix_count_ptr == 1) {
-			collision_callback_queue.push_back(GodotSignalCaller("body_fixture_entered", body_a, fnode_b, fnode_a));
+			fixture_entered_queue.enqueue(body_a, fnode_b);
 		}
 	}
 	if (monitoringB) {
@@ -328,7 +326,7 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 		++(*body_count_ptr);
 
 		if (*body_count_ptr == 1) {
-			collision_callback_queue.push_back(GodotSignalCaller("body_entered", body_b, body_a, nullptr));
+			object_entered_queue.enqueue(body_b, body_a);
 		}
 
 		int *fix_count_ptr = body_b->contact_monitor->entered_objects.getptr(fnode_a->get_instance_id());
@@ -338,7 +336,7 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 		++(*fix_count_ptr);
 
 		if (*fix_count_ptr == 1) {
-			collision_callback_queue.push_back(GodotSignalCaller("body_fixture_entered", body_b, fnode_a, fnode_b));
+			fixture_entered_queue.enqueue(body_b, fnode_a);
 		}
 	}
 }
@@ -359,7 +357,7 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 
 		if ((*body_count_ptr) == 0) {
 			body_a->contact_monitor->entered_objects.erase(body_b->get_instance_id());
-			collision_callback_queue.push_back(GodotSignalCaller("body_exited", body_a, body_b, nullptr));
+			object_exited_queue.enqueue(body_a, body_b);
 		}
 
 		int *fix_count_ptr = body_a->contact_monitor->entered_objects.getptr(fnode_b->get_instance_id());
@@ -367,7 +365,7 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 
 		if ((*fix_count_ptr) == 0) {
 			body_a->contact_monitor->entered_objects.erase(fnode_b->get_instance_id());
-			collision_callback_queue.push_back(GodotSignalCaller("body_fixture_exited", body_a, fnode_b, fnode_a));
+			fixture_exited_queue.enqueue(body_a, fnode_b);
 		}
 	}
 	if (monitoringB) {
@@ -376,7 +374,7 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 
 		if ((*body_count_ptr) == 0) {
 			body_b->contact_monitor->entered_objects.erase(body_a->get_instance_id());
-			collision_callback_queue.push_back(GodotSignalCaller("body_exited", body_b, body_a, nullptr));
+			object_exited_queue.enqueue(body_b, body_a);
 		}
 
 		int *fix_count_ptr = body_b->contact_monitor->entered_objects.getptr(fnode_a->get_instance_id());
@@ -384,7 +382,7 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 
 		if ((*fix_count_ptr) == 0) {
 			body_b->contact_monitor->entered_objects.erase(fnode_a->get_instance_id());
-			collision_callback_queue.push_back(GodotSignalCaller("body_fixture_exited", body_b, fnode_a, fnode_b));
+			fixture_exited_queue.enqueue(body_b, fnode_a);
 		}
 	}
 
@@ -640,12 +638,6 @@ void Box2DWorld::_bind_methods() {
 }
 
 void Box2DWorld::step(float p_step) {
-	//print_line(("step: " + std::to_string(p_step)
-	//		+ ", gravity: ("
-	//		+ std::to_string(world->GetGravity().x) + ", "
-	//		+ std::to_string(world->GetGravity().y) + ")")
-	//	.c_str());
-
 	// Reset contact "solves" counter to 0
 	const uint64_t *k = NULL;
 	while ((k = contact_buffer.next(k))) {
@@ -658,17 +650,11 @@ void Box2DWorld::step(float p_step) {
 	world->Step(p_step, 8, 8);
 	flag_rescan_contacts_monitored = false;
 
-	// Pump callbacks
-	while(!collision_callback_queue.empty()) {
-		GodotSignalCaller sig = collision_callback_queue.front();
-		if(sig.obj_b) {
-			sig.obj_emitter->emit_signal(sig.signal_name, sig.obj_a, sig.obj_b);
-		}
-		else {
-			sig.obj_emitter->emit_signal(sig.signal_name, sig.obj_a);
-		}
-		collision_callback_queue.pop_front();
-	}
+	// Body/shape inout callbacks
+	object_entered_queue.call_and_clear();
+	object_exited_queue.call_and_clear();
+	fixture_entered_queue.call_and_clear();
+	fixture_exited_queue.call_and_clear();
 
 	// Notify our bodies in this world
 	propagate_notification(NOTIFICATION_WORLD_STEPPED);

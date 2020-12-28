@@ -2,6 +2,7 @@
 
 #include <core/config/engine.h>
 
+#include "box2d_world.h"
 #include "box2d_fixtures.h"
 #include "box2d_joints.h"
 

@@ -1,6 +1,7 @@
 #include "box2d_physics_body.h"
 
 #include <core/config/engine.h>
+#include <scene/scene_string_names.h>
 
 #include "box2d_fixtures.h"
 #include "box2d_joints.h"
@@ -90,6 +91,34 @@ void Box2DPhysicsBody::sync_state() {
 	//if (contact_monitoring) {
 	//	world_node->world.contac
 	//}
+}
+
+void Box2DPhysicsBody::_on_object_entered(Box2DCollisionObject *p_object) {
+	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_object);
+	if (body) {
+		emit_signal(SceneStringNames::get_singleton()->body_entered, body);
+	}
+}
+
+void Box2DPhysicsBody::_on_object_exited(Box2DCollisionObject *p_object) {
+	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_object);
+	if (body) {
+		emit_signal(SceneStringNames::get_singleton()->body_exited, body);
+	}
+}
+
+void Box2DPhysicsBody::_on_fixture_entered(Box2DFixture *p_fixture) {
+	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_fixture->_get_owner_node());
+	if (body) {
+		emit_signal("body_fixture_entered", p_fixture);
+	}
+}
+
+void Box2DPhysicsBody::_on_fixture_exited(Box2DFixture *p_fixture) {
+	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_fixture->_get_owner_node());
+	if (body) {
+		emit_signal("body_fixture_exited", p_fixture);
+	}
 }
 
 void Box2DPhysicsBody::_notification(int p_what) {
@@ -263,11 +292,11 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "custom_mass", PROPERTY_HINT_EXP_RANGE, "0.01,65535,0.01"), "set_custom_mass", "get_custom_mass");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "custom_inertia", PROPERTY_HINT_EXP_RANGE, "0.01,65535,0.01"), "set_custom_inertia", "get_custom_inertia");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "custom_center_of_mass"), "set_custom_center_of_mass", "get_custom_center_of_mass");
-	
-	ADD_SIGNAL(MethodInfo("body_fixture_entered", PropertyInfo(Variant::OBJECT, "fixture", PROPERTY_HINT_RESOURCE_TYPE, "Node"), PropertyInfo(Variant::OBJECT, "local_fixture", PROPERTY_HINT_RESOURCE_TYPE, "Node")));
-	ADD_SIGNAL(MethodInfo("body_fixture_exited", PropertyInfo(Variant::OBJECT, "fixture", PROPERTY_HINT_RESOURCE_TYPE, "Node"), PropertyInfo(Variant::OBJECT, "local_fixture", PROPERTY_HINT_RESOURCE_TYPE, "Node")));
-	ADD_SIGNAL(MethodInfo("body_entered", PropertyInfo(Variant::OBJECT, "body", PROPERTY_HINT_RESOURCE_TYPE, "Node")));
-	ADD_SIGNAL(MethodInfo("body_exited", PropertyInfo(Variant::OBJECT, "body", PROPERTY_HINT_RESOURCE_TYPE, "Node")));
+
+	ADD_SIGNAL(MethodInfo("body_fixture_entered", PropertyInfo(Variant::OBJECT, "fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture"), PropertyInfo(Variant::OBJECT, "local_fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture")));
+	ADD_SIGNAL(MethodInfo("body_fixture_exited", PropertyInfo(Variant::OBJECT, "fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture"), PropertyInfo(Variant::OBJECT, "local_fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture")));
+	ADD_SIGNAL(MethodInfo("body_entered", PropertyInfo(Variant::OBJECT, "body", PROPERTY_HINT_RESOURCE_TYPE, "Box2DPhysicsBody")));
+	ADD_SIGNAL(MethodInfo("body_exited", PropertyInfo(Variant::OBJECT, "body", PROPERTY_HINT_RESOURCE_TYPE, "Box2DPhysicsBody")));
 	ADD_SIGNAL(MethodInfo("sleeping_state_changed"));
 
 	BIND_ENUM_CONSTANT(MODE_RIGID);
@@ -353,7 +382,6 @@ void Box2DPhysicsBody::set_custom_mass(const real_t p_mass) {
 }
 
 real_t Box2DPhysicsBody::get_custom_mass() const {
-
 	return massDataDef.mass;
 }
 
