@@ -1,6 +1,7 @@
 #include "box2d_area.h"
 
-#include "servers/audio_server.h"
+#include <scene/scene_string_names.h>
+#include <servers/audio_server.h>
 
 #include "box2d_fixtures.h"
 #include "box2d_physics_body.h"
@@ -21,9 +22,9 @@ void Box2DArea::_on_object_entered(Box2DCollisionObject *p_object) {
 
 	if (monitoring) {
 		if (body) {
-			emit_signal("body_entered", body);
+			emit_signal(SceneStringNames::get_singleton()->body_entered, body);
 		} else if (area && area->is_monitorable()) {
-			emit_signal("area_entered", area);
+			emit_signal(SceneStringNames::get_singleton()->area_entered, area);
 		}
 	}
 }
@@ -33,14 +34,15 @@ void Box2DArea::_on_object_exited(Box2DCollisionObject *p_object) {
 	const Box2DArea *area = dynamic_cast<const Box2DArea *>(p_object);
 
 	if (body) {
+		// Try to remove even if space_override==disabled
 		body->_remove_area(this);
 	}
 
 	if (monitoring) {
 		if (body) {
-			emit_signal("body_exited", body);
+			emit_signal(SceneStringNames::get_singleton()->body_exited, body);
 		} else if (area && area->is_monitorable()) {
-			emit_signal("area_exited", area);
+			emit_signal(SceneStringNames::get_singleton()->area_exited, area);
 		}
 	}
 }
@@ -90,11 +92,11 @@ void Box2DArea::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_priority", "priority"), &Box2DArea::set_priority);
 	ClassDB::bind_method(D_METHOD("get_priority"), &Box2DArea::get_priority);
 
-	//ClassDB::bind_method(D_METHOD("set_collision_mask_bit", "bit", "value"), &Box2DArea::set_collision_mask_bit);
-	//ClassDB::bind_method(D_METHOD("get_collision_mask_bit", "bit"), &Box2DArea::get_collision_mask_bit);
+	ClassDB::bind_method(D_METHOD("set_collision_mask_bit", "bit", "value"), &Box2DArea::set_collision_mask_bit);
+	ClassDB::bind_method(D_METHOD("get_collision_mask_bit", "bit"), &Box2DArea::get_collision_mask_bit);
 
-	//ClassDB::bind_method(D_METHOD("set_collision_layer_bit", "bit", "value"), &Box2DArea::set_collision_layer_bit);
-	//ClassDB::bind_method(D_METHOD("get_collision_layer_bit", "bit"), &Box2DArea::get_collision_layer_bit);
+	ClassDB::bind_method(D_METHOD("set_collision_layer_bit", "bit", "value"), &Box2DArea::set_collision_layer_bit);
+	ClassDB::bind_method(D_METHOD("get_collision_layer_bit", "bit"), &Box2DArea::get_collision_layer_bit);
 
 	ClassDB::bind_method(D_METHOD("set_monitoring", "enable"), &Box2DArea::set_monitoring);
 	ClassDB::bind_method(D_METHOD("is_monitoring"), &Box2DArea::is_monitoring);
@@ -102,7 +104,6 @@ void Box2DArea::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_monitorable", "enable"), &Box2DArea::set_monitorable);
 	ClassDB::bind_method(D_METHOD("is_monitorable"), &Box2DArea::is_monitorable);
 
-	// TODO
 	ClassDB::bind_method(D_METHOD("get_overlapping_bodies"), &Box2DArea::get_overlapping_bodies);
 	ClassDB::bind_method(D_METHOD("get_overlapping_areas"), &Box2DArea::get_overlapping_areas);
 
@@ -254,10 +255,39 @@ bool Box2DArea::is_monitorable() const {
 	return monitorable;
 }
 
+void Box2DArea::set_collision_mask_bit(int p_bit, bool p_value) {
+	uint32_t mask = get_collision_mask();
+	if (p_value) {
+		mask |= 1 << p_bit;
+	} else {
+		mask &= ~(1 << p_bit);
+	}
+	set_collision_mask(mask);
+}
+
+bool Box2DArea::get_collision_mask_bit(int p_bit) const {
+	return get_collision_mask() & (1 << p_bit);
+}
+
+void Box2DArea::set_collision_layer_bit(int p_bit, bool p_value) {
+	uint32_t layer = get_collision_layer();
+	if (p_value) {
+		layer |= 1 << p_bit;
+	} else {
+		layer &= ~(1 << p_bit);
+	}
+	set_collision_layer(layer);
+}
+
+bool Box2DArea::get_collision_layer_bit(int p_bit) const {
+	return get_collision_layer() & (1 << p_bit);
+}
+
 TypedArray<Node2D> Box2DArea::get_overlapping_bodies() const {
 	ERR_FAIL_COND_V_MSG(!monitoring, Array(), "Can't find overlapping bodies when monitoring is off.");
 	TypedArray<Node2D> ret;
-	ret.resize(contact_monitor->entered_objects.size()); // this is too big but better to allocate than resize N times
+	// allocate upper bound to avoid multiple allocations
+	ret.resize(contact_monitor->entered_objects.size());
 
 	int idx = 0;
 	for (const ObjectID *key = contact_monitor->entered_objects.next(NULL); key; key = contact_monitor->entered_objects.next(key)) {
@@ -274,7 +304,8 @@ TypedArray<Node2D> Box2DArea::get_overlapping_bodies() const {
 TypedArray<Box2DArea> Box2DArea::get_overlapping_areas() const {
 	ERR_FAIL_COND_V_MSG(!monitoring, Array(), "Can't find overlapping areas when monitoring is off.");
 	TypedArray<Box2DArea> ret;
-	ret.resize(contact_monitor->entered_objects.size()); // this is too big but better to allocate than resize N times
+	// allocate upper bound to avoid multiple allocations
+	ret.resize(contact_monitor->entered_objects.size());
 
 	int idx = 0;
 	for (const ObjectID *key = contact_monitor->entered_objects.next(NULL); key; key = contact_monitor->entered_objects.next(key)) {

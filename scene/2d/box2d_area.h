@@ -50,7 +50,6 @@ private:
 	virtual void _on_fixture_exited(Box2DFixture *p_fixture) override;
 
 protected:
-	//void _notification(int p_what);
 	static void _bind_methods();
 	void _validate_property(PropertyInfo &property) const override;
 
@@ -85,11 +84,11 @@ public:
 	void set_monitorable(bool p_enable);
 	bool is_monitorable() const;
 
-	//void set_collision_mask_bit(int p_bit, bool p_value);
-	//bool get_collision_mask_bit(int p_bit) const;
+	void set_collision_mask_bit(int p_bit, bool p_value);
+	bool get_collision_mask_bit(int p_bit) const;
 
-	//void set_collision_layer_bit(int p_bit, bool p_value);
-	//bool get_collision_layer_bit(int p_bit) const;
+	void set_collision_layer_bit(int p_bit, bool p_value);
+	bool get_collision_layer_bit(int p_bit) const;
 
 	TypedArray<Node2D> get_overlapping_bodies() const; // TODO should the return type be Box2DPhysicsObject?
 	TypedArray<Box2DArea> get_overlapping_areas() const;

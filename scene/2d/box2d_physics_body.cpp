@@ -185,7 +185,7 @@ void Box2DPhysicsBody::_update_area_effects() {
 void Box2DPhysicsBody::_on_object_entered(Box2DCollisionObject *p_object) {
 	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_object);
 	if (body) {
-		emit_signal("body_entered", body);
+		emit_signal(SceneStringNames::get_singleton()->body_entered, body);
 	}
 	// ignore areas
 }
@@ -193,7 +193,7 @@ void Box2DPhysicsBody::_on_object_entered(Box2DCollisionObject *p_object) {
 void Box2DPhysicsBody::_on_object_exited(Box2DCollisionObject *p_object) {
 	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_object);
 	if (body) {
-		emit_signal("body_exited", body);
+		emit_signal(SceneStringNames::get_singleton()->body_exited, body);
 	}
 	// ignore areas
 }

@@ -49,7 +49,7 @@ private:
 
 	Transform2D last_valid_xform;
 
-	// For sorting areas
+	// For sorting colliding areas by priority
 	struct Box2DAreaItem {
 		const Box2DArea *area = NULL;
 		inline bool operator==(const Box2DAreaItem &p_item) const { return area == p_item.area; }
