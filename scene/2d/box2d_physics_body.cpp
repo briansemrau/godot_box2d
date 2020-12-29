@@ -94,22 +94,22 @@ void Box2DPhysicsBody::sync_state() {
 	//}
 }
 
-void Box2DPhysicsBody::_compute_area_effects(const Box2DArea *p_area, b2Vec2 &p_gravity, float &p_lin_damp, float &p_ang_damp) {
+void Box2DPhysicsBody::_compute_area_effects(const Box2DArea *p_area, b2Vec2 &r_gravity, float &r_lin_damp, float &r_ang_damp) {
 	b2Body *body = _get_b2Body();
 
 	if (p_area->is_gravity_a_point()) {
 		if (p_area->get_gravity_distance_scale() > 0) {
 			Vector2 v = p_area->get_transform().xform(p_area->get_gravity_vector()) - get_transform().get_origin();
-			p_gravity += gd_to_b2(v.normalized() * (p_area->get_gravity() / Math::pow(v.length() * p_area->get_gravity_distance_scale() + 1, 2)));
+			r_gravity += gd_to_b2(v.normalized() * (p_area->get_gravity() / Math::pow(v.length() * p_area->get_gravity_distance_scale() + 1, 2)));
 		} else {
-			p_gravity += gd_to_b2((p_area->get_transform().xform(p_area->get_gravity_vector()) - get_transform().get_origin()).normalized() * p_area->get_gravity());
+			r_gravity += gd_to_b2((p_area->get_transform().xform(p_area->get_gravity_vector()) - get_transform().get_origin()).normalized() * p_area->get_gravity());
 		}
 	} else {
-		p_gravity += gd_to_b2(p_area->get_gravity_vector() * p_area->get_gravity());
+		r_gravity += gd_to_b2(p_area->get_gravity_vector() * p_area->get_gravity());
 	}
 
-	p_lin_damp += p_area->get_linear_damp();
-	p_ang_damp += p_area->get_angular_damp();
+	r_lin_damp += p_area->get_linear_damp();
+	r_ang_damp += p_area->get_angular_damp();
 }
 
 void Box2DPhysicsBody::_update_area_effects() {
