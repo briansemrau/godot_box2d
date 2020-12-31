@@ -97,12 +97,7 @@ struct ContactBufferManifold {
 class Box2DWorld;
 class Box2DPhysicsBody;
 
-class Box2DShapeQueryParameters : public Reference {
-	GDCLASS(Box2DShapeQueryParameters, Reference);
-
-	friend class Box2DWorld;
-
-	Ref<Box2DShape> shape_ref;
+struct MotionQueryParameters {
 	Transform2D transform = Transform2D();
 
 	Set<Box2DPhysicsBody *> exclude;
@@ -113,10 +108,19 @@ class Box2DShapeQueryParameters : public Reference {
 
 	// Properties exclusive for cast_motion
 	Vector2 motion = Vector2(0, 0);
-	float rotation = 0.0f;
-	Vector2 local_center = Vector2(0, 0);
-	//bool predict_other_body_motion = false;
+	float rotation = 0.0f; // TODO should these be combined to Transform2D?
+	Vector2 local_center = Vector2(0, 0); // TODO rename shape_local_center
+	//bool predict_other_body_motion = false; // naive prediction of other bodys' motion
 	//float motion_timedelta_for_prediction = 1/60;
+};
+
+class Box2DShapeQueryParameters : public Reference {
+	GDCLASS(Box2DShapeQueryParameters, Reference);
+
+	friend class Box2DWorld;
+
+	Ref<Box2DShape> shape_ref;
+	MotionQueryParameters parameters;
 
 protected:
 	static void _bind_methods();
@@ -163,6 +167,8 @@ public:
 	Vector<int64_t> get_exclude() const;
 };
 
+class Box2DPhysicsTestMotionResult;
+
 class Box2DWorld : public Node2D, public virtual b2DestructionListener, public virtual b2ContactFilter, public virtual b2ContactListener {
 	GDCLASS(Box2DWorld, Node2D);
 
@@ -184,6 +190,8 @@ private:
 			obj_b = p_objb;
 		}
 	};
+
+	// b2World Space Query Callbacks
 
 	class PointQueryCallback : public b2QueryCallback {
 	public:
@@ -244,6 +252,16 @@ private:
 		virtual float ReportFixture(b2Fixture *fixture, const b2Vec2 &point, const b2Vec2 &normal, float fraction) override;
 	};
 
+	struct CastQueryWrapper {
+		const b2BroadPhase *broadPhase;
+
+		const MotionQueryParameters *params;
+
+		Vector<b2FixtureProxy *> results;
+
+		bool QueryCallback(int32 proxyId);
+	};
+
 private:
 	Vector2 gravity;
 	bool auto_step{true};
@@ -251,14 +269,19 @@ private:
 
 	std::list<GodotSignalCaller> collision_callback_queue{};
 
+	// TODO make sure these are using the best data structure
 	Set<Box2DPhysicsBody *> bodies;
 	Set<Box2DJoint *> joints;
+
+	// b2World Callbacks
+	// TODO extract into classes
 
 	virtual void SayGoodbye(b2Joint *joint) override;
 	virtual void SayGoodbye(b2Fixture *fixture) override;
 
 	virtual bool ShouldCollide(b2Fixture *fixtureA, b2Fixture *fixtureB) override;
 
+	// TODO class ContactManager
 	int32_t next_contact_id = 0;
 	bool flag_rescan_contacts_monitored = false;
 	HashMap<uint64_t, ContactBufferManifold> contact_buffer;
@@ -276,6 +299,7 @@ private:
 	/// in a separate data structure.
 	/// Note: this is only called for contacts that are touching, solid, and awake.
 	virtual void PostSolve(b2Contact *contact, const b2ContactImpulse *impulse) override;
+	// end TODO
 
 	PointQueryCallback point_callback;
 	RaycastQueryCallback ray_callback;
@@ -286,6 +310,9 @@ private:
 
 	void create_b2World();
 	void destroy_b2World();
+
+	// TODO clean code suggests that output params should be a return struct
+	void _test_motion_toi(const Vector<const b2Shape *> &p_cast_b2shapes, const MotionQueryParameters *p_params, b2Fixture *&r_col_fixture, int &r_child_index, float &r_toi, int &r_test_shape_index, int &r_test_shape_child_index);
 
 protected:
 	void _notification(int p_what);
@@ -316,12 +343,55 @@ public:
 	Array intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
 	Array cast_motion(const Ref<Box2DShapeQueryParameters> &p_query);
 
+	// This is by-default continuous collision. Is this slow? TODO test or remove commented code
+	//bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, bool p_continuous_cd, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<PhysicsTestMotionResult2D>());
+	bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<PhysicsTestMotionResult2D>());
+
 	// Box2D space query API
 	void query_aabb(const Rect2 &p_aabb, const Callable &p_callback);
 	void raycast(const Vector2 &p_from, const Vector2 &p_to, const Callable &p_callback);
 
 	Box2DWorld();
 	~Box2DWorld();
+};
+
+class Box2DPhysicsTestMotionResult : public Reference {
+	GDCLASS(Box2DPhysicsTestMotionResult, Reference);
+
+	friend class Box2DWorld;
+
+	// TODO find the best place to put this struct
+	// Godot API includes it in the space2d class but it only seems relevant here.
+	// Perhaps this struct wrapping should not exist at all and params should
+	//     just sit in this class?
+	struct MotionResult {
+		Vector2 motion;
+		Vector2 remainder;
+		float t; // TOI with respect to motion [0, 1]
+
+		Vector2 collision_point;
+		Vector2 collision_normal;
+		Vector2 collider_velocity;
+		Box2DFixture *collider_fixture = nullptr;
+	};
+
+	MotionResult result;
+
+protected:
+	static void _bind_methods();
+
+public:
+	//bool is_colliding() const; // TODO return toi < 1.0f
+	Vector2 get_motion() const;
+	Vector2 get_motion_remainder() const;
+
+	Vector2 get_collision_point() const;
+	Vector2 get_collision_normal() const;
+	Vector2 get_collider_velocity() const;
+	ObjectID get_collider_fixture_id() const;
+	Object *get_collider_fixture() const;
+
+	Box2DPhysicsTestMotionResult();
 };
 
 #endif // BOX2D_WORLD_H
