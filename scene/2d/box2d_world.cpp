@@ -1163,8 +1163,6 @@ float Box2DWorld::RaycastQueryCallback::ReportFixture(b2Fixture *fixture, const 
 }
 
 inline bool _check_shape_overlaps_with_shapes(const b2Shape *p_b2shape, const b2Transform &p_transform, const Vector<const b2Shape *> p_other_b2shapes, const b2Transform &p_shapes_transform) {
-	bool overlaps = false;
-
 	for (int index_A = 0; index_A < p_b2shape->GetChildCount(); ++index_A) {
 
 		for (int i = 0; i < p_other_b2shapes.size(); ++i) {
@@ -1173,16 +1171,11 @@ inline bool _check_shape_overlaps_with_shapes(const b2Shape *p_b2shape, const b2
 			for (int index_B = 0; index_B < other_b2shape->GetChildCount(); ++index_B) {
 
 				if (b2TestOverlap(p_b2shape, index_A, other_b2shape, index_B, p_transform, p_shapes_transform)) {
-					overlaps = true;
-					goto endloop;
+					return true;
 				}
 			}
 		}
 	}
-endloop:
-
-	if (!overlaps)
-		return true;
 
 	return false;
 }
@@ -1192,7 +1185,7 @@ bool Box2DWorld::ShapeQueryCallback::ReportFixture(b2Fixture *fixture) {
 		return true;
 
 	// Check intersection
-	if (_check_shape_overlaps_with_shapes(fixture->GetShape(), fixture->GetBody()->GetTransform(), params->shape_ref->get_shapes(), gd_to_b2(params->get_transform()))) {
+	if (!_check_shape_overlaps_with_shapes(fixture->GetShape(), fixture->GetBody()->GetTransform(), params->shape_ref->get_shapes(), gd_to_b2(params->get_transform()))) {
 		return true;
 	}
 
