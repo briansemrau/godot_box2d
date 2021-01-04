@@ -148,11 +148,13 @@ void Box2DFixture::_notification(int p_what) {
 
 				body_node = new_body;
 
-				body_node->connect("sleeping_state_changed", Callable(this, "update"));
-				body_node->connect("enabled_state_changed", Callable(this, "update"));
+				if (body_node) {
+					body_node->connect("sleeping_state_changed", Callable(this, "update"));
+					body_node->connect("enabled_state_changed", Callable(this, "update"));
 
-				if (body_node && body_node->body && shape.is_valid()) {
-					create_b2();
+					if (body_node->body && shape.is_valid()) {
+						create_b2();
+					}
 				}
 			}
 
