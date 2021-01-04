@@ -136,7 +136,13 @@ void Box2DFixture::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_ENTER_TREE: {
-			Box2DPhysicsBody *new_body = Object::cast_to<Box2DPhysicsBody>(get_parent());
+			// Find the parent body
+			Node *_ancestor = get_parent();
+			Box2DPhysicsBody *new_body = NULL;
+			while (_ancestor && !new_body) {
+				new_body = Object::cast_to<Box2DPhysicsBody>(_ancestor);
+				_ancestor = _ancestor->get_parent();
+			}
 
 			// If new parent, recreate fixture
 			if (body_node != new_body) {
@@ -148,11 +154,13 @@ void Box2DFixture::_notification(int p_what) {
 
 				body_node = new_body;
 
-				body_node->connect("sleeping_state_changed", Callable(this, "update"));
-				body_node->connect("enabled_state_changed", Callable(this, "update"));
+				if (body_node) {
+					body_node->connect("sleeping_state_changed", Callable(this, "update"));
+					body_node->connect("enabled_state_changed", Callable(this, "update"));
 
-				if (body_node && body_node->body && shape.is_valid()) {
-					create_b2();
+					if (body_node->body && shape.is_valid()) {
+						create_b2();
+					}
 				}
 			}
 
@@ -285,11 +293,19 @@ bool Box2DFixture::_edit_is_selected_on_click(const Point2 &p_point, double p_to
 String Box2DFixture::get_configuration_warning() const {
 	String warning = Node2D::get_configuration_warning();
 
-	if (!Object::cast_to<Box2DPhysicsBody>(get_parent())) {
+	// Find the parent body
+	Node *_ancestor = get_parent();
+	Box2DPhysicsBody *parent_body = NULL;
+	while (_ancestor && !parent_body) {
+		parent_body = Object::cast_to<Box2DPhysicsBody>(_ancestor);
+		_ancestor = _ancestor->get_parent();
+	}
+
+	if (!parent_body) {
 		if (warning != String()) {
 			warning += "\n\n";
 		}
-		warning += TTR("Box2DFixture subtypes only serve to provide collision fixtures to a Box2DPhysicsBody node. Please use it as a child of Box2DPhysicsBody to give it collision.");
+		warning += TTR("Box2DFixture only serves to provide collision fixtures to a Box2DPhysicsBody node. Please use it within the child hierarchy of Box2DPhysicsBody to give it collision.");
 	}
 
 	return warning;
