@@ -65,6 +65,8 @@ public:
 
 	virtual String get_configuration_warning() const override;
 
+	Box2DPhysicsBody *get_body() const { return body_node; }
+
 	//virtual bool test_point(const Point2 &p_point); // TODO figure out how to handle this with edge/chain/(semantic poly made of chain?)
 
 	// raycast
