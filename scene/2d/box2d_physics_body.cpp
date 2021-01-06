@@ -250,6 +250,7 @@ bool Box2DPhysicsBody::_move_and_collide(const Vector2 &p_motion, const float p_
 	if (get_type() != Mode::MODE_KINEMATIC) {
 		ERR_PRINT_ONCE("This function is only meant to be used with Kinematic body types.");
 	}
+	ERR_FAIL_COND_V(!world_node, false);
 
 	// TODO check sync_to_physics property?
 
@@ -346,10 +347,11 @@ void Box2DPhysicsBody::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
-			// Send new transform to physics
-			Transform2D new_xform = get_box2dworld_transform();
-
-			teleport(new_xform);
+			if (get_type() != Mode::MODE_KINEMATIC || kinematic_integrate_velocity) {
+				// Send new transform to physics
+				Transform2D new_xform = get_box2dworld_transform();
+				teleport(new_xform);
+			}
 
 			// Inform joints in editor that we moved
 			if (Engine::get_singleton()->is_editor_hint()) {
