@@ -11,6 +11,78 @@
 * @author Brian Semrau
 */
 
+void Box2DKinematicCollision::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_position"), &Box2DKinematicCollision::get_position);
+	ClassDB::bind_method(D_METHOD("get_normal"), &Box2DKinematicCollision::get_normal);
+	ClassDB::bind_method(D_METHOD("get_travel"), &Box2DKinematicCollision::get_travel);
+	ClassDB::bind_method(D_METHOD("get_remainder"), &Box2DKinematicCollision::get_remainder);
+	ClassDB::bind_method(D_METHOD("get_local_fixture"), &Box2DKinematicCollision::get_local_fixture);
+	ClassDB::bind_method(D_METHOD("get_collider"), &Box2DKinematicCollision::get_collider);
+	ClassDB::bind_method(D_METHOD("get_collider_id"), &Box2DKinematicCollision::get_collider_id);
+	ClassDB::bind_method(D_METHOD("get_collider_fixture"), &Box2DKinematicCollision::get_collider_fixture);
+	ClassDB::bind_method(D_METHOD("get_collider_fixture_id"), &Box2DKinematicCollision::get_collider_fixture_id);
+	ClassDB::bind_method(D_METHOD("get_collider_velocity"), &Box2DKinematicCollision::get_collider_velocity);
+	//ClassDB::bind_method(D_METHOD("get_collider_metadata"), &Box2DKinematicCollision::get_collider_metadata);
+
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "position"), "", "get_position");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "normal"), "", "get_normal");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "travel"), "", "get_travel");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "remainder"), "", "get_remainder");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "local_fixture"), "", "get_local_fixture");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "collider"), "", "get_collider");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "collider_id"), "", "get_collider_id");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "collider_fixture"), "", "get_collider_fixture");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "collider_fixture_id"), "", "get_collider_fixture_id");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "collider_velocity"), "", "get_collider_velocity");
+	//ADD_PROPERTY(PropertyInfo(Variant::NIL, "collider_metadata", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NIL_IS_VARIANT), "", "get_collider_metadata");
+}
+
+Vector2 Box2DKinematicCollision::get_position() const {
+	return collision.collision_point;
+}
+
+Vector2 Box2DKinematicCollision::get_normal() const {
+	return collision.normal;
+}
+
+Vector2 Box2DKinematicCollision::get_travel() const {
+	return collision.travel;
+}
+
+Vector2 Box2DKinematicCollision::get_remainder() const {
+	return collision.remainder;
+}
+
+Object *Box2DKinematicCollision::get_local_fixture() const {
+	return collision.local_fixture;
+}
+
+Object *Box2DKinematicCollision::get_collider() const {
+	if (collision.collider_fixture != nullptr)
+		return collision.collider_fixture->get_body();
+	return nullptr;
+}
+
+ObjectID Box2DKinematicCollision::get_collider_id() const {
+	if (collision.collider_fixture != nullptr)
+		return collision.collider_fixture->get_body()->get_instance_id();
+	return ObjectID();
+}
+
+Object *Box2DKinematicCollision::get_collider_fixture() const {
+	return collision.collider_fixture;
+}
+
+ObjectID Box2DKinematicCollision::get_collider_fixture_id() const {
+	if (collision.collider_fixture != nullptr)
+		return collision.collider_fixture->get_instance_id();
+	return ObjectID();
+}
+
+Vector2 Box2DKinematicCollision::get_collider_velocity() const {
+	return collision.collider_vel;
+}
+
 void Box2DPhysicsBody::on_parent_created(Node *) {
 	//if (create_b2Body()) {
 	//	print_line("body created");
@@ -133,21 +205,81 @@ void Box2DPhysicsBody::set_box2dworld_transform(const Transform2D &p_transform) 
 	set_transform(target_xform);
 }
 
+void Box2DPhysicsBody::pre_step(float p_delta) {
+	if (get_type() == Mode::MODE_KINEMATIC) {
+		if (!kinematic_integrate_velocity) {
+			Transform2D motion = old_xform.affine_inverse() * get_box2dworld_transform();
+			// TODO there is a bug here. See this issue: https://github.com/godotengine/godot/issues/34869
+			// Maybe velocities should be differentiated in NOTIF_TRANSFORM_CHANGED(?) but then
+			// we don't have access to the time step... maybe maintain a member var for motion
+			_set_linear_velocity_no_check(motion.get_origin() / p_delta);
+			_set_angular_velocity_no_check(motion.get_rotation() / p_delta);
+		}
+		old_xform = get_box2dworld_transform();
+	}
+
+	// TODO area effects (pending PR)
+}
+
 void Box2DPhysicsBody::sync_state() {
 	set_block_transform_notify(true);
 	set_box2dworld_transform(b2_to_gd(body->GetTransform()));
 	set_block_transform_notify(false);
+
+	// At the moment, code meant for "_integrate_forces" goes in _physics_process
 	//if (get_script_instance())
 	//	get_script_instance()->call("_integrate_forces");
+}
 
-	// TODO something? check rigidbody2d impl
-	//if (contact_monitoring) {
-	//	world_node->world.contac
-	//}
+void Box2DPhysicsBody::teleport(const Transform2D &p_transform) {
+	bodyDef.position = gd_to_b2(p_transform.get_origin());
+	bodyDef.angle = p_transform.get_rotation();
+
+	if (body) {
+		const b2Vec2 new_b2pos = gd_to_b2(p_transform.get_origin());
+		const float new_b2ang = p_transform.get_rotation();
+		if (body->GetTransform().p != new_b2pos || body->GetTransform().q.GetAngle() != new_b2ang) {
+			body->SetTransform(new_b2pos, new_b2ang);
+		}
+	}
+
+	old_xform = p_transform;
+}
+
+bool Box2DPhysicsBody::_move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia, KinematicCollision &r_collision, const bool p_exclude_raycast_shapes, const bool p_test_only) {
+	if (get_type() != Mode::MODE_KINEMATIC) {
+		ERR_PRINT_ONCE("This function is only meant to be used with Kinematic body types.");
+	}
+
+	// TODO check sync_to_physics property?
+
+	Transform2D gt = get_box2dworld_transform();
+
+	Box2DWorld::MotionResult result;
+	bool colliding = world_node->_body_test_motion(this, gt, p_motion, p_infinite_inertia, &result);
+
+	if (colliding) {
+		r_collision.collision_point = result.collision_point;
+		r_collision.normal = result.collision_normal;
+		r_collision.collider_vel = result.collider_velocity;
+		r_collision.collider_fixture = result.collider_fixture;
+		r_collision.remainder = result.remainder;
+		r_collision.travel = result.motion;
+		r_collision.collider_fixture = result.collider_fixture;
+		r_collision.local_fixture = result.local_fixture;
+	}
+
+	if (!p_test_only) {
+		gt.elements[2] += result.motion;
+		set_block_transform_notify(true);
+		set_box2dworld_transform(gt);
+		set_block_transform_notify(false);
+	}
+
+	return colliding;
 }
 
 void Box2DPhysicsBody::_notification(int p_what) {
-	// TODO finalize implementation to imitate behavior from RigidBody2D and Kinematic (static too?)
 	switch (p_what) {
 		case NOTIFICATION_PREDELETE: {
 			// Inform joints that this node is no more
@@ -166,8 +298,8 @@ void Box2DPhysicsBody::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_ENTER_TREE: {
-			//last_valid_xform = get_global_transform();
-			last_valid_xform = get_box2dworld_transform();
+			//last_valid_xform = get_box2dworld_transform();
+			old_xform = get_box2dworld_transform();
 
 			// Find the Box2DWorld
 			Node *_ancestor = get_parent();
@@ -215,22 +347,9 @@ void Box2DPhysicsBody::_notification(int p_what) {
 
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
 			// Send new transform to physics
-			//Transform2D new_xform = get_global_transform();
-			//Transform2D new_xform = get_box2dworld_transform();
 			Transform2D new_xform = get_box2dworld_transform();
 
-			bodyDef.position = gd_to_b2(new_xform.get_origin());
-			bodyDef.angle = new_xform.get_rotation();
-
-			if (body) {
-				body->SetTransform(gd_to_b2(new_xform.get_origin()), new_xform.get_rotation());
-				// Revert changes. Node transform shall be updated on physics process.
-				if (body->GetType() != b2_staticBody) {
-					//set_notify_local_transform(false);
-					//set_global_transform(last_valid_xform);
-					//set_notify_local_transform(true);
-				}
-			}
+			teleport(new_xform);
 
 			// Inform joints in editor that we moved
 			if (Engine::get_singleton()->is_editor_hint()) {
@@ -360,6 +479,11 @@ void Box2DPhysicsBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("apply_central_linear_impulse", "impulse"), &Box2DPhysicsBody::apply_central_linear_impulse, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("apply_torque_impulse", "impulse"), &Box2DPhysicsBody::apply_torque_impulse, DEFVAL(true));
 
+	ClassDB::bind_method(D_METHOD("set_kinematic_integrate_velocity", "enabled"), &Box2DPhysicsBody::set_kinematic_integrate_velocity);
+	ClassDB::bind_method(D_METHOD("is_kinematic_integrating_velocity"), &Box2DPhysicsBody::is_kinematic_integrating_velocity);
+
+	ClassDB::bind_method(D_METHOD("move_and_collide", "velocity", "rotation", "infinite_inertia", "exclude_raycast_shapes", "test_only"), &Box2DPhysicsBody::move_and_collide, DEFVAL(true), DEFVAL(true), DEFVAL(false));
+
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_scale", PROPERTY_HINT_RANGE, "-128,128,0.01"), "set_gravity_scale", "get_gravity_scale");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM, "Static,Kinematic,Rigid"), "set_type", "get_type");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bullet"), "set_bullet", "is_bullet");
@@ -369,6 +493,7 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "contact_monitor"), "set_contact_monitor", "is_contact_monitor_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "awake"), "set_awake", "is_awake"); // TODO rename to sleeping, or keep and add sleeping property
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "can_sleep"), "set_can_sleep", "get_can_sleep");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "kinematic_integrate_velocity"), "set_kinematic_integrate_velocity", "is_kinematic_integrating_velocity");
 	ADD_GROUP("Linear", "linear_");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "linear_velocity"), "set_linear_velocity", "get_linear_velocity");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "linear_damping", PROPERTY_HINT_RANGE, "-1,1,0.001"), "set_linear_damping", "get_linear_damping");
@@ -432,11 +557,16 @@ String Box2DPhysicsBody::get_configuration_warning() const {
 	return warning;
 }
 
-void Box2DPhysicsBody::set_linear_velocity(const Vector2 &p_vel) {
+void Box2DPhysicsBody::_set_linear_velocity_no_check(const Vector2 &p_vel) {
 	if (body) {
 		body->SetLinearVelocity(gd_to_b2(p_vel));
 	}
 	bodyDef.linearVelocity = gd_to_b2(p_vel);
+}
+
+void Box2DPhysicsBody::set_linear_velocity(const Vector2 &p_vel) {
+	ERR_FAIL_COND_MSG(get_type() == Mode::MODE_KINEMATIC && !kinematic_integrate_velocity, "Kinematic type bodies do not support setting linear_velocity without enabling `kinematic_integrate_velocity`.");
+	_set_linear_velocity_no_check(p_vel);
 }
 
 Vector2 Box2DPhysicsBody::get_linear_velocity() const {
@@ -446,16 +576,22 @@ Vector2 Box2DPhysicsBody::get_linear_velocity() const {
 	return b2_to_gd(bodyDef.linearVelocity);
 }
 
-void Box2DPhysicsBody::set_angular_velocity(const real_t p_omega) {
+void Box2DPhysicsBody::_set_angular_velocity_no_check(const real_t p_omega) {
 	if (body) {
 		body->SetAngularVelocity(p_omega);
 	}
 	bodyDef.angularVelocity = p_omega;
 }
 
+void Box2DPhysicsBody::set_angular_velocity(const real_t p_omega) {
+	ERR_FAIL_COND_MSG(get_type() == Mode::MODE_KINEMATIC && !kinematic_integrate_velocity, "Kinematic type bodies do not support setting linear_velocity without enabling `kinematic_integrate_velocity`.");
+	_set_angular_velocity_no_check(p_omega);
+}
+
 real_t Box2DPhysicsBody::get_angular_velocity() const {
-	if (body)
+	if (body) {
 		return body->GetAngularVelocity();
+	}
 	return bodyDef.angularVelocity;
 }
 
@@ -819,6 +955,41 @@ void Box2DPhysicsBody::apply_torque_impulse(real_t impulse, bool wake) {
 	body->ApplyAngularImpulse(impulse * GD_TO_B2, wake);
 }
 
+void Box2DPhysicsBody::set_kinematic_integrate_velocity(bool p_integrate_vel) {
+	ERR_FAIL_COND_MSG(get_type() != Mode::MODE_KINEMATIC, "The property kinematic_integrate_velocity has no effect on non-kinematic bodies.");
+	if (kinematic_integrate_velocity == p_integrate_vel) {
+		return;
+	}
+
+	kinematic_integrate_velocity = p_integrate_vel;
+
+	if (kinematic_integrate_velocity) {
+		// Make sure any transform changes between last step and now are integrated
+		teleport(get_box2dworld_transform());
+	}
+}
+
+bool Box2DPhysicsBody::is_kinematic_integrating_velocity() const {
+	return kinematic_integrate_velocity;
+}
+
+Ref<Box2DKinematicCollision> Box2DPhysicsBody::move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia, const bool p_exclude_raycast_shapes, const bool p_test_only) {
+	KinematicCollision col;
+
+	if (_move_and_collide(p_motion, p_rotation, p_infinite_inertia, col, p_exclude_raycast_shapes, p_test_only)) {
+		if (motion_cache.is_null()) {
+			motion_cache.instance();
+			motion_cache->owner = this;
+		}
+
+		motion_cache->collision = col;
+
+		return motion_cache;
+	}
+
+	return Ref<Box2DKinematicCollision>();
+}
+
 Box2DPhysicsBody::Box2DPhysicsBody() {
 	filterDef.maskBits = 0x0001;
 
@@ -831,4 +1002,8 @@ Box2DPhysicsBody::~Box2DPhysicsBody() {
 		WARN_PRINT("b2Body is being deleted in destructor, not NOTIFICATION_PREDELETE.");
 		destroy_b2Body();
 	} // else Box2D has/will clean up body
+
+	if (motion_cache.is_valid()) {
+		motion_cache->owner = nullptr;
+	}
 }

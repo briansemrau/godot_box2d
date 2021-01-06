@@ -100,7 +100,7 @@ class Box2DPhysicsBody;
 struct MotionQueryParameters {
 	Transform2D transform = Transform2D();
 
-	Set<Box2DPhysicsBody *> exclude;
+	Set<const Box2DPhysicsBody *> exclude;
 	// potential addition: exclude fixtures
 	b2Filter filter; // TODO If/when we fork Box2D, filters get 32bit data
 	bool collide_with_bodies = true; // TODO might be better named as "collide_with_solids"
@@ -127,7 +127,7 @@ protected:
 
 public:
 	const b2Filter &_get_filter() const;
-	Set<Box2DPhysicsBody *> _get_exclude() const;
+	Set<const Box2DPhysicsBody *> _get_exclude() const;
 
 	void set_shape(const RES &p_shape_ref);
 	RES get_shape() const;
@@ -175,6 +175,19 @@ class Box2DWorld : public Node2D, public virtual b2DestructionListener, public v
 	friend class Box2DPhysicsBody;
 	friend class Box2DJoint;
 
+public:
+	struct MotionResult {
+		Vector2 motion;
+		Vector2 remainder;
+		float t; // TOI with respect to motion [0, 1]
+
+		Vector2 collision_point;
+		Vector2 collision_normal;
+		Vector2 collider_velocity;
+		Box2DFixture *collider_fixture = nullptr;
+		Box2DFixture *local_fixture = nullptr;
+	};
+
 private:
 	class GodotSignalCaller {
 		public:
@@ -199,7 +212,7 @@ private:
 
 		b2Vec2 point;
 		int max_results;
-		Set<Box2DPhysicsBody *> exclude;
+		Set<const Box2DPhysicsBody *> exclude;
 		b2Filter filter;
 		bool collide_with_bodies;
 		bool collide_with_sensors;
@@ -228,7 +241,7 @@ private:
 
 		Result result;
 
-		Set<Box2DPhysicsBody *> exclude;
+		Set<const Box2DPhysicsBody *> exclude;
 		b2Filter filter;
 		bool collide_with_bodies;
 		bool collide_with_sensors;
@@ -255,7 +268,7 @@ private:
 	struct CastQueryWrapper {
 		const b2BroadPhase *broadPhase;
 
-		const MotionQueryParameters *params;
+		MotionQueryParameters params;
 
 		Vector<b2FixtureProxy *> results;
 
@@ -311,8 +324,20 @@ private:
 	void create_b2World();
 	void destroy_b2World();
 
-	// TODO clean code suggests that output params should be a return struct
-	void _test_motion_toi(const Vector<const b2Shape *> &p_cast_b2shapes, const MotionQueryParameters *p_params, b2Fixture *&r_col_fixture, int &r_child_index, float &r_toi, int &r_test_shape_index, int &r_test_shape_child_index);
+	struct TestMotionTOIResult {
+		bool collision;
+
+		b2Fixture *col_fixture;
+		int col_child_index;
+
+		int test_shape_index;
+		int test_shape_child_index;
+
+		int manifold_pt_count;
+		b2WorldManifold manifold;
+	};
+
+	float _test_motion_toi(const Vector<const b2Shape *> &p_test_shapes, const MotionQueryParameters &p_params, TestMotionTOIResult *r_result);
 
 protected:
 	void _notification(int p_what);
@@ -345,6 +370,7 @@ public:
 
 	// This is by-default continuous collision. Is this slow? TODO test or remove commented code
 	//bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, bool p_continuous_cd, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<PhysicsTestMotionResult2D>());
+	bool _body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, MotionResult *r_result);
 	bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<PhysicsTestMotionResult2D>());
 
 	// Box2D space query API
@@ -364,18 +390,8 @@ class Box2DPhysicsTestMotionResult : public Reference {
 	// Godot API includes it in the space2d class but it only seems relevant here.
 	// Perhaps this struct wrapping should not exist at all and params should
 	//     just sit in this class?
-	struct MotionResult {
-		Vector2 motion;
-		Vector2 remainder;
-		float t; // TOI with respect to motion [0, 1]
 
-		Vector2 collision_point;
-		Vector2 collision_normal;
-		Vector2 collider_velocity;
-		Box2DFixture *collider_fixture = nullptr;
-	};
-
-	MotionResult result;
+	Box2DWorld::MotionResult result;
 
 protected:
 	static void _bind_methods();
@@ -388,10 +404,12 @@ public:
 	Vector2 get_collision_point() const;
 	Vector2 get_collision_normal() const;
 	Vector2 get_collider_velocity() const;
+	Box2DFixture *get_collider_fixture() const;
 	ObjectID get_collider_fixture_id() const;
-	Object *get_collider_fixture() const;
+	Box2DFixture *get_local_fixture() const;
+	ObjectID get_local_fixture_id() const;
 
-	Box2DPhysicsTestMotionResult();
+	//Box2DPhysicsTestMotionResult();
 };
 
 #endif // BOX2D_WORLD_H

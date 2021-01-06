@@ -71,7 +71,7 @@ const b2Filter &Box2DShapeQueryParameters::_get_filter() const {
 	return parameters.filter;
 }
 
-Set<Box2DPhysicsBody *> Box2DShapeQueryParameters::_get_exclude() const {
+Set<const Box2DPhysicsBody *> Box2DShapeQueryParameters::_get_exclude() const {
 	return parameters.exclude;
 }
 
@@ -165,7 +165,7 @@ Vector<int64_t> Box2DShapeQueryParameters::get_exclude() const {
 	Vector<int64_t> ret;
 	ret.resize(parameters.exclude.size());
 	int idx = 0;
-	for (Set<Box2DPhysicsBody *>::Element *E = parameters.exclude.front(); E; E = E->next()) {
+	for (Set<const Box2DPhysicsBody *>::Element *E = parameters.exclude.front(); E; E = E->next()) {
 		ret.write[idx] = int64_t(E->get()->get_instance_id());
 	}
 	return ret;
@@ -634,46 +634,127 @@ void Box2DWorld::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "auto_step"), "set_auto_step", "get_auto_step");
 }
 
-inline void _expand_aabb_from_shapes_with_motion(const Vector<const b2Shape *> *p_b2shapes, const b2Transform &p_xform_t0, const b2Transform &p_xform_t1, b2AABB *r_aabb) {
-	for (int i = 0; i < p_b2shapes->size(); ++i) {
-		const b2Shape *cast_b2shape = (*p_b2shapes)[i];
+inline void _get_aabb_from_shapes(const Vector<const b2Shape *> &p_b2shapes, const b2Transform &p_xform, b2AABB &r_aabb) {
+	p_b2shapes[0]->ComputeAABB(&r_aabb, p_xform, 0);
+	for (int i = 0; i < p_b2shapes.size(); ++i) {
+		const b2Shape *test_b2shape = p_b2shapes[i];
+		for (int child_index = 0; child_index < test_b2shape->GetChildCount(); ++child_index) {
+			b2AABB aabb;
+			test_b2shape->ComputeAABB(&aabb, p_xform, child_index);
+			r_aabb.Combine(aabb);
+		}
+	}
+}
+
+inline void _get_aabb_from_shapes_with_motion(const Vector<const b2Shape *> &p_b2shapes, const b2Transform &p_xform_t0, const b2Transform &p_xform_t1, b2AABB &r_aabb) {
+	if (p_b2shapes.size() == 0)
+		return;
+
+	p_b2shapes[0]->ComputeAABB(&r_aabb, p_xform_t0, 0);
+
+	for (int i = 0; i < p_b2shapes.size(); ++i) {
+		const b2Shape *cast_b2shape = p_b2shapes[i];
 
 		for (int child_index = 0; child_index < cast_b2shape->GetChildCount(); ++child_index) {
 			b2AABB aabb_t0, aabb_t1;
 			cast_b2shape->ComputeAABB(&aabb_t0, p_xform_t0, child_index);
 			cast_b2shape->ComputeAABB(&aabb_t1, p_xform_t1, child_index);
 
-			r_aabb->Combine(aabb_t0);
-			r_aabb->Combine(aabb_t1);
+			r_aabb.Combine(aabb_t0);
+			r_aabb.Combine(aabb_t1);
 		}
 	}
 }
 
-void Box2DWorld::_test_motion_toi(const Vector<const b2Shape *> &p_cast_b2shapes, const MotionQueryParameters *p_params,
-		b2Fixture *&r_col_fixture, int &r_child_index, float &r_toi,
-		int &r_test_shape_index, int &r_test_shape_child_index) {
+b2Manifold _evaluate_intersection_manifold(const b2Shape *p_shapeA, const int p_child_index_A, const b2Transform &p_xfA, const b2Shape *p_shapeB, const int p_child_index_B, const b2Transform &p_xfB) {
+	b2Manifold manifold;
 
-	b2Transform xform_t0 = b2Transform(gd_to_b2(p_params->transform.get_origin()), b2Rot(p_params->transform.get_rotation()));
-	b2Transform xform_t1 = b2Transform(xform_t0.p + gd_to_b2(p_params->motion), b2Rot(p_params->transform.get_rotation() + p_params->rotation));
+	// Convert chains to edges
+	b2EdgeShape shapeA_as_edge;
+	if (p_shapeA->GetType() == b2Shape::Type::e_chain) {
+		dynamic_cast<const b2ChainShape *>(p_shapeA)->GetChildEdge(&shapeA_as_edge, p_child_index_A);
+		p_shapeA = &shapeA_as_edge;
+	}
 
-	// Calc AABB with motion
+	b2EdgeShape shapeB_as_edge;
+	if (p_shapeB->GetType() == b2Shape::Type::e_chain) {
+		dynamic_cast<const b2ChainShape *>(p_shapeB)->GetChildEdge(&shapeB_as_edge, p_child_index_B);
+		p_shapeA = &shapeB_as_edge;
+	}
+
+	// This is, as far as I know, the cleanest way to implement this.
+	switch (p_shapeA->GetType()) {
+		case b2Shape::Type::e_circle: {
+			switch (p_shapeB->GetType()) {
+				case b2Shape::Type::e_circle: {
+					b2CollideCircles(&manifold, dynamic_cast<const b2CircleShape *>(p_shapeA), p_xfA, dynamic_cast<const b2CircleShape *>(p_shapeB), p_xfB);
+				} break;
+				case b2Shape::Type::e_edge: {
+					b2CollideEdgeAndCircle(&manifold, dynamic_cast<const b2EdgeShape *>(p_shapeB), p_xfB, dynamic_cast<const b2CircleShape *>(p_shapeA), p_xfA);
+				} break;
+				case b2Shape::Type::e_polygon: {
+					b2CollidePolygonAndCircle(&manifold, dynamic_cast<const b2PolygonShape *>(p_shapeB), p_xfB, dynamic_cast<const b2CircleShape *>(p_shapeA), p_xfA);
+				} break;
+			}
+		} break;
+		case b2Shape::Type::e_edge: {
+			switch (p_shapeB->GetType()) {
+				case b2Shape::Type::e_circle: {
+					b2CollideEdgeAndCircle(&manifold, dynamic_cast<const b2EdgeShape *>(p_shapeA), p_xfA, dynamic_cast<const b2CircleShape *>(p_shapeB), p_xfB);
+				} break;
+				case b2Shape::Type::e_edge: {
+					ERR_FAIL_V_MSG(manifold, "There are no contacts between two edges in Box2D. This is an invalid manifold query.");
+				} break;
+				case b2Shape::Type::e_polygon: {
+					b2CollideEdgeAndPolygon(&manifold, dynamic_cast<const b2EdgeShape *>(p_shapeA), p_xfA, dynamic_cast<const b2PolygonShape *>(p_shapeB), p_xfB);
+				} break;
+			}
+		} break;
+		case b2Shape::Type::e_polygon: {
+			switch (p_shapeB->GetType()) {
+				case b2Shape::Type::e_circle: {
+					b2CollidePolygonAndCircle(&manifold, dynamic_cast<const b2PolygonShape *>(p_shapeA), p_xfA, dynamic_cast<const b2CircleShape *>(p_shapeB), p_xfB);
+				} break;
+				case b2Shape::Type::e_edge: {
+					b2CollideEdgeAndPolygon(&manifold, dynamic_cast<const b2EdgeShape *>(p_shapeB), p_xfB, dynamic_cast<const b2PolygonShape *>(p_shapeA), p_xfA);
+				} break;
+				case b2Shape::Type::e_polygon: {
+					b2CollidePolygons(&manifold, dynamic_cast<const b2PolygonShape *>(p_shapeA), p_xfA, dynamic_cast<const b2PolygonShape *>(p_shapeB), p_xfB);
+				} break;
+			}
+		} break;
+	}
+
+	return manifold;
+}
+
+float Box2DWorld::_test_motion_toi(const Vector<const b2Shape *> &p_test_shapes, const MotionQueryParameters &p_params, TestMotionTOIResult *r_result) {
+	if (p_test_shapes.size() == 0) {
+		return 1.0f;
+	}
+
+	const b2Vec2 b2motion = gd_to_b2(p_params.motion);
+
+	const b2Transform xform_t0 = b2Transform(gd_to_b2(p_params.transform.get_origin()), b2Rot(p_params.transform.get_rotation()));
+	const b2Transform xform_t1 = b2Transform(xform_t0.p + b2motion, b2Rot(p_params.transform.get_rotation() + p_params.rotation));
+
+	CastQueryWrapper query_callback;
+	query_callback.broadPhase = &world->GetContactManager().m_broadPhase;
+	query_callback.params = p_params;
+
 	b2AABB query_aabb;
-	_expand_aabb_from_shapes_with_motion(&p_cast_b2shapes, xform_t0, xform_t1, &query_aabb);
+	_get_aabb_from_shapes_with_motion(p_test_shapes, xform_t0, xform_t1, query_aabb);
 
-	// Query broadphase
-	CastQueryWrapper wrapper;
-	wrapper.broadPhase = &world->GetContactManager().m_broadPhase;
-	wrapper.params = p_params;
+	world->GetContactManager().m_broadPhase.Query(&query_callback, query_aabb);
 
-	world->GetContactManager().m_broadPhase.Query(&wrapper, query_aabb);
+	// Calculate all TOI pairs and report the closest one
 
-	// Calculate TOIs and select the closest one
 	b2TOIInput input;
 	// if predict_other_body_motion:
 	//     input.tMax = motion_timedelta_for_prediction (i think)
 	// else:
 	input.tMax = 1.0f;
-	input.sweepA.localCenter = gd_to_b2(p_params->local_center);
+	input.sweepA.localCenter = gd_to_b2(p_params.local_center);
 	input.sweepA.c0 = xform_t0.p;
 	input.sweepA.c = xform_t1.p;
 	input.sweepA.a0 = xform_t0.q.GetAngle();
@@ -686,31 +767,38 @@ void Box2DWorld::_test_motion_toi(const Vector<const b2Shape *> &p_cast_b2shapes
 
 	b2TOIOutput output;
 
+	TestMotionTOIResult result{};
+
 	// TODO optimize this
 	// With longer motion casts, especially in the diagonal direction, there will
 	// be many irrelevant shapes being tested using TOI.
-	for (int i = 0; i < p_cast_b2shapes.size(); ++i) {
-		const b2Shape *cast_b2shape = p_cast_b2shapes[i];
 
-		for (int child_index_cast = 0; child_index_cast < cast_b2shape->GetChildCount(); ++child_index_cast) {
-			input.proxyA.Set(cast_b2shape, child_index_cast);
+	// iterate test shapes
+	for (int i = 0; i < p_test_shapes.size(); ++i) {
+		const b2Shape *test_b2shape = p_test_shapes[i];
 
-			for (int j = 0; j < wrapper.results.size(); ++j) {
-				const b2FixtureProxy *proxy = wrapper.results[j];
-				const b2Body *body = proxy->fixture->GetBody();
-				const b2Shape *b2shape = proxy->fixture->GetShape();
+		for (int test_child_index = 0; test_child_index < test_b2shape->GetChildCount(); ++test_child_index) {
+			input.proxyA.Set(test_b2shape, test_child_index);
 
-				for (int child_index_result = 0; child_index_result < b2shape->GetChildCount(); ++child_index_result) {
-					input.proxyB.Set(b2shape, child_index_result);
-					input.sweepB.localCenter = body->GetLocalCenter();
+			// iterate query result shapes
+			for (int j = 0; j < query_callback.results.size(); ++j) {
+				const b2FixtureProxy *result_proxy = query_callback.results[j];
+				const b2Body *result_body = result_proxy->fixture->GetBody();
+				const b2Shape *result_b2shape = result_proxy->fixture->GetShape();
+
+				for (int result_child_index = 0; result_child_index < result_b2shape->GetChildCount(); ++result_child_index) {
+					input.proxyB.Set(result_b2shape, result_child_index);
+					input.sweepB.localCenter = result_body->GetLocalCenter();
 					input.sweepB.alpha0 = 0.0f;
 					// if predict_other_body_motion:
 					//     calculate sweepB from body
 					// else:
-					input.sweepB.c = body->GetWorldCenter();
+					input.sweepB.c = result_body->GetWorldCenter();
 					input.sweepB.c0 = input.sweepB.c;
-					input.sweepB.a = body->GetAngle();
+					input.sweepB.a = result_body->GetAngle();
 					input.sweepB.a0 = input.sweepB.a;
+
+					// Evaluate TOI between test and query result
 
 					b2TimeOfImpact(&output, &input);
 
@@ -719,11 +807,39 @@ void Box2DWorld::_test_motion_toi(const Vector<const b2Shape *> &p_cast_b2shapes
 						case b2TOIOutput::State::e_overlapped:
 						case b2TOIOutput::State::e_touching: {
 							if (output.t < min_output.t) {
+								// Check if motion and local contact normal are opposing
+								// <----- []->[]
+								// Allows motion to exit overlapping bodies
+
+								b2Transform xform_t;
+								input.sweepA.GetTransform(&xform_t, output.t);
+
+								b2Manifold local_manifold = _evaluate_intersection_manifold(
+										test_b2shape, test_child_index, xform_t,
+										result_b2shape, result_child_index, result_body->GetTransform());
+
+								if (local_manifold.pointCount == 0) {
+									// probably e_failed
+									// If we can't find any collision, ignore it
+									break;
+								}
+
+								b2WorldManifold manifold;
+								manifold.Initialize(&local_manifold, xform_t0, test_b2shape->m_radius, result_body->GetTransform(), result_b2shape->m_radius);
+								const b2Vec2 normal = manifold.normal;
+
+								if (b2Dot(normal, b2motion) < 0) {
+									break;
+								}
+
 								min_output = output;
-								r_col_fixture = proxy->fixture;
-								r_child_index = child_index_result;
-								r_test_shape_index = i;
-								r_test_shape_child_index = child_index_cast;
+								result.collision = true;
+								result.col_fixture = result_proxy->fixture;
+								result.col_child_index = result_child_index;
+								result.test_shape_index = i;
+								result.test_shape_child_index = test_child_index;
+								result.manifold_pt_count = local_manifold.pointCount;
+								result.manifold = manifold;
 							}
 						} break;
 					}
@@ -732,8 +848,12 @@ void Box2DWorld::_test_motion_toi(const Vector<const b2Shape *> &p_cast_b2shapes
 		}
 	}
 
+	if (r_result != nullptr) {
+		*r_result = result;
+	}
+
 	const float t_norm = min_output.t; // min_output.t / input.tMax;
-	r_toi = t_norm;
+	return t_norm;
 }
 
 void Box2DWorld::step(float p_step) {
@@ -752,6 +872,14 @@ void Box2DWorld::step(float p_step) {
 		}
 	}
 
+	// Handle pre-step logic
+	Set<Box2DPhysicsBody *>::Element *obj = bodies.front();
+	while (obj) {
+		obj->get()->pre_step(p_step);
+		obj = obj->next();
+	}
+
+	// Step
 	world->Step(p_step, 8, 8);
 	flag_rescan_contacts_monitored = false;
 
@@ -920,7 +1048,7 @@ Array Box2DWorld::intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query,
 
 // Are file-scoped inline functions (for duplicate code) good practice for code cleanliness?
 // no, for purpose of extensibility they should be members
-inline bool _query_should_ignore_fixture(b2Fixture *p_fixture, const bool p_collide_with_sensors, const bool p_collide_with_bodies, const b2Filter &p_filter, const Set<Box2DPhysicsBody *> &p_exclude) {
+inline bool _query_should_ignore_fixture(b2Fixture *p_fixture, const bool p_collide_with_sensors, const bool p_collide_with_bodies, const b2Filter &p_filter, const Set<const Box2DPhysicsBody *> &p_exclude) {
 	// Check sensor flags
 	if (!(p_collide_with_sensors && p_fixture->IsSensor()) && !(p_collide_with_bodies && !p_fixture->IsSensor()))
 		return true;
@@ -939,7 +1067,7 @@ inline bool _query_should_ignore_fixture(b2Fixture *p_fixture, const bool p_coll
 		return true;
 
 	// Check exclusion
-	if (p_exclude.find(p_fixture->GetBody()->GetUserData().owner) > 0)
+	if (p_exclude.has(p_fixture->GetBody()->GetUserData().owner))
 		return true;
 
 	// This fixture should not be filtered
@@ -956,12 +1084,7 @@ Array Box2DWorld::cast_motion(const Ref<Box2DShapeQueryParameters> &p_query) {
 	// This function differs from the Godot API because we can find the *exact*
 	// time of collision using TOI. 
 
-	b2Fixture *col_fixture = nullptr; // unused
-	int child_index_col = 0; // unused
-	float toi;
-	int query_shape_index = 0; // unused
-	int query_child_index = 0; // unused
-	_test_motion_toi(p_query->shape_ref->get_shapes(), &p_query->parameters, col_fixture, child_index_col, toi, query_shape_index, query_child_index);
+	float toi = _test_motion_toi(p_query->shape_ref->get_shapes(), p_query->parameters, nullptr);
 
 	const real_t motion_len = p_query->get_motion().length();
 	const float t_safe = MAX(0, toi - (b2_linearSlop * B2_TO_GD / motion_len));
@@ -972,139 +1095,82 @@ Array Box2DWorld::cast_motion(const Ref<Box2DShapeQueryParameters> &p_query) {
 	return ret;
 }
 
-b2Manifold _evaluate_intersection_manifold(const b2Shape *p_shapeA, const int p_child_index_A, const b2Transform &p_xfA, const b2Shape *p_shapeB, const int p_child_index_B, const b2Transform &p_xfB) {
-	b2Manifold manifold;
+bool Box2DWorld::_body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, MotionResult *r_result) {
+	const float toi_safety_margin = (2.0f * b2_linearSlop * B2_TO_GD / p_motion.length());
 
-	// Convert chains to edges
-	b2EdgeShape shapeA_as_edge;
-	if (p_shapeA->GetType() == b2Shape::Type::e_chain) {
-		dynamic_cast<const b2ChainShape *>(p_shapeA)->GetChildEdge(&shapeA_as_edge, p_child_index_A);
-		p_shapeA = &shapeA_as_edge;
-	}
-
-	b2EdgeShape shapeB_as_edge;
-	if (p_shapeB->GetType() == b2Shape::Type::e_chain) {
-		dynamic_cast<const b2ChainShape *>(p_shapeB)->GetChildEdge(&shapeB_as_edge, p_child_index_B);
-		p_shapeA = &shapeB_as_edge;
-	}
-
-	// This is, as far as I know, the cleanest way to implement this.
-	switch (p_shapeA->GetType()) {
-		case b2Shape::Type::e_circle: {
-			switch (p_shapeB->GetType()) {
-				case b2Shape::Type::e_circle: {
-					b2CollideCircles(&manifold, dynamic_cast<const b2CircleShape *>(p_shapeA), p_xfA, dynamic_cast<const b2CircleShape *>(p_shapeB), p_xfB);
-				} break;
-				case b2Shape::Type::e_edge: {
-					b2CollideEdgeAndCircle(&manifold, dynamic_cast<const b2EdgeShape *>(p_shapeB), p_xfB, dynamic_cast<const b2CircleShape *>(p_shapeA), p_xfA);
-				} break;
-				case b2Shape::Type::e_polygon: {
-					b2CollidePolygonAndCircle(&manifold, dynamic_cast<const b2PolygonShape *>(p_shapeB), p_xfB, dynamic_cast<const b2CircleShape *>(p_shapeA), p_xfA);
-				} break;
-			}
-		} break;
-		case b2Shape::Type::e_edge: {
-			switch (p_shapeB->GetType()) {
-				case b2Shape::Type::e_circle: {
-					b2CollideEdgeAndCircle(&manifold, dynamic_cast<const b2EdgeShape *>(p_shapeA), p_xfA, dynamic_cast<const b2CircleShape *>(p_shapeB), p_xfB);
-				} break;
-				case b2Shape::Type::e_edge: {
-					ERR_FAIL_V_MSG(manifold, "There are no contacts between two edges in Box2D. This is an invalid manifold query.");
-				} break;
-				case b2Shape::Type::e_polygon: {
-					b2CollideEdgeAndPolygon(&manifold, dynamic_cast<const b2EdgeShape *>(p_shapeA), p_xfA, dynamic_cast<const b2PolygonShape *>(p_shapeB), p_xfB);
-				} break;
-			}
-		} break;
-		case b2Shape::Type::e_polygon: {
-			switch (p_shapeB->GetType()) {
-				case b2Shape::Type::e_circle: {
-					b2CollidePolygonAndCircle(&manifold, dynamic_cast<const b2PolygonShape *>(p_shapeA), p_xfA, dynamic_cast<const b2CircleShape *>(p_shapeB), p_xfB);
-				} break;
-				case b2Shape::Type::e_edge: {
-					b2CollideEdgeAndPolygon(&manifold, dynamic_cast<const b2EdgeShape *>(p_shapeB), p_xfB, dynamic_cast<const b2PolygonShape *>(p_shapeA), p_xfA);
-				} break;
-				case b2Shape::Type::e_polygon: {
-					b2CollidePolygons(&manifold, dynamic_cast<const b2PolygonShape *>(p_shapeA), p_xfA, dynamic_cast<const b2PolygonShape *>(p_shapeB), p_xfB);
-				} break;
-			}
-		} break;
-	}
-
-	return manifold;
-}
-
-bool Box2DWorld::body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result) {
 	MotionQueryParameters params;
 	params.transform = p_from;
-	params.motion = p_motion;
+	params.motion = p_motion * (1.0f + toi_safety_margin);
+	params.exclude.insert(p_body);
 
-	// Get all b2shapes that make up the body
+	// TODO this could be optimized
 	Vector<const b2Shape *> query_b2shapes;
-
-	b2Fixture *fixture = p_body->body->GetFixtureList();
-	while (fixture) {
-		query_b2shapes.append_array(fixture->GetUserData().owner->get_shape()->get_shapes());
-
-		fixture = fixture->GetNext();
+	for (b2Fixture *f = p_body->body->GetFixtureList(); f; f = f->GetNext()){
+		query_b2shapes.push_back(f->GetShape());
 	}
 
-	// Query TOI
-	b2Fixture *col_fixture = nullptr;
-	int child_index_col = 0;
-	float toi;
-	int query_shape_i = 0;
-	int query_shape_child_index = 0;
-	_test_motion_toi(query_b2shapes, &params, col_fixture, child_index_col, toi, query_shape_i, query_shape_child_index);
+	TestMotionTOIResult toi_result;
+	float toi = _test_motion_toi(query_b2shapes, params, &toi_result);
 
-	if (r_result.is_valid()) {
-		// TODO set result values to default/zero
+	if (toi_result.collision) {
+		// correct for motion query safety margin
+		toi = MIN(1.0f, toi * (1.0f + toi_safety_margin));
+		// reduce by margin to avoid 1-inch punching objects
+		toi = MAX(0.0f, toi - toi_safety_margin);
 	}
+
+	r_result->motion = p_motion * toi;
+	r_result->remainder = p_motion * (1.0f - toi);
+	r_result->t = toi;
 
 	if (toi == 1.0f) {
-		// No collision
 		return false;
 	}
 
 	// Collision has occurred
-	if (r_result.is_valid()) {
+
+	if (r_result) {
 		// Calculate collision point and other data
 
-		const b2Shape *shapeA = query_b2shapes[query_shape_i];
-		const b2Shape *shapeB = col_fixture->GetShape();
+		const b2Shape *local_shape = query_b2shapes[toi_result.test_shape_index];
+		const b2Shape *col_shape = toi_result.col_fixture->GetShape();
 
-		b2Manifold manifold = _evaluate_intersection_manifold(
-			shapeA, query_shape_child_index, gd_to_b2(p_from),
-			shapeB, child_index_col, col_fixture->GetBody()->GetTransform());
-
-		if (manifold.pointCount == 0) {
-			// Oops, looks like there is no collision
-			// _test_motion_toi likely selected the closest TOI output with type e_failed
-			return false;
+		// Find the collided local fixture
+		// TODO if fixture list wasn't a LL this could be optimized
+		b2Fixture *local_fixture = p_body->body->GetFixtureList();
+		for (int i = 0; i < toi_result.test_shape_index; ++i) {
+			local_fixture = local_fixture->GetNext();
 		}
+
+		const int pt_count = toi_result.manifold_pt_count;
+		const b2WorldManifold manifold = toi_result.manifold;
 
 		// Average the values at each manifold point because we can only return one point
-		// TODO should we be using the world manifold instead?
-		b2Vec2 local_col_point = b2Vec2_zero;
-		b2Vec2 local_col_normal = b2Vec2_zero;
-		for (int i = 0; i < manifold.pointCount; ++i) {
-			local_col_point += manifold.localPoint;
-			local_col_normal += manifold.localNormal;
+		b2Vec2 col_point = b2Vec2_zero;
+		b2Vec2 col_normal = b2Vec2_zero;
+		for (int i = 0; i < pt_count; ++i) {
+			col_point += manifold.points[i];
+			col_normal += manifold.normal;
 		}
-		local_col_point *= 1.0f / static_cast<float>(manifold.pointCount);
-		local_col_normal *= 1.0f / static_cast<float>(manifold.pointCount);
+		col_point *= 1.0f / static_cast<float>(pt_count);
+		col_normal *= 1.0f / static_cast<float>(pt_count);
 
-		Box2DPhysicsTestMotionResult::MotionResult *result = const_cast<Box2DPhysicsTestMotionResult::MotionResult *>(&r_result->result);
-		result->motion = p_motion * toi;
-		result->remainder = p_motion * (1.0f - toi);
-		const b2Vec2 collision_point = p_body->body->GetWorldVector(local_col_point);
-		result->collision_point = b2_to_gd(collision_point);
-		result->collision_normal = b2_to_gd(p_body->body->GetWorldVector(local_col_normal));
-		result->collider_velocity = b2_to_gd(col_fixture->GetBody()->GetLinearVelocityFromWorldPoint(collision_point));
-		result->collider_fixture = col_fixture->GetUserData().owner;
+		r_result->collision_point = b2_to_gd(col_point);
+		r_result->collision_normal = Vector2(col_normal.x, col_normal.y);
+		r_result->collider_velocity = b2_to_gd(toi_result.col_fixture->GetBody()->GetLinearVelocityFromWorldPoint(col_point));
+		r_result->collider_fixture = toi_result.col_fixture->GetUserData().owner;
+		r_result->local_fixture = local_fixture->GetUserData().owner;
 	}
 
 	return true;
+}
+
+bool Box2DWorld::body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result) {
+	MotionResult *r = nullptr;
+	if (r_result.is_valid()) {
+		r = const_cast<MotionResult *>(&r_result->result);
+	}
+	return _body_test_motion(p_body, p_from, p_motion, p_infinite_inertia, r);
 }
 
 void Box2DWorld::query_aabb(const Rect2 &p_bounds, const Callable &p_callback) {
@@ -1269,7 +1335,7 @@ float Box2DWorld::UserRaycastQueryCallback::ReportFixture(b2Fixture *fixture, co
 bool Box2DWorld::CastQueryWrapper::QueryCallback(int32 proxyId) {
 	b2FixtureProxy *proxy = (b2FixtureProxy *)broadPhase->GetUserData(proxyId);
 
-	if (_query_should_ignore_fixture(proxy->fixture, params->collide_with_sensors, params->collide_with_bodies, params->filter, params->exclude))
+	if (_query_should_ignore_fixture(proxy->fixture, params.collide_with_sensors, params.collide_with_bodies, params.filter, params.exclude))
 		return true;
 
 	// There could be some optimization here for cast_motion in cases of large motion vectors.
@@ -1326,10 +1392,22 @@ Vector2 Box2DPhysicsTestMotionResult::get_collider_velocity() const {
 	return result.collider_velocity;
 }
 
-ObjectID Box2DPhysicsTestMotionResult::get_collider_fixture_id() const {
-	return result.collider_fixture->get_instance_id();
+Box2DFixture *Box2DPhysicsTestMotionResult::get_collider_fixture() const {
+	return result.collider_fixture;
 }
 
-Object *Box2DPhysicsTestMotionResult::get_collider_fixture() const {
-	return result.collider_fixture;
+ObjectID Box2DPhysicsTestMotionResult::get_collider_fixture_id() const {
+	if (result.collider_fixture != nullptr)
+		return result.collider_fixture->get_instance_id();
+	return ObjectID();
+}
+
+Box2DFixture *Box2DPhysicsTestMotionResult::get_local_fixture() const {
+	return result.local_fixture;
+}
+
+ObjectID Box2DPhysicsTestMotionResult::get_local_fixture_id() const {
+	if (result.local_fixture != nullptr)
+		return result.local_fixture->get_instance_id();
+	return ObjectID();
 }

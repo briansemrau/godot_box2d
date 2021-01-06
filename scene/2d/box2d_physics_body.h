@@ -19,6 +19,7 @@
 */
 
 class Box2DWorld;
+class Box2DKinematicCollision;
 
 // TODO either rename this more generic or add Area node that also uses b2Body
 // or maybe this is just noted in the future docs to handle Area2D functionality
@@ -34,6 +35,16 @@ public:
 		MODE_STATIC = b2BodyType::b2_staticBody,
 		MODE_KINEMATIC = b2BodyType::b2_kinematicBody,
 		MODE_RIGID = b2BodyType::b2_dynamicBody,
+	};
+
+	struct KinematicCollision {
+		Vector2 collision_point;
+		Vector2 normal;
+		Vector2 collider_vel;
+		Box2DFixture *collider_fixture = nullptr; // use pointer or objectID? might be a crash if obj is freed
+		Vector2 remainder;
+		Vector2 travel;
+		Box2DFixture *local_fixture = nullptr;
 	};
 
 private:
@@ -67,8 +78,12 @@ private:
 	Box2DWorld *world_node = NULL;
 	Set<Box2DJoint *> joints;
 
-	Transform2D last_valid_xform;
-	
+	//Transform2D last_valid_xform; // this is for sync_to_physics, but is it needed?
+	Transform2D old_xform; // For calculating kinematic body movement velocity
+	bool kinematic_integrate_velocity = false; // Default false is Godot behavior, true is Box2D behavior
+
+	Ref<Box2DKinematicCollision> motion_cache;
+
 	// TODO maybe keep a list of local state we want this class to track wrt a b2body parameter or field
 	// are there any others?  enabled for example can bet set on the fly in code
 	bool prev_sleeping_state = true;
@@ -86,7 +101,12 @@ private:
 	void update_mass(bool p_calc_reset = true);
 	void update_filterdata();
 
+	void pre_step(float p_delta);
 	void sync_state();
+
+	void teleport(const Transform2D &p_transform);
+
+	bool _move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia, KinematicCollision &r_collision, const bool p_exclude_raycast_shapes = true, const bool p_test_only = false);
 
 protected:
 	void _notification(int p_what);
@@ -95,9 +115,11 @@ protected:
 public:
 	virtual String get_configuration_warning() const override;
 
+	void _set_linear_velocity_no_check(const Vector2 &p_vel);
 	void set_linear_velocity(const Vector2 &p_vel);
 	Vector2 get_linear_velocity() const;
 
+	void _set_angular_velocity_no_check(const real_t p_omega);
 	void set_angular_velocity(const real_t p_omega);
 	real_t get_angular_velocity() const;
 
@@ -179,6 +201,8 @@ public:
 	//Vector2 get_contact_total_impulse(int p_idx) const;
 	//bool get_contact_is_new(int p_idx) const;
 
+	// Rigid body functions
+
 	void apply_force(const Vector2 &p_force, const Vector2 &p_point, bool p_wake = true);
 	void apply_central_force(const Vector2 &p_force, bool p_wake = true);
 	void apply_torque(real_t p_torque, bool p_wake = true);
@@ -186,10 +210,52 @@ public:
 	void apply_central_linear_impulse(const Vector2 &p_impulse, bool p_wake = true);
 	void apply_torque_impulse(real_t p_impulse, bool p_wake = true);
 
+	// Kinematic body functions
+
+	void set_kinematic_integrate_velocity(bool p_integrate_vel);
+	bool is_kinematic_integrating_velocity() const;
+
+	// p_exclude_raycast_shapes is unused
+	Ref<Box2DKinematicCollision> move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia = true, const bool p_exclude_raycast_shapes = true, const bool p_test_only = false);
+	//bool test_move(const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia = true);
+	//Vector2 move_and_slide(const Vector2 &p_linear_velocity, const Vector2 &p_up_direction = Vector2(0, 0), bool p_stop_on_slope = false, int p_max_slides = 4, float p_floor_max_angle = Math::deg2rad((float)45), bool p_infinite_inertia = true);
+	//Vector2 move_and_slide_with_snap(const Vector2 &p_linear_velocity, const Vector2 &p_snap, const Vector2 &p_up_direction = Vector2(0, 0), bool p_stop_on_slope = false, int p_max_slides = 4, float p_floor_max_angle = Math::deg2rad((float)45), bool p_infinite_inertia = true);
+	//bool is_on_floor() const;
+	//bool is_on_wall() const;
+	//bool is_on_ceiling() const;
+	//Vector2 get_floor_normal() const;
+	//Vector2 get_floor_velocity() const;
+
 	Box2DPhysicsBody();
 	~Box2DPhysicsBody();
 };
 
 VARIANT_ENUM_CAST(Box2DPhysicsBody::Mode);
+
+class Box2DKinematicCollision : public Reference {
+	GDCLASS(Box2DKinematicCollision, Reference);
+
+	friend class Box2DPhysicsBody;
+
+	Box2DPhysicsBody *owner;
+	Box2DPhysicsBody::KinematicCollision collision;
+
+protected:
+	static void _bind_methods();
+
+public:
+	Vector2 get_position() const;
+	Vector2 get_normal() const;
+	Vector2 get_travel() const;
+	Vector2 get_remainder() const;
+	Object *get_local_fixture() const;
+	Object *get_collider() const;
+	ObjectID get_collider_id() const;
+	Object *get_collider_fixture() const;
+	ObjectID get_collider_fixture_id() const;
+	Vector2 get_collider_velocity() const;
+
+	//Box2DKinematicCollision();
+};
 
 #endif // BOX2D_PHYSICS_BODY_H
