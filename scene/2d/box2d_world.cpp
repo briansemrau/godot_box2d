@@ -672,13 +672,13 @@ b2Manifold _evaluate_intersection_manifold(const b2Shape *p_shapeA, const int p_
 	// Convert chains to edges
 	b2EdgeShape shapeA_as_edge;
 	if (p_shapeA->GetType() == b2Shape::Type::e_chain) {
-		dynamic_cast<const b2ChainShape *>(p_shapeA)->GetChildEdge(&shapeA_as_edge, p_child_index_A);
+		static_cast<const b2ChainShape *>(p_shapeA)->GetChildEdge(&shapeA_as_edge, p_child_index_A);
 		p_shapeA = &shapeA_as_edge;
 	}
 
 	b2EdgeShape shapeB_as_edge;
 	if (p_shapeB->GetType() == b2Shape::Type::e_chain) {
-		dynamic_cast<const b2ChainShape *>(p_shapeB)->GetChildEdge(&shapeB_as_edge, p_child_index_B);
+		static_cast<const b2ChainShape *>(p_shapeB)->GetChildEdge(&shapeB_as_edge, p_child_index_B);
 		p_shapeA = &shapeB_as_edge;
 	}
 
@@ -687,39 +687,39 @@ b2Manifold _evaluate_intersection_manifold(const b2Shape *p_shapeA, const int p_
 		case b2Shape::Type::e_circle: {
 			switch (p_shapeB->GetType()) {
 				case b2Shape::Type::e_circle: {
-					b2CollideCircles(&manifold, dynamic_cast<const b2CircleShape *>(p_shapeA), p_xfA, dynamic_cast<const b2CircleShape *>(p_shapeB), p_xfB);
+					b2CollideCircles(&manifold, static_cast<const b2CircleShape *>(p_shapeA), p_xfA, static_cast<const b2CircleShape *>(p_shapeB), p_xfB);
 				} break;
 				case b2Shape::Type::e_edge: {
-					b2CollideEdgeAndCircle(&manifold, dynamic_cast<const b2EdgeShape *>(p_shapeB), p_xfB, dynamic_cast<const b2CircleShape *>(p_shapeA), p_xfA);
+					b2CollideEdgeAndCircle(&manifold, static_cast<const b2EdgeShape *>(p_shapeB), p_xfB, static_cast<const b2CircleShape *>(p_shapeA), p_xfA);
 				} break;
 				case b2Shape::Type::e_polygon: {
-					b2CollidePolygonAndCircle(&manifold, dynamic_cast<const b2PolygonShape *>(p_shapeB), p_xfB, dynamic_cast<const b2CircleShape *>(p_shapeA), p_xfA);
+					b2CollidePolygonAndCircle(&manifold, static_cast<const b2PolygonShape *>(p_shapeB), p_xfB, static_cast<const b2CircleShape *>(p_shapeA), p_xfA);
 				} break;
 			}
 		} break;
 		case b2Shape::Type::e_edge: {
 			switch (p_shapeB->GetType()) {
 				case b2Shape::Type::e_circle: {
-					b2CollideEdgeAndCircle(&manifold, dynamic_cast<const b2EdgeShape *>(p_shapeA), p_xfA, dynamic_cast<const b2CircleShape *>(p_shapeB), p_xfB);
+					b2CollideEdgeAndCircle(&manifold, static_cast<const b2EdgeShape *>(p_shapeA), p_xfA, static_cast<const b2CircleShape *>(p_shapeB), p_xfB);
 				} break;
 				case b2Shape::Type::e_edge: {
 					ERR_FAIL_V_MSG(manifold, "There are no contacts between two edges in Box2D. This is an invalid manifold query.");
 				} break;
 				case b2Shape::Type::e_polygon: {
-					b2CollideEdgeAndPolygon(&manifold, dynamic_cast<const b2EdgeShape *>(p_shapeA), p_xfA, dynamic_cast<const b2PolygonShape *>(p_shapeB), p_xfB);
+					b2CollideEdgeAndPolygon(&manifold, static_cast<const b2EdgeShape *>(p_shapeA), p_xfA, static_cast<const b2PolygonShape *>(p_shapeB), p_xfB);
 				} break;
 			}
 		} break;
 		case b2Shape::Type::e_polygon: {
 			switch (p_shapeB->GetType()) {
 				case b2Shape::Type::e_circle: {
-					b2CollidePolygonAndCircle(&manifold, dynamic_cast<const b2PolygonShape *>(p_shapeA), p_xfA, dynamic_cast<const b2CircleShape *>(p_shapeB), p_xfB);
+					b2CollidePolygonAndCircle(&manifold, static_cast<const b2PolygonShape *>(p_shapeA), p_xfA, static_cast<const b2CircleShape *>(p_shapeB), p_xfB);
 				} break;
 				case b2Shape::Type::e_edge: {
-					b2CollideEdgeAndPolygon(&manifold, dynamic_cast<const b2EdgeShape *>(p_shapeB), p_xfB, dynamic_cast<const b2PolygonShape *>(p_shapeA), p_xfA);
+					b2CollideEdgeAndPolygon(&manifold, static_cast<const b2EdgeShape *>(p_shapeB), p_xfB, static_cast<const b2PolygonShape *>(p_shapeA), p_xfA);
 				} break;
 				case b2Shape::Type::e_polygon: {
-					b2CollidePolygons(&manifold, dynamic_cast<const b2PolygonShape *>(p_shapeA), p_xfA, dynamic_cast<const b2PolygonShape *>(p_shapeB), p_xfB);
+					b2CollidePolygons(&manifold, static_cast<const b2PolygonShape *>(p_shapeA), p_xfA, static_cast<const b2PolygonShape *>(p_shapeB), p_xfB);
 				} break;
 			}
 		} break;
