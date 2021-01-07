@@ -408,7 +408,9 @@ void Box2DPhysicsBody::_add_area(Box2DArea *p_area) {
 	const int index = colliding_areas.find(item);
 	if (index == -1) {
 		colliding_areas.ordered_insert(item);
-		p_area->connect(SceneStringNames::get_singleton()->tree_exited, callable_mp(this, &Box2DPhysicsBody::_remove_area_variant), { Variant(p_area) }, Object::ConnectFlags::CONNECT_ONESHOT);
+		Vector<Variant> binds;
+		binds.push_back(Variant(p_area));
+		p_area->connect(SceneStringNames::get_singleton()->tree_exited, callable_mp(this, &Box2DPhysicsBody::_remove_area_variant), binds, Object::ConnectFlags::CONNECT_ONESHOT);
 	}
 }
 
