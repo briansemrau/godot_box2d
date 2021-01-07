@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   height="16"
+   viewBox="0 0 16 16"
+   width="16"
+   version="1.1"
+   id="svg4"
+   sodipodi:docname="Box2DArea.svg"
+   inkscape:version="1.0.1 (3bc2e813f5, 2020-09-07)">
+  <metadata
+     id="metadata10">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs8" />
+  <sodipodi:namedview
+     pagecolor="#454545"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="2093"
+     inkscape:window-height="1550"
+     id="namedview6"
+     showgrid="true"
+     inkscape:pagecheckerboard="true"
+     inkscape:zoom="44.547727"
+     inkscape:cx="4.9458502"
+     inkscape:cy="8.2762609"
+     inkscape:window-x="2503"
+     inkscape:window-y="276"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg4">
+    <inkscape:grid
+       type="xygrid"
+       id="grid835"
+       empspacing="4" />
+  </sodipodi:namedview>
+  <path
+     id="path2"
+     style="fill:#a5b7f3;fill-opacity:1"
+     d="M 1 1 L 1 3 L 1 5 L 3 5 L 3 3 L 5 3 L 5 1 L 1 1 z M 11 1 L 11 3 L 13 3 L 13 5 L 15 5 L 15 1 L 11 1 z M 4 4 L 4 6 L 4 10 L 4 12 L 6 12 L 6 11 L 6 10 L 6 8.5 L 6 6 L 10 6 L 10 10 L 9 10 L 9 11 C 9 11 9.6871507 10.979318 10.419922 11.345703 C 10.611479 11.441482 10.809972 11.586273 11 11.765625 L 11 11.5 C 11 11.5 11.012781 10.733609 11.488281 10.099609 C 11.621359 9.9221733 11.799744 9.763683 12 9.6191406 L 12 4 L 4 4 z M 1 11 L 1 13 L 1 15 L 3 15 L 5 15 L 5 13 L 3 13 L 3 11 L 1 11 z " />
+  <path
+     style="fill:none;stroke:#a5b7f3;stroke-width:1px;stroke-linecap:square;stroke-linejoin:miter;stroke-opacity:1"
+     d="m 7.5,10 v 5.5 H 9 c 0,0 1.5,0 1.5,-1.5 C 10.5,12.5 9,12.5 9,12.5 H 7.5"
+     id="path987"
+     sodipodi:nodetypes="ccczcc" />
+  <path
+     style="fill:none;stroke:#a5b7f3;stroke-width:1px;stroke-linecap:square;stroke-linejoin:miter;stroke-opacity:1"
+     d="m 15.5,15.5 h -3 c 0,-2.5 3,-2 3,-4 0,0 0,-1 -1.5,-1 -1.5,0 -1.5,1 -1.5,1"
+     id="path989"
+     sodipodi:nodetypes="ccszc" />
+</svg>
