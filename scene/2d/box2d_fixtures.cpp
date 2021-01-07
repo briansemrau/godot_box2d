@@ -141,7 +141,13 @@ void Box2DFixture::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_ENTER_TREE: {
-			Box2DCollisionObject *new_body = Object::cast_to<Box2DCollisionObject>(get_parent());
+			// Find the parent body
+			Node *_ancestor = get_parent();
+			Box2DCollisionObject *new_body = NULL;
+			while (_ancestor && !new_body) {
+				new_body = Object::cast_to<Box2DCollisionObject>(_ancestor);
+				_ancestor = _ancestor->get_parent();
+			}
 
 			// If new parent, recreate fixture
 			if (owner_node != new_body) {
@@ -154,12 +160,15 @@ void Box2DFixture::_notification(int p_what) {
 
 				owner_node = new_body;
 
-				if (owner_node->has_signal("sleeping_state_changed"))
-					owner_node->connect("sleeping_state_changed", Callable(this, "update"));
-				owner_node->connect("enabled_state_changed", Callable(this, "update"));
+				if (owner_node) {
+					if (owner_node->has_signal("sleeping_state_changed")) {
+						owner_node->connect("sleeping_state_changed", Callable(this, "update"));
+					}
+					owner_node->connect("enabled_state_changed", Callable(this, "update"));
 
-				if (owner_node && owner_node->body && shape.is_valid()) {
-					create_b2();
+					if (owner_node->body && shape.is_valid()) {
+						create_b2();
+					}
 				}
 			}
 
@@ -301,11 +310,19 @@ bool Box2DFixture::_edit_is_selected_on_click(const Point2 &p_point, double p_to
 String Box2DFixture::get_configuration_warning() const {
 	String warning = Node2D::get_configuration_warning();
 
-	if (!Object::cast_to<Box2DCollisionObject>(get_parent())) {
+	// Find the parent body
+	Node *_ancestor = get_parent();
+	Box2DCollisionObject *parent_body = NULL;
+	while (_ancestor && !parent_body) {
+		parent_body = Object::cast_to<Box2DCollisionObject>(_ancestor);
+		_ancestor = _ancestor->get_parent();
+	}
+
+	if (!parent_body) {
 		if (warning != String()) {
 			warning += "\n\n";
 		}
-		warning += TTR("Box2DFixture subtypes only serve to provide collision fixtures to a Box2DCollisionObject node. Please use it as a child of Box2DPhysicsBody or Box2DArea to give it collision.");
+		warning += TTR("Box2DFixture only serves to provide collision fixtures to a Box2DCollisionObject node. Please use it within the child hierarchy of Box2DCollisionObject to give it collision.");
 	}
 
 	return warning;
