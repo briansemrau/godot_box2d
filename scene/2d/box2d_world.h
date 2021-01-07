@@ -235,19 +235,19 @@ private:
 	private:
 		struct CollisionUpdatePair {
 			Box2DCollisionObject *function_owner;
-			P *transitive;
+			P *transient;
 		};
 		std::deque<CollisionUpdatePair> queue{};
 
 	public:
-		inline void enqueue(Box2DCollisionObject *p_caller, P *p_transitive) {
-			queue.push_back({ p_caller, p_transitive });
+		inline void enqueue(Box2DCollisionObject *p_caller, P *p_transient) {
+			queue.push_back({ p_caller, p_transient });
 		}
 
 		inline void call_and_clear() {
 			while (!queue.empty()) {
 				CollisionUpdatePair *pair = &queue.front();
-				(pair->function_owner->*on_thing_inout)(pair->transitive);
+				(pair->function_owner->*on_thing_inout)(pair->transient);
 				queue.pop_front();
 			}
 		}
