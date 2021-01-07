@@ -11,8 +11,8 @@
 */
 
 void Box2DArea::_on_object_entered(Box2DCollisionObject *p_object) {
-	Box2DPhysicsBody *body = dynamic_cast<Box2DPhysicsBody *>(p_object);
-	const Box2DArea *area = dynamic_cast<const Box2DArea *>(p_object);
+	Box2DPhysicsBody *body = Object::cast_to<Box2DPhysicsBody>(p_object);
+	const Box2DArea *area = Object::cast_to<const Box2DArea>(p_object);
 
 	if (body) {
 		if (get_space_override_mode() != Box2DArea::SpaceOverride::SPACE_OVERRIDE_DISABLED) {
@@ -30,8 +30,8 @@ void Box2DArea::_on_object_entered(Box2DCollisionObject *p_object) {
 }
 
 void Box2DArea::_on_object_exited(Box2DCollisionObject *p_object) {
-	Box2DPhysicsBody *body = dynamic_cast<Box2DPhysicsBody *>(p_object);
-	const Box2DArea *area = dynamic_cast<const Box2DArea *>(p_object);
+	Box2DPhysicsBody *body = Object::cast_to<Box2DPhysicsBody>(p_object);
+	const Box2DArea *area = Object::cast_to<const Box2DArea>(p_object);
 
 	if (body) {
 		// Try to remove even if space_override==disabled
@@ -48,8 +48,8 @@ void Box2DArea::_on_object_exited(Box2DCollisionObject *p_object) {
 }
 
 void Box2DArea::_on_fixture_entered(Box2DFixture *p_fixture) {
-	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_fixture->_get_owner_node());
-	const Box2DArea *area = dynamic_cast<const Box2DArea *>(p_fixture->_get_owner_node());
+	const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(p_fixture->_get_owner_node());
+	const Box2DArea *area = Object::cast_to<const Box2DArea>(p_fixture->_get_owner_node());
 	if (body) {
 		emit_signal("body_fixture_entered", p_fixture);
 	} else if (area && area->is_monitorable()) {
@@ -58,8 +58,8 @@ void Box2DArea::_on_fixture_entered(Box2DFixture *p_fixture) {
 }
 
 void Box2DArea::_on_fixture_exited(Box2DFixture *p_fixture) {
-	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_fixture->_get_owner_node());
-	const Box2DArea *area = dynamic_cast<const Box2DArea *>(p_fixture->_get_owner_node());
+	const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(p_fixture->_get_owner_node());
+	const Box2DArea *area = Object::cast_to<const Box2DArea>(p_fixture->_get_owner_node());
 	if (body) {
 		emit_signal("body_fixture_exited", p_fixture);
 	} else if (area && area->is_monitorable()) {
@@ -292,7 +292,7 @@ TypedArray<Node2D> Box2DArea::get_overlapping_bodies() const {
 	int idx = 0;
 	for (const ObjectID *key = contact_monitor->entered_objects.next(NULL); key; key = contact_monitor->entered_objects.next(key)) {
 		const Object *obj = ObjectDB::get_instance(*key);
-		const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(obj);
+		const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(obj);
 		if (body)
 			ret[idx++] = body;
 	}
@@ -310,7 +310,7 @@ TypedArray<Box2DArea> Box2DArea::get_overlapping_areas() const {
 	int idx = 0;
 	for (const ObjectID *key = contact_monitor->entered_objects.next(NULL); key; key = contact_monitor->entered_objects.next(key)) {
 		const Object *obj = ObjectDB::get_instance(*key);
-		const Box2DArea *area = dynamic_cast<const Box2DArea *>(obj);
+		const Box2DArea *area = Object::cast_to<const Box2DArea>(obj);
 		if (area)
 			ret[idx++] = area;
 	}

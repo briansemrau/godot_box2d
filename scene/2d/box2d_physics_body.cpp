@@ -183,7 +183,7 @@ void Box2DPhysicsBody::_update_area_effects() {
 }
 
 void Box2DPhysicsBody::_on_object_entered(Box2DCollisionObject *p_object) {
-	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_object);
+	const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(p_object);
 	if (body) {
 		emit_signal(SceneStringNames::get_singleton()->body_entered, body);
 	}
@@ -191,7 +191,7 @@ void Box2DPhysicsBody::_on_object_entered(Box2DCollisionObject *p_object) {
 }
 
 void Box2DPhysicsBody::_on_object_exited(Box2DCollisionObject *p_object) {
-	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_object);
+	const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(p_object);
 	if (body) {
 		emit_signal(SceneStringNames::get_singleton()->body_exited, body);
 	}
@@ -199,7 +199,7 @@ void Box2DPhysicsBody::_on_object_exited(Box2DCollisionObject *p_object) {
 }
 
 void Box2DPhysicsBody::_on_fixture_entered(Box2DFixture *p_fixture) {
-	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_fixture->_get_owner_node());
+	const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(p_fixture->_get_owner_node());
 	if (body) {
 		emit_signal("body_fixture_entered", p_fixture);
 	}
@@ -207,7 +207,7 @@ void Box2DPhysicsBody::_on_fixture_entered(Box2DFixture *p_fixture) {
 }
 
 void Box2DPhysicsBody::_on_fixture_exited(Box2DFixture *p_fixture) {
-	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_fixture->_get_owner_node());
+	const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(p_fixture->_get_owner_node());
 	if (body) {
 		emit_signal("body_fixture_exited", p_fixture);
 	}
@@ -415,7 +415,7 @@ void Box2DPhysicsBody::_remove_area(Box2DArea *p_area) {
 }
 
 void Box2DPhysicsBody::_remove_area_variant(const Variant &p_area) {
-	_remove_area(dynamic_cast<Box2DArea *>(static_cast<Object *>(p_area)));
+	_remove_area(Object::cast_to<Box2DArea>(static_cast<Object *>(p_area)));
 }
 
 String Box2DPhysicsBody::get_configuration_warning() const {
