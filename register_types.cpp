@@ -21,10 +21,13 @@ void register_godot_box2d_types() {
 
 	ClassDB::register_class<Box2DShapeQueryParameters>();
 	ClassDB::register_class<Box2DWorld>();
+
 	ClassDB::register_virtual_class<Box2DCollisionObject>();
 	ClassDB::register_class<Box2DPhysicsBody>();
 	ClassDB::register_class<Box2DArea>();
+
 	ClassDB::register_class<Box2DFixture>();
+
 	ClassDB::register_virtual_class<Box2DShape>();
 	ClassDB::register_class<Box2DCircleShape>();
 	ClassDB::register_class<Box2DRectShape>();

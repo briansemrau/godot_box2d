@@ -143,14 +143,14 @@ void Box2DFixture::_notification(int p_what) {
 		case NOTIFICATION_ENTER_TREE: {
 			// Find the parent body
 			Node *_ancestor = get_parent();
-			Box2DCollisionObject *new_body = NULL;
-			while (_ancestor && !new_body) {
-				new_body = Object::cast_to<Box2DCollisionObject>(_ancestor);
+			Box2DCollisionObject *new_owner = NULL;
+			while (_ancestor && !new_owner) {
+				new_owner = Object::cast_to<Box2DCollisionObject>(_ancestor);
 				_ancestor = _ancestor->get_parent();
 			}
 
 			// If new parent, recreate fixture
-			if (owner_node != new_body) {
+			if (owner_node != new_owner) {
 				if (owner_node) {
 					if (owner_node->has_signal("sleeping_state_changed"))
 						owner_node->disconnect("sleeping_state_changed", Callable(this, "update"));
@@ -158,13 +158,17 @@ void Box2DFixture::_notification(int p_what) {
 				}
 				destroy_b2();
 
-				owner_node = new_body;
+				owner_node = new_owner;
 
 				if (owner_node) {
 					if (owner_node->has_signal("sleeping_state_changed")) {
 						owner_node->connect("sleeping_state_changed", Callable(this, "update"));
 					}
 					owner_node->connect("enabled_state_changed", Callable(this, "update"));
+
+					if (Object::cast_to<Box2DArea>(owner_node)) {
+						set_sensor(true);
+					}
 
 					if (owner_node->body && shape.is_valid()) {
 						create_b2();
@@ -356,6 +360,15 @@ Ref<Box2DShape> Box2DFixture::get_shape() {
 }
 
 void Box2DFixture::set_sensor(bool p_sensor) {
+	if (fixtureDef.isSensor == p_sensor) {
+		return;
+	}
+
+	// Force fixtures under Box2DArea to be sensors
+	if (owner_node && Object::cast_to<Box2DArea>(owner_node)) {
+		p_sensor = true;
+	}
+
 	for (int i = 0; i < fixtures.size(); i++) {
 		fixtures[i]->SetSensor(p_sensor);
 	}

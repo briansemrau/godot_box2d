@@ -117,6 +117,10 @@ void Box2DPhysicsBody::_update_area_effects() {
 		return;
 
 	b2Body *body = _get_b2Body();
+
+	if (body == nullptr)
+		return;
+
 	body->SetGravityScale(0);
 
 	b2Vec2 gravity = b2Vec2_zero;
@@ -130,23 +134,25 @@ void Box2DPhysicsBody::_update_area_effects() {
 		colliding_areas.sort();
 		const Box2DAreaItem *area_arr = &colliding_areas[0];
 
-		for (int i = area_count - 1; i >= 0 && !stopped; i--) {
-			Box2DArea::SpaceOverride mode = area_arr[i].area->get_space_override_mode();
+		for (int i = area_count - 1; i >= 0 && !stopped; --i) {
+			const Box2DArea *area = area_arr[i].area;
+
+			Box2DArea::SpaceOverride mode = area->get_space_override_mode();
 			switch (mode) {
 				case Box2DArea::SpaceOverride::SPACE_OVERRIDE_COMBINE_REPLACE: {
-					_compute_area_effects(area_arr[i].area, gravity, linear_damp, angular_damp);
+					_compute_area_effects(area, gravity, linear_damp, angular_damp);
 					stopped = true;
 				} break;
 
 				case Box2DArea::SpaceOverride::SPACE_OVERRIDE_COMBINE: {
-					_compute_area_effects(area_arr[i].area, gravity, linear_damp, angular_damp);
+					_compute_area_effects(area, gravity, linear_damp, angular_damp);
 				} break;
 
 				case Box2DArea::SpaceOverride::SPACE_OVERRIDE_REPLACE: {
 					gravity = b2Vec2_zero;
 					angular_damp = 0;
 					linear_damp = 0;
-					_compute_area_effects(area_arr[i].area, gravity, linear_damp, angular_damp);
+					_compute_area_effects(area, gravity, linear_damp, angular_damp);
 					stopped = true;
 				} break;
 
@@ -154,7 +160,7 @@ void Box2DPhysicsBody::_update_area_effects() {
 					gravity = b2Vec2_zero;
 					angular_damp = 0;
 					linear_damp = 0;
-					_compute_area_effects(area_arr[i].area, gravity, linear_damp, angular_damp);
+					_compute_area_effects(area, gravity, linear_damp, angular_damp);
 				} break;
 
 				default: {
