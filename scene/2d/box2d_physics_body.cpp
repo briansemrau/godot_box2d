@@ -61,13 +61,13 @@ Object *Box2DKinematicCollision::get_local_fixture() const {
 
 Object *Box2DKinematicCollision::get_collider() const {
 	if (collision.collider_fixture != nullptr)
-		return collision.collider_fixture->get_body();
+		return collision.collider_fixture->get_owner();
 	return nullptr;
 }
 
 ObjectID Box2DKinematicCollision::get_collider_id() const {
 	if (collision.collider_fixture != nullptr)
-		return collision.collider_fixture->get_body()->get_instance_id();
+		return collision.collider_fixture->get_owner()->get_instance_id();
 	return ObjectID();
 }
 
@@ -83,59 +83,6 @@ ObjectID Box2DKinematicCollision::get_collider_fixture_id() const {
 
 Vector2 Box2DKinematicCollision::get_collider_velocity() const {
 	return collision.collider_vel;
-}
-
-void Box2DPhysicsBody::on_parent_created(Node *) {
-	//if (create_b2Body()) {
-	//	print_line("body created");
-	//}
-	WARN_PRINT("BODY CREATED IN CALLBACK");
-}
-
-bool Box2DPhysicsBody::create_b2Body() {
-	if (world_node && !body) {
-		ERR_FAIL_COND_V(!world_node->world, false);
-
-		// Create body
-		bodyDef.position = gd_to_b2(get_box2dworld_transform().get_origin());
-		bodyDef.angle = get_box2dworld_transform().get_rotation();
-
-		body = world_node->world->CreateBody(&bodyDef);
-		body->GetUserData().owner = this;
-
-		//print_line("body created");
-
-		update_mass(false);
-
-		// Notify joints
-		auto joint = joints.front();
-		while (joint) {
-			joint->get()->on_parent_created(this);
-			joint = joint->next();
-		}
-
-		return true;
-	}
-	return false;
-}
-
-bool Box2DPhysicsBody::destroy_b2Body() {
-	if (body) {
-		ERR_FAIL_COND_V(!world_node, false);
-		ERR_FAIL_COND_V(!world_node->world, false);
-
-		// Destroy body
-		world_node->world->DestroyBody(body);
-		//print_line("body destroyed");
-		body = NULL;
-
-		// b2Fixture destruction is handled by Box2D
-
-		// b2Joint destruction is handled by Box2D
-
-		return true;
-	}
-	return false;
 }
 
 void Box2DPhysicsBody::update_mass(bool p_calc_reset) {
@@ -219,7 +166,7 @@ void Box2DPhysicsBody::pre_step(float p_delta) {
 		old_xform = get_box2dworld_transform();
 	}
 
-	// TODO area effects (pending PR)
+	_update_area_effects();
 }
 
 void Box2DPhysicsBody::sync_state() {
@@ -236,6 +183,7 @@ void Box2DPhysicsBody::teleport(const Transform2D &p_transform) {
 	bodyDef.position = gd_to_b2(p_transform.get_origin());
 	bodyDef.angle = p_transform.get_rotation();
 
+	b2Body *body = _get_b2Body();
 	if (body) {
 		const b2Vec2 new_b2pos = gd_to_b2(p_transform.get_origin());
 		const float new_b2ang = p_transform.get_rotation();
@@ -251,14 +199,14 @@ bool Box2DPhysicsBody::_move_and_collide(const Vector2 &p_motion, const float p_
 	if (get_type() != Mode::MODE_KINEMATIC) {
 		ERR_PRINT_ONCE("This function is only meant to be used with Kinematic body types.");
 	}
-	ERR_FAIL_COND_V(!world_node, false);
+	ERR_FAIL_COND_V(!_get_world_node(), false);
 
 	// TODO check sync_to_physics property?
 
 	Transform2D gt = get_box2dworld_transform();
 
 	Box2DWorld::MotionResult result;
-	bool colliding = world_node->_body_test_motion(this, gt, p_motion, p_infinite_inertia, &result);
+	bool colliding = _get_world_node()->_body_test_motion(this, gt, p_motion, p_infinite_inertia, &result);
 
 	if (colliding) {
 		r_collision.collision_point = result.collision_point;
@@ -991,10 +939,10 @@ void Box2DPhysicsBody::apply_torque_impulse(real_t impulse, bool wake) {
 }
 
 void Box2DPhysicsBody::set_kinematic_integrate_velocity(bool p_integrate_vel) {
-	ERR_FAIL_COND_MSG(get_type() != Mode::MODE_KINEMATIC, "The property kinematic_integrate_velocity has no effect on non-kinematic bodies.");
 	if (kinematic_integrate_velocity == p_integrate_vel) {
 		return;
 	}
+	ERR_FAIL_COND_MSG(get_type() != Mode::MODE_KINEMATIC, "The property kinematic_integrate_velocity has no effect on non-kinematic bodies.");
 
 	kinematic_integrate_velocity = p_integrate_vel;
 

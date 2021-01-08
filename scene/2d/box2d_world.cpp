@@ -1060,7 +1060,7 @@ inline bool _query_should_ignore_fixture(b2Fixture *p_fixture, const bool p_coll
 		return true;
 
 	// Check exclusion
-	if (p_exclude.has(p_fixture->GetBody()->GetUserData().owner))
+	if (p_exclude.has(Object::cast_to<Box2DPhysicsBody>(p_fixture->GetBody()->GetUserData().owner)))
 		return true;
 
 	// This fixture should not be filtered

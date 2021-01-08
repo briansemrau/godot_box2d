@@ -74,6 +74,8 @@ protected:
 	virtual void _on_fixture_entered(Box2DFixture *p_fixture) = 0;
 	virtual void _on_fixture_exited(Box2DFixture *p_fixture) = 0;
 
+	virtual void pre_step(float p_delta){};
+
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();

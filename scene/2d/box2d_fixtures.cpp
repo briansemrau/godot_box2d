@@ -265,7 +265,7 @@ void Box2DFixture::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_collision_exception_with", "fixture"), &Box2DFixture::add_collision_exception_with);
 	ClassDB::bind_method(D_METHOD("remove_collision_exception_with", "fixture"), &Box2DFixture::remove_collision_exception_with);
 
-	ClassDB::bind_method(D_METHOD("get_parent_body"), &Box2DFixture::get_body);
+	ClassDB::bind_method(D_METHOD("get_collision_object"), &Box2DFixture::get_owner);
 
 	ClassDB::bind_method(D_METHOD("_shape_changed"), &Box2DFixture::_shape_changed);
 
