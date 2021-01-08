@@ -15,8 +15,9 @@
 #include <box2d/b2_world_callbacks.h>
 
 #include "../../util/box2d_types_converter.h"
+#include "box2d_collision_object.h"
 
-#include <list>
+#include <deque>
 #include <unordered_set>
 
 /**
@@ -172,7 +173,7 @@ class Box2DPhysicsTestMotionResult;
 class Box2DWorld : public Node2D, public virtual b2DestructionListener, public virtual b2ContactFilter, public virtual b2ContactListener {
 	GDCLASS(Box2DWorld, Node2D);
 
-	friend class Box2DPhysicsBody;
+	friend class Box2DCollisionObject;
 	friend class Box2DJoint;
 
 public:
@@ -189,23 +190,6 @@ public:
 	};
 
 private:
-	class GodotSignalCaller {
-		public:
-		String signal_name{""};
-		Node* obj_emitter{nullptr};
-		Node* obj_a{nullptr};
-		Node* obj_b{nullptr};
-
-		GodotSignalCaller(const String &p_signal_name, Node* p_obj_emitter, Node* p_obja, Node* p_objb) {
-			obj_emitter = p_obj_emitter;
-			signal_name = p_signal_name;
-			obj_a = p_obja;
-			obj_b = p_objb;
-		}
-	};
-
-	// b2World Space Query Callbacks
-
 	class PointQueryCallback : public b2QueryCallback {
 	public:
 		Set<Box2DFixture *> results; // Use a set so composite fixtures don't double-count towards max_results
@@ -274,17 +258,43 @@ private:
 
 		bool QueryCallback(int32 proxyId);
 	};
+	
+	template <class P, void (Box2DCollisionObject::*on_thing_inout)(P *)>
+	class CollisionUpdateQueue {
+	private:
+		struct CollisionUpdatePair {
+			Box2DCollisionObject *function_owner;
+			P *transient;
+		};
+		std::deque<CollisionUpdatePair> queue{};
+
+	public:
+		inline void enqueue(Box2DCollisionObject *p_caller, P *p_transient) {
+			queue.push_back({ p_caller, p_transient });
+		}
+
+		inline void call_and_clear() {
+			while (!queue.empty()) {
+				CollisionUpdatePair *pair = &queue.front();
+				(pair->function_owner->*on_thing_inout)(pair->transient);
+				queue.pop_front();
+			}
+		}
+	};
 
 private:
 	Vector2 gravity;
 	bool auto_step{true};
 	b2World *world = NULL;
 
-	std::list<GodotSignalCaller> collision_callback_queue{};
+	CollisionUpdateQueue<Box2DCollisionObject, &Box2DCollisionObject::_on_object_entered> object_entered_queue;
+	CollisionUpdateQueue<Box2DCollisionObject, &Box2DCollisionObject::_on_object_exited> object_exited_queue;
+	CollisionUpdateQueue<Box2DFixture, &Box2DCollisionObject::_on_fixture_entered> fixture_entered_queue;
+	CollisionUpdateQueue<Box2DFixture, &Box2DCollisionObject::_on_fixture_exited> fixture_exited_queue;
 
 	// TODO make sure these are using the best data structure
-	Set<Box2DPhysicsBody *> bodies;
-	Set<Box2DJoint *> joints;
+	Set<Box2DCollisionObject *> body_owners;
+	Set<Box2DJoint *> joint_owners;
 
 	// b2World Callbacks
 	// TODO extract into classes

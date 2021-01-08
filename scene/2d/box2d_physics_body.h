@@ -1,9 +1,9 @@
 #ifndef BOX2D_PHYSICS_BODY_H
 #define BOX2D_PHYSICS_BODY_H
 
+#include <core/io/resource.h>
 #include <core/object/object.h>
 #include <core/object/reference.h>
-#include <core/io/resource.h>
 #include <core/templates/vset.h>
 #include <scene/2d/node_2d.h>
 
@@ -12,6 +12,9 @@
 #include <box2d/b2_world.h>
 
 #include "../../util/box2d_types_converter.h"
+
+#include "box2d_area.h"
+#include "box2d_collision_object.h"
 #include "box2d_world.h"
 
 /**
@@ -21,10 +24,8 @@
 class Box2DWorld;
 class Box2DKinematicCollision;
 
-// TODO either rename this more generic or add Area node that also uses b2Body
-// or maybe this is just noted in the future docs to handle Area2D functionality
-class Box2DPhysicsBody : public Node2D {
-	GDCLASS(Box2DPhysicsBody, Node2D);
+class Box2DPhysicsBody : public Box2DCollisionObject {
+	GDCLASS(Box2DPhysicsBody, Box2DCollisionObject);
 
 	friend class Box2DWorld;
 	friend class Box2DFixture;
@@ -48,35 +49,31 @@ public:
 	};
 
 private:
-	b2BodyDef bodyDef;
 	b2MassData massDataDef{ 1.0f, b2Vec2_zero, 0.5f }; // default for a disk of 1kg, 1m radius
 	bool use_custom_massdata = false;
 	real_t linear_damping = 0.0f;
 	real_t angular_damping = 0.0f;
-	b2Filter filterDef;
 
 	VSet<Box2DPhysicsBody *> filtered;
 	VSet<Box2DPhysicsBody *> filtering_me;
 	// TODO i don't care enough right now to let bodies exclude specific fixtures
 
-	struct ContactMonitor {
-		// bool locked; // TODO when physics moved to separate thread
-		VSet<Box2DContactPoint> contacts;
+	Set<Box2DJoint *> joints;
 
-		// TODO when adding area functionality, this list can be used to apply area effects
-		// All the bodies/fixtures currently in contact with this body.
-		// The int value stores the number of fixtures currently in contact.
-		// When the counter transitions from 0->1 or 1->0, body_entered/exited is emitted.
-		HashMap<ObjectID, int> entered_objects;
+	Transform2D last_valid_xform;
+
+	// For sorting colliding areas by priority
+	struct Box2DAreaItem {
+		const Box2DArea *area = NULL;
+		inline bool operator==(const Box2DAreaItem &p_item) const { return area == p_item.area; }
+		inline bool operator<(const Box2DAreaItem &p_item) const { return area->get_priority() < p_item.area->get_priority(); }
+		inline Box2DAreaItem() {}
+		inline Box2DAreaItem(const Box2DArea *p_area) {
+			area = p_area;
+		}
 	};
 
-	ContactMonitor *contact_monitor = NULL;
-	int max_contacts_reported = 0;
-
-	b2Body *body = NULL;
-
-	Box2DWorld *world_node = NULL;
-	Set<Box2DJoint *> joints;
+	Vector<Box2DAreaItem> colliding_areas;
 
 	//Transform2D last_valid_xform; // this is for sync_to_physics, but is it needed?
 	Transform2D old_xform; // For calculating kinematic body movement velocity
@@ -87,32 +84,41 @@ private:
 	// TODO maybe keep a list of local state we want this class to track wrt a b2body parameter or field
 	// are there any others?  enabled for example can bet set on the fly in code
 	bool prev_sleeping_state = true;
-	bool prev_enabled_state = true;
 
 	// Moving to and from world transform
 	void set_box2dworld_transform(const Transform2D &p_transform);
 	Transform2D get_box2dworld_transform();
 
-	void on_parent_created(Node *);
-
-	bool create_b2Body();
-	bool destroy_b2Body();
-
 	void update_mass(bool p_calc_reset = true);
-	void update_filterdata();
 
-	void pre_step(float p_delta);
+	void _compute_area_effects(const Box2DArea *p_area, b2Vec2 &p_gravity, float &p_lin_damp, float &p_ang_damp);
+	void _update_area_effects();
+
 	void sync_state();
 
 	void teleport(const Transform2D &p_transform);
 
 	bool _move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia, KinematicCollision &r_collision, const bool p_exclude_raycast_shapes = true, const bool p_test_only = false);
 
+	virtual void _on_object_entered(Box2DCollisionObject *p_object) override;
+	virtual void _on_object_exited(Box2DCollisionObject *p_object) override;
+	virtual void _on_fixture_entered(Box2DFixture *p_fixture) override;
+	virtual void _on_fixture_exited(Box2DFixture *p_fixture) override;
+
+protected:
+	virtual void on_b2Body_created() override;
+
+	virtual void pre_step(float p_delta) override;
+
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
 
 public:
+	void _add_area(Box2DArea *p_area);
+	void _remove_area(Box2DArea *p_area);
+	void _remove_area_variant(const Variant &p_area);
+
 	virtual String get_configuration_warning() const override;
 
 	void _set_linear_velocity_no_check(const Vector2 &p_vel);
@@ -158,22 +164,8 @@ public:
 	void set_can_sleep(bool p_can_sleep);
 	bool get_can_sleep() const;
 
-	void set_enabled(bool p_enabled);
-	bool is_enabled() const;
-
 	void set_fixed_rotation(bool p_fixed);
 	bool is_fixed_rotation() const;
-
-	void set_collision_layer(uint16_t p_layer);
-	uint16_t get_collision_layer() const;
-
-	void set_collision_mask(uint16_t p_mask);
-	uint16_t get_collision_mask() const;
-
-	void set_group_index(int16_t p_group_index);
-	int16_t get_group_index() const;
-
-	void set_filter_data(uint16_t p_layer, uint16_t p_mask, int16 p_group_index);
 
 	Array get_collision_exceptions();
 	void add_collision_exception_with(Node *p_node);
