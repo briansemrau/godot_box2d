@@ -224,8 +224,8 @@ bool Box2DWorld::ShouldCollide(b2Fixture *fixtureA, b2Fixture *fixtureB) {
 	}
 
 	// Check for body exclusions
-	Box2DPhysicsBody *const &bodyA = dynamic_cast<Box2DPhysicsBody *>(ownerA->owner_node);
-	Box2DPhysicsBody *const &bodyB = dynamic_cast<Box2DPhysicsBody *>(ownerB->owner_node);
+	Box2DPhysicsBody *const &bodyA = Object::cast_to<Box2DPhysicsBody>(ownerA->owner_node);
+	Box2DPhysicsBody *const &bodyB = Object::cast_to<Box2DPhysicsBody>(ownerB->owner_node);
 	if (bodyA && bodyB) {
 		if ((ownerA->accept_body_collision_exceptions && bodyA->filtered.has(bodyB)) || (ownerB->accept_body_collision_exceptions && bodyB->filtered.has(bodyA))) {
 			return false;
@@ -647,6 +647,18 @@ void Box2DWorld::step(float p_step) {
 		}
 	}
 
+	// Handle area effects
+	// Contacts are updated at the end of the previous step and integration happens
+	// before solving constraints, so this is the place to do it.
+	Set<Box2DCollisionObject *>::Element *obj = body_owners.front();
+	while (obj) {
+		Box2DPhysicsBody *body = Object::cast_to<Box2DPhysicsBody>(obj->get());
+		if (body)
+			body->_update_area_effects();
+		obj = obj->next();
+	}
+
+	// Step
 	world->Step(p_step, 8, 8);
 	flag_rescan_contacts_monitored = false;
 
@@ -829,7 +841,7 @@ inline bool _query_should_ignore_fixture(b2Fixture *fixture, const bool collide_
 		return true;
 
 	// Check exclusion
-	if (exclude.find(dynamic_cast<Box2DPhysicsBody *>(fixture->GetBody()->GetUserData().owner)) > 0)
+	if (exclude.find(Object::cast_to<Box2DPhysicsBody>(fixture->GetBody()->GetUserData().owner)) > 0)
 		return true;
 
 	// This fixture should not be filtered

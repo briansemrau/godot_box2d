@@ -3,6 +3,7 @@
 #include <core/config/engine.h>
 #include <scene/scene_string_names.h>
 
+#include "box2d_area.h"
 #include "box2d_fixtures.h"
 #include "box2d_joints.h"
 
@@ -93,32 +94,130 @@ void Box2DPhysicsBody::sync_state() {
 	//}
 }
 
+void Box2DPhysicsBody::_compute_area_effects(const Box2DArea *p_area, b2Vec2 &r_gravity, float &r_lin_damp, float &r_ang_damp) {
+	b2Body *body = _get_b2Body();
+
+	if (p_area->is_gravity_a_point()) {
+		if (p_area->get_gravity_distance_scale() > 0) {
+			Vector2 v = p_area->get_transform().xform(p_area->get_gravity_vector()) - get_transform().get_origin();
+			r_gravity += gd_to_b2(v.normalized() * (p_area->get_gravity() / Math::pow(v.length() * p_area->get_gravity_distance_scale() + 1, 2)));
+		} else {
+			r_gravity += gd_to_b2((p_area->get_transform().xform(p_area->get_gravity_vector()) - get_transform().get_origin()).normalized() * p_area->get_gravity());
+		}
+	} else {
+		r_gravity += gd_to_b2(p_area->get_gravity_vector() * p_area->get_gravity());
+	}
+
+	r_lin_damp += p_area->get_linear_damp();
+	r_ang_damp += p_area->get_angular_damp();
+}
+
+void Box2DPhysicsBody::_update_area_effects() {
+	if (get_type() != Box2DPhysicsBody::Mode::MODE_RIGID)
+		return;
+
+	b2Body *body = _get_b2Body();
+
+	if (body == nullptr)
+		return;
+
+	body->SetGravityScale(0);
+
+	b2Vec2 gravity = b2Vec2_zero;
+	float linear_damp = 0.0f;
+	float angular_damp = 0.0f;
+
+	const int area_count = colliding_areas.size();
+	bool stopped = false;
+
+	if (area_count) {
+		colliding_areas.sort();
+		const Box2DAreaItem *area_arr = &colliding_areas[0];
+
+		for (int i = area_count - 1; i >= 0 && !stopped; --i) {
+			const Box2DArea *area = area_arr[i].area;
+
+			Box2DArea::SpaceOverride mode = area->get_space_override_mode();
+			switch (mode) {
+				case Box2DArea::SpaceOverride::SPACE_OVERRIDE_COMBINE_REPLACE: {
+					_compute_area_effects(area, gravity, linear_damp, angular_damp);
+					stopped = true;
+				} break;
+
+				case Box2DArea::SpaceOverride::SPACE_OVERRIDE_COMBINE: {
+					_compute_area_effects(area, gravity, linear_damp, angular_damp);
+				} break;
+
+				case Box2DArea::SpaceOverride::SPACE_OVERRIDE_REPLACE: {
+					gravity = b2Vec2_zero;
+					angular_damp = 0;
+					linear_damp = 0;
+					_compute_area_effects(area, gravity, linear_damp, angular_damp);
+					stopped = true;
+				} break;
+
+				case Box2DArea::SpaceOverride::SPACE_OVERRIDE_REPLACE_COMBINE: {
+					gravity = b2Vec2_zero;
+					angular_damp = 0;
+					linear_damp = 0;
+					_compute_area_effects(area, gravity, linear_damp, angular_damp);
+				} break;
+
+				default: {
+					// area override has been disabled after colliding
+				} break;
+			}
+		}
+	}
+	if (!stopped) {
+		// Apply default area effects
+		//_compute_area_effects(def_area, gravity, linear_damp, angular_damp);
+		gravity += body->GetWorld()->GetGravity();
+		linear_damp += body->GetLinearDamping();
+		angular_damp += body->GetAngularDamping();
+	}
+
+	gravity *= get_gravity_scale() * body->GetMass();
+
+	body->ApplyForceToCenter(gravity, false);
+	if (linear_damp >= 0) {
+		body->SetLinearDamping(linear_damp);
+	}
+	if (angular_damp >= 0) {
+		body->SetLinearDamping(angular_damp);
+	}
+}
+
 void Box2DPhysicsBody::_on_object_entered(Box2DCollisionObject *p_object) {
-	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_object);
+	const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(p_object);
 	if (body) {
 		emit_signal(SceneStringNames::get_singleton()->body_entered, body);
 	}
+	// ignore areas
 }
 
 void Box2DPhysicsBody::_on_object_exited(Box2DCollisionObject *p_object) {
-	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_object);
+	const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(p_object);
 	if (body) {
 		emit_signal(SceneStringNames::get_singleton()->body_exited, body);
 	}
+	// ignore areas
 }
 
 void Box2DPhysicsBody::_on_fixture_entered(Box2DFixture *p_fixture) {
-	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_fixture->_get_owner_node());
+	const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(p_fixture->_get_owner_node());
 	if (body) {
 		emit_signal("body_fixture_entered", p_fixture);
 	}
+	// ignore area fixtures
 }
 
 void Box2DPhysicsBody::_on_fixture_exited(Box2DFixture *p_fixture) {
-	const Box2DPhysicsBody *body = dynamic_cast<const Box2DPhysicsBody *>(p_fixture->_get_owner_node());
+	const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(p_fixture->_get_owner_node());
 	if (body) {
 		emit_signal("body_fixture_exited", p_fixture);
 	}
+	// ignore area fixtures
 }
 
 void Box2DPhysicsBody::_notification(int p_what) {
@@ -302,6 +401,29 @@ void Box2DPhysicsBody::_bind_methods() {
 	BIND_ENUM_CONSTANT(MODE_RIGID);
 	BIND_ENUM_CONSTANT(MODE_STATIC);
 	BIND_ENUM_CONSTANT(MODE_KINEMATIC);
+}
+
+void Box2DPhysicsBody::_add_area(Box2DArea *p_area) {
+	Box2DAreaItem item = Box2DAreaItem(p_area);
+	const int index = colliding_areas.find(item);
+	if (index == -1) {
+		colliding_areas.ordered_insert(item);
+		Vector<Variant> binds;
+		binds.push_back(Variant(p_area));
+		p_area->connect(SceneStringNames::get_singleton()->tree_exited, callable_mp(this, &Box2DPhysicsBody::_remove_area_variant), binds, Object::ConnectFlags::CONNECT_ONESHOT);
+	}
+}
+
+void Box2DPhysicsBody::_remove_area(Box2DArea *p_area) {
+	const int index = colliding_areas.find(Box2DAreaItem(p_area));
+	if (index > -1) {
+		colliding_areas.remove(index);
+		p_area->disconnect(SceneStringNames::get_singleton()->tree_exited, callable_mp(this, &Box2DPhysicsBody::_remove_area_variant));
+	}
+}
+
+void Box2DPhysicsBody::_remove_area_variant(const Variant &p_area) {
+	_remove_area(Object::cast_to<Box2DArea>(static_cast<Object *>(p_area)));
 }
 
 String Box2DPhysicsBody::get_configuration_warning() const {

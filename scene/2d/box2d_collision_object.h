@@ -51,7 +51,6 @@ protected:
 		// bool locked; // TODO when physics moved to separate thread
 		VSet<Box2DContactPoint> contacts;
 
-		// TODO when adding area functionality, this list can be used to apply area effects
 		// All the bodies/fixtures currently in contact with this body.
 		// The int value stores the number of b2Fixtures currently in contact.
 		// When the counter transitions from 0->1 or 1->0, body_entered/exited is emitted.

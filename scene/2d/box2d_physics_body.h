@@ -13,6 +13,7 @@
 
 #include "../../util/box2d_types_converter.h"
 
+#include "box2d_area.h"
 #include "box2d_collision_object.h"
 #include "box2d_world.h"
 
@@ -47,7 +48,20 @@ private:
 	Set<Box2DJoint *> joints;
 
 	Transform2D last_valid_xform;
-	
+
+	// For sorting colliding areas by priority
+	struct Box2DAreaItem {
+		const Box2DArea *area = NULL;
+		inline bool operator==(const Box2DAreaItem &p_item) const { return area == p_item.area; }
+		inline bool operator<(const Box2DAreaItem &p_item) const { return area->get_priority() < p_item.area->get_priority(); }
+		inline Box2DAreaItem() {}
+		inline Box2DAreaItem(const Box2DArea *p_area) {
+			area = p_area;
+		}
+	};
+
+	Vector<Box2DAreaItem> colliding_areas;
+
 	// TODO maybe keep a list of local state we want this class to track wrt a b2body parameter or field
 	// are there any others?  enabled for example can bet set on the fly in code
 	bool prev_sleeping_state = true;
@@ -59,6 +73,9 @@ private:
 	void update_mass(bool p_calc_reset = true);
 
 	void sync_state();
+
+	void _compute_area_effects(const Box2DArea *p_area, b2Vec2 &p_gravity, float &p_lin_damp, float &p_ang_damp);
+	void _update_area_effects();
 
 	virtual void _on_object_entered(Box2DCollisionObject *p_object) override;
 	virtual void _on_object_exited(Box2DCollisionObject *p_object) override;
@@ -73,6 +90,10 @@ protected:
 	static void _bind_methods();
 
 public:
+	void _add_area(Box2DArea *p_area);
+	void _remove_area(Box2DArea *p_area);
+	void _remove_area_variant(const Variant &p_area);
+
 	virtual String get_configuration_warning() const override;
 
 	void set_linear_velocity(const Vector2 &p_vel);
