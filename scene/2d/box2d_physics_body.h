@@ -85,10 +85,6 @@ private:
 	// are there any others?  enabled for example can bet set on the fly in code
 	bool prev_sleeping_state = true;
 
-	// Moving to and from world transform
-	void set_box2dworld_transform(const Transform2D &p_transform);
-	Transform2D get_box2dworld_transform();
-
 	void update_mass(bool p_calc_reset = true);
 
 	void _compute_area_effects(const Box2DArea *p_area, b2Vec2 &p_gravity, float &p_lin_damp, float &p_ang_damp);

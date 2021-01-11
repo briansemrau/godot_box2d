@@ -95,30 +95,6 @@ void Box2DPhysicsBody::update_mass(bool p_calc_reset) {
 	}
 }
 
-Transform2D Box2DPhysicsBody::get_box2dworld_transform() {
-	std::vector<Transform2D> transforms{};
-	transforms.push_back(get_transform());
-	Node* parent = get_parent();
-	while(parent) {
-		if(parent == _get_world_node()) {
-			break;
-		}
-		CanvasItem* cv = Object::cast_to<CanvasItem>(parent);
-		if(cv) {
-			transforms.push_back(cv->get_transform());
-		}
-		parent = parent->get_parent();
-	}
-
-	Transform2D returned{};
-	while(transforms.size() > 0) {
-		returned = returned * transforms.back();
-		transforms.pop_back();
-	}
-
-	return returned;
-}
-
 void Box2DPhysicsBody::on_b2Body_created() {
 	update_mass(false);
 
@@ -128,29 +104,6 @@ void Box2DPhysicsBody::on_b2Body_created() {
 		joint->get()->on_parent_created(this);
 		joint = joint->next();
 	}
-}
-
-void Box2DPhysicsBody::set_box2dworld_transform(const Transform2D &p_transform) {
-	std::vector<Transform2D> transforms{};
-	transforms.push_back(p_transform);
-	Node* parent = get_parent();
-	while(parent) {
-		if(parent == _get_world_node()) {
-			break;
-		}
-		CanvasItem* cv = Object::cast_to<CanvasItem>(parent);
-		if(cv) {
-			transforms.push_back(cv->get_transform().affine_inverse());
-		}
-		parent = parent->get_parent();
-	}
-
-	Transform2D target_xform{};
-	while(transforms.size() > 0) {
-		target_xform = target_xform * transforms.back();
-		transforms.pop_back();
-	}
-	set_transform(target_xform);
 }
 
 void Box2DPhysicsBody::pre_step(float p_delta) {

@@ -68,51 +68,51 @@ void Box2DCollisionObject::update_filterdata() {
 	}
 }
 
-Transform2D Box2DCollisionObject::get_box2dworld_transform() {
-	std::vector<Transform2D> transforms{};
-	transforms.push_back(get_transform());
-	Node* parent = get_parent();
-	while(parent) {
-		if(parent == world_node) {
-			break;
-		}
-		CanvasItem* cv = Object::cast_to<CanvasItem>(parent);
-		if(cv) {
-			transforms.push_back(cv->get_transform());
-		}
-		parent = parent->get_parent();
-	}
-
-	Transform2D returned{};
-	while(transforms.size() > 0) {
-		returned = returned * transforms.back();
-		transforms.pop_back();
-	}
-
-	return returned;
-}
-
 void Box2DCollisionObject::set_box2dworld_transform(const Transform2D &p_transform) {
 	std::vector<Transform2D> transforms{};
 	transforms.push_back(p_transform);
-	Node* parent = get_parent();
-	while(parent) {
-		if(parent == world_node) {
+	Node *parent = get_parent();
+	while (parent) {
+		if (parent == world_node) {
 			break;
 		}
-		CanvasItem* cv = Object::cast_to<CanvasItem>(parent);
-		if(cv) {
+		CanvasItem *cv = Object::cast_to<CanvasItem>(parent);
+		if (cv) {
 			transforms.push_back(cv->get_transform().affine_inverse());
 		}
 		parent = parent->get_parent();
 	}
 
 	Transform2D target_xform{};
-	while(transforms.size() > 0) {
+	while (transforms.size() > 0) {
 		target_xform = target_xform * transforms.back();
 		transforms.pop_back();
 	}
 	set_transform(target_xform);
+}
+
+Transform2D Box2DCollisionObject::get_box2dworld_transform() {
+	std::vector<Transform2D> transforms{};
+	transforms.push_back(get_transform());
+	Node *parent = get_parent();
+	while (parent) {
+		if (parent == world_node) {
+			break;
+		}
+		CanvasItem *cv = Object::cast_to<CanvasItem>(parent);
+		if (cv) {
+			transforms.push_back(cv->get_transform());
+		}
+		parent = parent->get_parent();
+	}
+
+	Transform2D returned{};
+	while (transforms.size() > 0) {
+		returned = returned * transforms.back();
+		transforms.pop_back();
+	}
+
+	return returned;
 }
 
 void Box2DCollisionObject::_set_contact_monitor(bool p_enabled) {

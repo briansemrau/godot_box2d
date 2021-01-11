@@ -33,10 +33,6 @@ class Box2DCollisionObject : public Node2D {
 
 	Box2DWorld *world_node = NULL;
 
-	// Moving to and from world transform
-	void set_box2dworld_transform(const Transform2D &p_transform);
-	Transform2D get_box2dworld_transform();
-
 	void on_parent_created(Node *);
 
 	bool create_b2Body();
@@ -62,6 +58,10 @@ protected:
 
 	inline Box2DWorld *_get_world_node() const { return world_node; };
 	inline b2Body *_get_b2Body() const { return body; }
+
+	// Moving to and from world transform
+	void set_box2dworld_transform(const Transform2D &p_transform);
+	Transform2D get_box2dworld_transform();
 
 	virtual void on_b2Body_created(){};
 	virtual void on_b2Body_destroyed(){};
