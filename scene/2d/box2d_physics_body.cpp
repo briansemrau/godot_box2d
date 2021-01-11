@@ -148,40 +148,6 @@ void Box2DPhysicsBody::teleport(const Transform2D &p_transform) {
 	old_xform = p_transform;
 }
 
-bool Box2DPhysicsBody::_move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia, KinematicCollision &r_collision, const bool p_exclude_raycast_shapes, const bool p_test_only) {
-	if (get_type() != Mode::MODE_KINEMATIC) {
-		ERR_PRINT_ONCE("This function is only meant to be used with Kinematic body types.");
-	}
-	ERR_FAIL_COND_V(!_get_world_node(), false);
-
-	// TODO check sync_to_physics property?
-
-	Transform2D gt = get_box2dworld_transform();
-
-	Box2DWorld::MotionResult result;
-	bool colliding = _get_world_node()->_body_test_motion(this, gt, p_motion, p_infinite_inertia, &result);
-
-	if (colliding) {
-		r_collision.collision_point = result.collision_point;
-		r_collision.normal = result.collision_normal;
-		r_collision.collider_vel = result.collider_velocity;
-		r_collision.collider_fixture = result.collider_fixture;
-		r_collision.remainder = result.remainder;
-		r_collision.travel = result.motion;
-		r_collision.collider_fixture = result.collider_fixture;
-		r_collision.local_fixture = result.local_fixture;
-	}
-
-	if (!p_test_only) {
-		gt.elements[2] += result.motion;
-		set_block_transform_notify(true);
-		set_box2dworld_transform(gt);
-		set_block_transform_notify(false);
-	}
-
-	return colliding;
-}
-
 void Box2DPhysicsBody::_compute_area_effects(const Box2DArea *p_area, b2Vec2 &r_gravity, float &r_lin_damp, float &r_ang_damp) {
 	b2Body *body = _get_b2Body();
 
@@ -308,6 +274,38 @@ void Box2DPhysicsBody::_on_fixture_exited(Box2DFixture *p_fixture) {
 	// ignore area fixtures
 }
 
+Ref<Box2DKinematicCollision> Box2DPhysicsBody::_move_and_collide_binding(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia, const bool p_exclude_raycast_shapes, const bool p_test_only) {
+	KinematicCollision col;
+
+	if (move_and_collide(p_motion, p_rotation, p_infinite_inertia, col, p_exclude_raycast_shapes, p_test_only)) {
+		if (motion_cache.is_null()) {
+			motion_cache.instance();
+			motion_cache->owner = this;
+		}
+
+		motion_cache->collision = col;
+
+		return motion_cache;
+	}
+
+	return Ref<Box2DKinematicCollision>();
+}
+
+Ref<Box2DKinematicCollision> Box2DPhysicsBody::_get_slide_collision_binding(int p_bounce) {
+	ERR_FAIL_INDEX_V(p_bounce, kinematic_colliders.size(), Ref<Box2DKinematicCollision>());
+	if (p_bounce >= kinematic_colliders_refcache.size()) {
+		kinematic_colliders_refcache.resize(p_bounce + 1);
+	}
+
+	if (kinematic_colliders_refcache[p_bounce].is_null()) {
+		kinematic_colliders_refcache.write[p_bounce].instance();
+		kinematic_colliders_refcache.write[p_bounce]->owner = this;
+	}
+
+	kinematic_colliders_refcache.write[p_bounce]->collision = kinematic_colliders[p_bounce];
+	return kinematic_colliders_refcache[p_bounce];
+}
+
 void Box2DPhysicsBody::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_PREDELETE: {
@@ -328,6 +326,15 @@ void Box2DPhysicsBody::_notification(int p_what) {
 			//last_valid_xform = get_box2dworld_transform();
 			old_xform = get_box2dworld_transform();
 
+			// Reset move_and_slide data
+			on_floor = false;
+			on_floor_body = ObjectID();
+			on_ceiling = false;
+			on_wall = false;
+			kinematic_colliders.clear();
+			floor_velocity = Vector2();
+
+			// for debug drawing
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
 				set_process_internal(true);
 			}
@@ -340,6 +347,12 @@ void Box2DPhysicsBody::_notification(int p_what) {
 			// TODO What do we do if it exits the tree, the ref is kept (in a script), and it's never destroyed?
 			//      Exiting w/o reentering should destroy body.
 			//      This applies to Box2DFixture and Box2DJoint as well.
+			//
+			// Perhaps body creation/destruction should be queued
+			// - body created: immediate CreateBody request
+			// - body destroyed: queue DestroyBody
+			//     - recreated before pumping -> remove from queue
+			// - world pre-step: pump queue
 
 			set_process_internal(false);
 		} break;
@@ -468,7 +481,23 @@ void Box2DPhysicsBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_kinematic_integrate_velocity", "enabled"), &Box2DPhysicsBody::set_kinematic_integrate_velocity);
 	ClassDB::bind_method(D_METHOD("is_kinematic_integrating_velocity"), &Box2DPhysicsBody::is_kinematic_integrating_velocity);
 
-	ClassDB::bind_method(D_METHOD("move_and_collide", "velocity", "rotation", "infinite_inertia", "exclude_raycast_shapes", "test_only"), &Box2DPhysicsBody::move_and_collide, DEFVAL(true), DEFVAL(true), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("move_and_collide", "velocity", "rotation", "infinite_inertia", "exclude_raycast_shapes", "test_only"), &Box2DPhysicsBody::_move_and_collide_binding, DEFVAL(true), DEFVAL(true), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("move_and_slide", "linear_velocity", "up_direction", "stop_on_slope", "max_slides", "floor_max_angle", "infinite_inertia"), &Box2DPhysicsBody::move_and_slide, DEFVAL(Vector2(0, 0)), DEFVAL(false), DEFVAL(4), DEFVAL(Math::deg2rad(45.0f)), DEFVAL(true));
+	//ClassDB::bind_method(D_METHOD("move_and_slide_with_snap", "linear_velocity", "snap", "up_direction", "stop_on_slope", "max_slides", "floor_max_angle", "infinite_inertia"), &Box2DPhysicsBody::move_and_slide_with_snap, DEFVAL(Vector2(0, 0)), DEFVAL(false), DEFVAL(4), DEFVAL(Math::deg2rad(45.0f)), DEFVAL(true));
+
+	//ClassDB::bind_method(D_METHOD("test_move", "from", "rel_vec", "infinite_inertia"), &Box2DPhysicsBody::test_move, DEFVAL(true));
+
+	ClassDB::bind_method(D_METHOD("is_on_floor"), &Box2DPhysicsBody::is_on_floor);
+	ClassDB::bind_method(D_METHOD("is_on_ceiling"), &Box2DPhysicsBody::is_on_ceiling);
+	ClassDB::bind_method(D_METHOD("is_on_wall"), &Box2DPhysicsBody::is_on_wall);
+	ClassDB::bind_method(D_METHOD("get_floor_normal"), &Box2DPhysicsBody::get_floor_normal);
+	ClassDB::bind_method(D_METHOD("get_floor_velocity"), &Box2DPhysicsBody::get_floor_velocity);
+
+	ClassDB::bind_method(D_METHOD("get_slide_count"), &Box2DPhysicsBody::get_slide_count);
+	ClassDB::bind_method(D_METHOD("get_slide_collision", "slide_idx"), &Box2DPhysicsBody::_get_slide_collision_binding);
+
+	//ClassDB::bind_method(D_METHOD("set_sync_to_physics", "enable"), &Box2DPhysicsBody::set_sync_to_physics);
+	//ClassDB::bind_method(D_METHOD("is_sync_to_physics_enabled"), &Box2DPhysicsBody::is_sync_to_physics_enabled);
 
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_scale", PROPERTY_HINT_RANGE, "-128,128,0.01"), "set_gravity_scale", "get_gravity_scale");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM, "Static,Kinematic,Rigid"), "set_type", "get_type");
@@ -479,6 +508,7 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "awake"), "set_awake", "is_awake"); // TODO rename to sleeping, or keep and add sleeping property
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "can_sleep"), "set_can_sleep", "get_can_sleep");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "kinematic_integrate_velocity"), "set_kinematic_integrate_velocity", "is_kinematic_integrating_velocity");
+	//ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sync_to_physics"), "set_sync_to_physics", "is_sync_to_physics_enabled");
 	ADD_GROUP("Linear", "linear_");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "linear_velocity"), "set_linear_velocity", "get_linear_velocity");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "linear_damping", PROPERTY_HINT_RANGE, "-1,1,0.001"), "set_linear_damping", "get_linear_damping");
@@ -909,21 +939,153 @@ bool Box2DPhysicsBody::is_kinematic_integrating_velocity() const {
 	return kinematic_integrate_velocity;
 }
 
-Ref<Box2DKinematicCollision> Box2DPhysicsBody::move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia, const bool p_exclude_raycast_shapes, const bool p_test_only) {
-	KinematicCollision col;
+bool Box2DPhysicsBody::move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia, KinematicCollision &r_collision, const bool p_exclude_raycast_shapes, const bool p_test_only) {
+	if (get_type() != Mode::MODE_KINEMATIC) {
+		ERR_PRINT_ONCE("This function is only meant to be used with Kinematic body types.");
+	}
+	ERR_FAIL_COND_V(!_get_world_node(), false);
 
-	if (_move_and_collide(p_motion, p_rotation, p_infinite_inertia, col, p_exclude_raycast_shapes, p_test_only)) {
-		if (motion_cache.is_null()) {
-			motion_cache.instance();
-			motion_cache->owner = this;
-		}
+	// TODO check sync_to_physics property?
 
-		motion_cache->collision = col;
+	Transform2D gt = get_box2dworld_transform();
 
-		return motion_cache;
+	Box2DWorld::MotionResult result;
+	bool colliding = _get_world_node()->body_test_motion(this, gt, p_motion, p_infinite_inertia, &result);
+
+	if (colliding) {
+		r_collision.collision_point = result.collision_point;
+		r_collision.normal = result.collision_normal;
+		r_collision.collider_vel = result.collider_velocity;
+		r_collision.collider_fixture = result.collider_fixture;
+		r_collision.remainder = result.remainder;
+		r_collision.travel = result.motion;
+		r_collision.collider_fixture = result.collider_fixture;
+		r_collision.local_fixture = result.local_fixture;
 	}
 
-	return Ref<Box2DKinematicCollision>();
+	if (!p_test_only) {
+		gt.elements[2] += result.motion;
+		set_block_transform_notify(true);
+		set_box2dworld_transform(gt);
+		set_block_transform_notify(false);
+	}
+
+	return colliding;
+}
+
+#define FLOOR_ANGLE_THRESHOLD 0.01f // TODO remove this trash
+
+Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const Vector2 &p_up_direction, bool p_stop_on_slope, int p_max_slides, float p_floor_max_angle, bool p_infinite_inertia) {
+
+	Vector2 body_velocity = p_linear_velocity;
+	Vector2 body_velocity_normal = body_velocity.normalized();
+	Vector2 up_direction = p_up_direction.normalized();
+
+	Vector2 current_floor_velocity = floor_velocity;
+	if (on_floor && on_floor_body.is_valid()) {
+		const Object *obj = ObjectDB::get_instance(on_floor_body);
+		const Box2DPhysicsBody *body = Object::cast_to<Box2DPhysicsBody>(obj);
+		if (body) {
+			// TODO this could be more accurate by taking into account angular velocity
+			current_floor_velocity = body->get_linear_velocity();
+		}
+	}
+
+	Vector2 motion = (current_floor_velocity + body_velocity) * _get_world_node()->get_last_step_delta();
+
+	on_floor = false;
+	on_floor_body = ObjectID();
+	on_ceiling = false;
+	on_wall = false;
+	kinematic_colliders.clear();
+	floor_normal = Vector2();
+	floor_velocity = Vector2();
+
+	while (p_max_slides) {
+		KinematicCollision collision;
+		bool collided = false;
+
+		collided = move_and_collide(motion, 0, p_infinite_inertia, collision);
+		if (!collided) {
+			motion = Vector2(); // motion completed
+		}
+
+		if (collided) {
+			kinematic_colliders.push_back(collision);
+			motion = collision.remainder;
+
+			if (up_direction == Vector2()) {
+				// every collision is a wall
+				on_wall = true;
+			} else {
+				if (Math::acos(collision.normal.dot(up_direction)) <= p_floor_max_angle + FLOOR_ANGLE_THRESHOLD) {
+
+					on_floor = true;
+					floor_normal = collision.normal;
+					on_floor_body = collision.collider_fixture->get_instance_id();
+					floor_velocity = collision.collider_vel;
+
+					if (p_stop_on_slope) {
+						if ((body_velocity_normal + up_direction).length() < 0.01 && collision.travel.length() < 1) {
+							Transform2D gt = get_box2dworld_transform();
+							gt.elements[2] -= collision.travel.slide(up_direction);
+							set_box2dworld_transform(gt);
+							return Vector2();
+						}
+					}
+				} else if (Math::acos(collision.normal.dot(-up_direction)) <= p_floor_max_angle + FLOOR_ANGLE_THRESHOLD) {
+					on_ceiling = true;
+				} else {
+					on_wall = true;
+				}
+			}
+
+			motion = motion.slide(collision.normal);
+			body_velocity = body_velocity.slide(collision.normal);
+		}
+
+		if (!collided || motion == Vector2()) {
+			break;
+		}
+
+		--p_max_slides;
+	}
+
+	return body_velocity;
+}
+
+bool Box2DPhysicsBody::is_on_floor() const {
+	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, false, "This function is only available for Kinematic type bodies.");
+	return on_floor;
+}
+
+bool Box2DPhysicsBody::is_on_wall() const {
+	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, false, "This function is only available for Kinematic type bodies.");
+	return on_ceiling;
+}
+
+bool Box2DPhysicsBody::is_on_ceiling() const {
+	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, false, "This function is only available for Kinematic type bodies.");
+	return on_wall;
+}
+
+Vector2 Box2DPhysicsBody::get_floor_normal() const {
+	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, Vector2(), "This function is only available for Kinematic type bodies.");
+	return floor_normal;
+}
+
+Vector2 Box2DPhysicsBody::get_floor_velocity() const {
+	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, Vector2(), "This function is only available for Kinematic type bodies.");
+	return floor_velocity;
+}
+
+int Box2DPhysicsBody::get_slide_count() const {
+	return kinematic_colliders.size();
+}
+
+Box2DPhysicsBody::KinematicCollision Box2DPhysicsBody::get_slide_collision(int p_bounce) const {
+	ERR_FAIL_INDEX_V(p_bounce, kinematic_colliders.size(), KinematicCollision());
+	return kinematic_colliders[p_bounce];
 }
 
 Box2DPhysicsBody::Box2DPhysicsBody() {
@@ -934,6 +1096,12 @@ Box2DPhysicsBody::Box2DPhysicsBody() {
 Box2DPhysicsBody::~Box2DPhysicsBody() {
 	if (motion_cache.is_valid()) {
 		motion_cache->owner = nullptr;
+	}
+
+	for (int i = 0; i < kinematic_colliders_refcache.size(); i++) {
+		if (kinematic_colliders_refcache[i].is_valid()) {
+			kinematic_colliders_refcache.write[i]->owner = nullptr;
+		}
 	}
 
 	// B2 destruction handled by Box2DCollisionObject

@@ -13,15 +13,16 @@
 
 #include "../../util/box2d_types_converter.h"
 
-#include "box2d_area.h"
 #include "box2d_collision_object.h"
-#include "box2d_world.h"
+#include "box2d_area.h"
+#include "box2d_joints.h"
+
+#include <vector>
 
 /**
 * @author Brian Semrau
 */
 
-class Box2DWorld;
 class Box2DKinematicCollision;
 
 class Box2DPhysicsBody : public Box2DCollisionObject {
@@ -81,6 +82,18 @@ private:
 
 	Ref<Box2DKinematicCollision> motion_cache;
 
+	Vector2 floor_normal{};
+	Vector2 floor_velocity{};
+	ObjectID on_floor_body{};
+	bool on_floor{ false };
+	bool on_ceiling{ false };
+	bool on_wall{ false };
+
+	// Used for move_and_slide/_with_snap
+	std::vector<KinematicCollision> kinematic_colliders;
+	Vector<Ref<Box2DKinematicCollision>> kinematic_colliders_refcache;
+	Ref<Box2DKinematicCollision> kinematic_motion_cache;
+
 	// TODO maybe keep a list of local state we want this class to track wrt a b2body parameter or field
 	// are there any others?  enabled for example can bet set on the fly in code
 	bool prev_sleeping_state = true;
@@ -94,12 +107,14 @@ private:
 
 	void teleport(const Transform2D &p_transform);
 
-	bool _move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia, KinematicCollision &r_collision, const bool p_exclude_raycast_shapes = true, const bool p_test_only = false);
-
 	virtual void _on_object_entered(Box2DCollisionObject *p_object) override;
 	virtual void _on_object_exited(Box2DCollisionObject *p_object) override;
 	virtual void _on_fixture_entered(Box2DFixture *p_fixture) override;
 	virtual void _on_fixture_exited(Box2DFixture *p_fixture) override;
+
+private:
+	Ref<Box2DKinematicCollision> _move_and_collide_binding(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia = true, const bool p_exclude_raycast_shapes = true, const bool p_test_only = false);
+	Ref<Box2DKinematicCollision> _get_slide_collision_binding(int p_bounce);
 
 protected:
 	virtual void on_b2Body_created() override;
@@ -204,15 +219,23 @@ public:
 	bool is_kinematic_integrating_velocity() const;
 
 	// p_exclude_raycast_shapes is unused
-	Ref<Box2DKinematicCollision> move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia = true, const bool p_exclude_raycast_shapes = true, const bool p_test_only = false);
-	//bool test_move(const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia = true);
-	//Vector2 move_and_slide(const Vector2 &p_linear_velocity, const Vector2 &p_up_direction = Vector2(0, 0), bool p_stop_on_slope = false, int p_max_slides = 4, float p_floor_max_angle = Math::deg2rad((float)45), bool p_infinite_inertia = true);
-	//Vector2 move_and_slide_with_snap(const Vector2 &p_linear_velocity, const Vector2 &p_snap, const Vector2 &p_up_direction = Vector2(0, 0), bool p_stop_on_slope = false, int p_max_slides = 4, float p_floor_max_angle = Math::deg2rad((float)45), bool p_infinite_inertia = true);
-	//bool is_on_floor() const;
-	//bool is_on_wall() const;
-	//bool is_on_ceiling() const;
-	//Vector2 get_floor_normal() const;
-	//Vector2 get_floor_velocity() const;
+	bool move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia, KinematicCollision &r_collision, const bool p_exclude_raycast_shapes = true, const bool p_test_only = false);
+	// TODO bool test_move(const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia = true);
+
+	// TODO missing rotation param, maybe pass a Transform2D
+	Vector2 move_and_slide(const Vector2 &p_linear_velocity, const Vector2 &p_up_direction = Vector2(0, 0), bool p_stop_on_slope = false, int p_max_slides = 4, float p_floor_max_angle = Math::deg2rad(45.0f), bool p_infinite_inertia = true);
+	// TODO Vector2 move_and_slide_with_snap(const Vector2 &p_linear_velocity, const Vector2 &p_snap, const Vector2 &p_up_direction = Vector2(0, 0), bool p_stop_on_slope = false, int p_max_slides = 4, float p_floor_max_angle = Math::deg2rad((float)45), bool p_infinite_inertia = true);
+	bool is_on_floor() const;
+	bool is_on_wall() const;
+	bool is_on_ceiling() const;
+	Vector2 get_floor_normal() const;
+	Vector2 get_floor_velocity() const;
+
+	int get_slide_count() const;
+	KinematicCollision get_slide_collision(int p_bounce) const;
+
+	//void set_sync_to_physics(bool p_enable);
+	//bool is_sync_to_physics_enabled() const;
 
 	Box2DPhysicsBody();
 	~Box2DPhysicsBody();

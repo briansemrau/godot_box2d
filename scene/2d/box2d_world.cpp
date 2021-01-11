@@ -6,7 +6,7 @@
 #include <box2d/b2_collision.h>
 #include <box2d/b2_time_of_impact.h>
 
-#include "box2d_collision_object.h"
+#include "box2d_physics_body.h"
 #include "box2d_fixtures.h"
 #include "box2d_joints.h"
 
@@ -631,6 +631,8 @@ void Box2DWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("query_aabb", "aabb", "callback"), &Box2DWorld::query_aabb);
 	ClassDB::bind_method(D_METHOD("raycast", "from", "to", "callback"), &Box2DWorld::raycast);
 
+	ClassDB::bind_method(D_METHOD("body_test_motion", "body", "from", "motion", "infinite_inertia", "result"), &Box2DWorld::_body_test_motion_binding, DEFVAL(Variant()));
+
 	ClassDB::bind_method(D_METHOD("step", "delta"), &Box2DWorld::step);
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
@@ -880,6 +882,8 @@ void Box2DWorld::step(float p_step) {
 	world->Step(p_step, 8, 8);
 	flag_rescan_contacts_monitored = false;
 
+	last_step_delta = p_step;
+
 	// Body/shape inout callbacks
 	object_entered_queue.call_and_clear();
 	object_exited_queue.call_and_clear();
@@ -888,6 +892,10 @@ void Box2DWorld::step(float p_step) {
 
 	// Notify our bodies in this world
 	propagate_notification(NOTIFICATION_WORLD_STEPPED);
+}
+
+float Box2DWorld::get_last_step_delta() const {
+	return last_step_delta;
 }
 
 void Box2DWorld::set_gravity(const Vector2 &p_gravity) {
@@ -1088,7 +1096,7 @@ Array Box2DWorld::cast_motion(const Ref<Box2DShapeQueryParameters> &p_query) {
 	return ret;
 }
 
-bool Box2DWorld::_body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, MotionResult *r_result) {
+bool Box2DWorld::body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, MotionResult *r_result) {
 	const float toi_safety_margin = (2.0f * b2_linearSlop * B2_TO_GD / p_motion.length());
 
 	MotionQueryParameters params;
@@ -1158,12 +1166,15 @@ bool Box2DWorld::_body_test_motion(const Box2DPhysicsBody *p_body, const Transfo
 	return true;
 }
 
-bool Box2DWorld::body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result) {
+bool Box2DWorld::_body_test_motion_binding(const Object *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result) {
+	const Box2DPhysicsBody *body = Object::cast_to<Box2DPhysicsBody>(p_body);
+	ERR_FAIL_COND_V(!body, false);
+
 	MotionResult *r = nullptr;
 	if (r_result.is_valid()) {
 		r = const_cast<MotionResult *>(&r_result->result);
 	}
-	return _body_test_motion(p_body, p_from, p_motion, p_infinite_inertia, r);
+	return body_test_motion(body, p_from, p_motion, p_infinite_inertia, r);
 }
 
 void Box2DWorld::query_aabb(const Rect2 &p_bounds, const Callable &p_callback) {

@@ -285,7 +285,10 @@ private:
 private:
 	Vector2 gravity;
 	bool auto_step{true};
+
 	b2World *world = NULL;
+
+	float last_step_delta = 0.0f;
 
 	CollisionUpdateQueue<Box2DCollisionObject, &Box2DCollisionObject::_on_object_entered> object_entered_queue;
 	CollisionUpdateQueue<Box2DCollisionObject, &Box2DCollisionObject::_on_object_exited> object_exited_queue;
@@ -360,6 +363,8 @@ public:
 
 	void step(float p_step);
 
+	float get_last_step_delta() const;
+
 	void set_gravity(const Vector2 &gravity);
 	Vector2 get_gravity() const;
 
@@ -380,8 +385,8 @@ public:
 
 	// This is by-default continuous collision. Is this slow? TODO test or remove commented code
 	//bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, bool p_continuous_cd, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<PhysicsTestMotionResult2D>());
-	bool _body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, MotionResult *r_result);
-	bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<PhysicsTestMotionResult2D>());
+	bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, MotionResult *r_result);
+	bool _body_test_motion_binding(const Object *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<PhysicsTestMotionResult2D>());
 
 	// Box2D space query API
 	void query_aabb(const Rect2 &p_aabb, const Callable &p_callback);
