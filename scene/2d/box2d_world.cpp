@@ -965,6 +965,8 @@ Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, con
 Dictionary Box2DWorld::intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Vector<int64_t> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_sensors, uint32_t p_collision_layer, int32_t p_group_index) {
 	// This function uses queries in Box2DWorld-local space, not global space
 
+	ERR_FAIL_COND_V_MSG(!(p_to - p_from).length_squared() > 0.0f, Dictionary{}, "Raycast queries must have valid vector inputs.");
+
 	ray_callback.result.fixture = NULL;
 
 	ray_callback.exclude.clear();
@@ -1097,11 +1099,18 @@ Array Box2DWorld::cast_motion(const Ref<Box2DShapeQueryParameters> &p_query) {
 }
 
 bool Box2DWorld::body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, MotionResult *r_result) {
+	ERR_FAIL_COND_V(!p_body, false);
+	ERR_FAIL_COND_V(!p_body->body, false);
+
 	const float toi_safety_margin = (2.0f * b2_linearSlop * B2_TO_GD / p_motion.length());
+	const bool use_safety_margin = p_motion.length_squared() > 0.001;
 
 	MotionQueryParameters params;
 	params.transform = p_from;
-	params.motion = p_motion * (1.0f + toi_safety_margin);
+	params.motion = p_motion;
+	if (use_safety_margin) {
+		params.motion *= (1.0f + toi_safety_margin);
+	}
 	params.exclude.insert(p_body);
 
 	// TODO this could be optimized
@@ -1113,16 +1122,18 @@ bool Box2DWorld::body_test_motion(const Box2DPhysicsBody *p_body, const Transfor
 	TestMotionTOIResult toi_result;
 	float toi = _test_motion_toi(query_b2shapes, params, &toi_result);
 
-	if (toi_result.collision) {
+	if (toi_result.collision && use_safety_margin) {
 		// correct for motion query safety margin
 		toi = MIN(1.0f, toi * (1.0f + toi_safety_margin));
 		// reduce by margin to avoid 1-inch punching objects
 		toi = MAX(0.0f, toi - toi_safety_margin);
 	}
 
-	r_result->motion = p_motion * toi;
-	r_result->remainder = p_motion * (1.0f - toi);
-	r_result->t = toi;
+	if (r_result) {
+		r_result->motion = p_motion * toi;
+		r_result->remainder = p_motion * (1.0f - toi);
+		r_result->t = toi;
+	}
 
 	if (toi == 1.0f) {
 		return false;
@@ -1185,6 +1196,8 @@ void Box2DWorld::query_aabb(const Rect2 &p_bounds, const Callable &p_callback) {
 }
 
 void Box2DWorld::raycast(const Vector2 &p_from, const Vector2 &p_to, const Callable &p_callback) {
+	ERR_FAIL_COND_MSG(!(p_to - p_from).length_squared() > 0.0f, "Raycast queries must have valid vector inputs.");
+
 	// This function uses queries in Box2DWorld-local space, not global space
 	user_raycast_callback.handled_fixtures.clear();
 	user_raycast_callback.callback = &p_callback;
