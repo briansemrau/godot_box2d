@@ -44,12 +44,17 @@ private:
 	bool audio_bus_override = false;
 	StringName audio_bus;
 
+	Transform2D last_step_xform;
+
 	virtual void _on_object_entered(Box2DCollisionObject *p_object) override;
 	virtual void _on_object_exited(Box2DCollisionObject *p_object) override;
 	virtual void _on_fixture_entered(Box2DFixture *p_fixture) override;
 	virtual void _on_fixture_exited(Box2DFixture *p_fixture) override;
 
+	virtual void pre_step(float p_delta) override;
+
 protected:
+	void _notification(int p_what);
 	static void _bind_methods();
 	void _validate_property(PropertyInfo &property) const override;
 
