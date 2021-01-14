@@ -737,6 +737,7 @@ float Box2DWorld::_test_motion_toi(const Vector<const b2Shape *> &p_test_shapes,
 	if (p_test_shapes.size() == 0) {
 		return 1.0f;
 	}
+	ERR_FAIL_COND_V_MSG(!(p_params.motion == p_params.motion), 1.0f, "Motion is NaN.");
 
 	const b2Vec2 b2motion = gd_to_b2(p_params.motion);
 
@@ -825,7 +826,7 @@ float Box2DWorld::_test_motion_toi(const Vector<const b2Shape *> &p_test_shapes,
 
 								if (local_manifold.pointCount == 0) {
 									// probably e_failed
-									// If we can't find any collision, ignore it
+									// If we can't find any collision, skip
 									break;
 								}
 
@@ -859,6 +860,105 @@ float Box2DWorld::_test_motion_toi(const Vector<const b2Shape *> &p_test_shapes,
 
 	const float t_norm = min_output.t; // min_output.t / input.tMax;
 	return t_norm;
+}
+
+bool Box2DWorld::_solve_position_step(const Vector<const b2Shape *> &p_body_shapes, const MotionQueryParameters &p_params, b2Vec2 &r_correction) const {
+	// Part of this implementation was adapted from b2_contact_solver.cpp.
+
+	// Query existing intersections
+	CastQueryWrapper query_callback;
+	query_callback.broadPhase = &world->GetContactManager().m_broadPhase;
+	query_callback.params = p_params;
+	query_callback.max_results = 32;
+
+	b2Transform body_xform = gd_to_b2(p_params.transform);
+	body_xform.p += r_correction;
+
+	b2AABB query_aabb;
+	_get_aabb_from_shapes(p_body_shapes, body_xform, query_aabb);
+
+	world->GetContactManager().m_broadPhase.Query(&query_callback, query_aabb);
+
+	float minSeparation = 0.0f;
+
+	b2Vec2 before = r_correction; // TODO remove
+
+	// iterate results
+	for (int i = 0; i < p_body_shapes.size(); ++i) {
+		const b2Shape *body_b2shape = p_body_shapes[i];
+		for (int body_child_index = 0; body_child_index < body_b2shape->GetChildCount(); ++body_child_index) {
+
+			for (int j = 0; j < query_callback.results.size(); ++j) {
+				const b2FixtureProxy *result_proxy = query_callback.results[j];
+				const b2Body *result_body = result_proxy->fixture->GetBody();
+				const b2Shape *result_b2shape = result_proxy->fixture->GetShape();
+				const b2Transform result_xform = result_body->GetTransform();
+				for (int result_child_index = 0; result_child_index < result_b2shape->GetChildCount(); ++result_child_index) {
+
+					// Calculate contact and separations
+					b2Manifold local_manifold = _evaluate_intersection_manifold(
+							body_b2shape, body_child_index, body_xform,
+							result_b2shape, result_child_index, result_xform);
+
+					for (int m_i = 0; m_i < local_manifold.pointCount; ++m_i) {
+						b2Vec2 normal;
+						b2Vec2 point;
+						float separation;
+
+						switch (local_manifold.type) {
+							case b2Manifold::e_circles: {
+								b2Vec2 pointA = b2Mul(body_xform, local_manifold.localPoint);
+								b2Vec2 pointB = b2Mul(result_xform, local_manifold.points[0].localPoint);
+								normal = pointB - pointA;
+								normal.Normalize();
+								point = 0.5f * (pointA + pointB);
+								separation = b2Dot(pointB - pointA, normal) - body_b2shape->m_radius - result_b2shape->m_radius;
+							} break;
+
+							case b2Manifold::e_faceA: {
+								normal = b2Mul(body_xform.q, local_manifold.localNormal);
+								b2Vec2 planePoint = b2Mul(body_xform, local_manifold.localPoint);
+
+								b2Vec2 clipPoint = b2Mul(result_xform, local_manifold.points[m_i].localPoint);
+								separation = b2Dot(clipPoint - planePoint, normal) - body_b2shape->m_radius - result_b2shape->m_radius;
+								point = clipPoint;
+							} break;
+
+							case b2Manifold::e_faceB: {
+								normal = b2Mul(result_xform.q, local_manifold.localNormal);
+								b2Vec2 planePoint = b2Mul(result_xform, local_manifold.localPoint);
+
+								b2Vec2 clipPoint = b2Mul(body_xform, local_manifold.points[m_i].localPoint);
+								separation = b2Dot(clipPoint - planePoint, normal) - body_b2shape->m_radius - result_b2shape->m_radius;
+								point = clipPoint;
+
+								normal = -normal;
+							} break;
+						}
+
+						minSeparation = b2Min(minSeparation, separation);
+
+						// Correct for separation
+						float C = b2Clamp(b2_baumgarte * (separation + b2_linearSlop), -b2_maxLinearCorrection, 0.0f);
+
+						r_correction += C * normal;
+					}
+				}
+			}
+		}
+	}
+
+	return minSeparation >= -3.0f * b2_linearSlop;
+}
+
+b2Vec2 Box2DWorld::_solve_position(const Vector<const b2Shape *> &p_body_shapes, const MotionQueryParameters &p_params, int p_solve_steps) const {
+	b2Vec2 correction = b2Vec2_zero;
+	for (int i = 0; i < p_solve_steps; ++i) {
+		const bool solved = _solve_position_step(p_body_shapes, p_params, correction);
+		if (solved)
+			break;
+	}
+	return correction;
 }
 
 void Box2DWorld::step(float p_step) {
@@ -1102,40 +1202,51 @@ bool Box2DWorld::body_test_motion(const Box2DPhysicsBody *p_body, const Transfor
 	ERR_FAIL_COND_V(!p_body, false);
 	ERR_FAIL_COND_V(!p_body->body, false);
 
-	const float toi_safety_margin = (2.0f * b2_linearSlop * B2_TO_GD / p_motion.length());
-	const bool use_safety_margin = p_motion.length_squared() > 0.001;
+	const float toi_safety_margin = 3.0f * b2_linearSlop * B2_TO_GD;
+	const float toi_safety_margin_factor = (toi_safety_margin / p_motion.length());
+	const bool use_safety_margin = p_motion.length_squared() > 0.001 * 0.001;
 
 	MotionQueryParameters params;
 	params.transform = p_from;
 	params.motion = p_motion;
 	if (use_safety_margin) {
-		params.motion *= (1.0f + toi_safety_margin);
+		//params.motion *= (1.0f + toi_safety_margin_factor);
+		params.motion += (params.motion.normalized() * toi_safety_margin);
 	}
 	params.exclude.insert(p_body);
 
-	// TODO this could be optimized
 	Vector<const b2Shape *> query_b2shapes;
-	for (b2Fixture *f = p_body->body->GetFixtureList(); f; f = f->GetNext()){
+	for (b2Fixture *f = p_body->body->GetFixtureList(); f; f = f->GetNext()) {
 		query_b2shapes.push_back(f->GetShape());
 	}
+
+	// Unstuck body
+
+	const Vector2 correction = b2_to_gd(_solve_position(query_b2shapes, params));
+	ERR_FAIL_COND_V(!(correction.x == correction.x && correction.y == correction.y), false); // TODO remove
+	params.transform.translate(correction);
+
+	// Test motion
 
 	TestMotionTOIResult toi_result;
 	float toi = _test_motion_toi(query_b2shapes, params, &toi_result);
 
 	if (toi_result.collision && use_safety_margin) {
-		// correct for motion query safety margin
-		toi = MIN(1.0f, toi * (1.0f + toi_safety_margin));
-		// reduce by margin to avoid 1-inch punching objects
-		toi = MAX(0.0f, toi - toi_safety_margin);
+		// correct for previously applied motion safety margin
+		toi = MIN(1.0f, toi * (1.0f + toi_safety_margin_factor));
+		// reduce by margin to avoid collision
+		toi = MAX(0.0f, toi - toi_safety_margin_factor);
 	}
 
 	if (r_result) {
 		r_result->motion = p_motion * toi;
+		r_result->motion += correction;
 		r_result->remainder = p_motion * (1.0f - toi);
 		r_result->t = toi;
+		ERR_FAIL_COND_V(!(r_result->motion.x == r_result->motion.x && r_result->motion.y == r_result->motion.y), false); // TODO remove
 	}
 
-	if (toi == 1.0f) {
+	if (toi >= 1.0f) {
 		return false;
 	}
 
@@ -1168,7 +1279,7 @@ bool Box2DWorld::body_test_motion(const Box2DPhysicsBody *p_body, const Transfor
 		col_normal *= 1.0f / static_cast<float>(pt_count);
 
 		r_result->collision_point = b2_to_gd(col_point);
-		r_result->collision_normal = Vector2(col_normal.x, col_normal.y);
+		r_result->collision_normal = -Vector2(col_normal.x, col_normal.y);
 		r_result->collider_velocity = b2_to_gd(toi_result.col_fixture->GetBody()->GetLinearVelocityFromWorldPoint(col_point));
 		r_result->collider_fixture = toi_result.col_fixture->GetUserData().owner;
 		r_result->local_fixture = local_fixture->GetUserData().owner;
@@ -1368,7 +1479,7 @@ bool Box2DWorld::CastQueryWrapper::QueryCallback(int32 proxyId) {
 
 	results.append(proxy);
 
-	return true;
+	return max_results == -1 || results.size() < max_results;
 }
 
 void Box2DPhysicsTestMotionResult::_bind_methods() {

@@ -249,10 +249,11 @@ private:
 		virtual float ReportFixture(b2Fixture *fixture, const b2Vec2 &point, const b2Vec2 &normal, float fraction) override;
 	};
 
-	struct CastQueryWrapper {
+	struct CastQueryWrapper { // TODO rename this. It's no longer relevant to just cast_motion
 		const b2BroadPhase *broadPhase;
 
 		MotionQueryParameters params;
+		int max_results = -1;
 
 		Vector<b2FixtureProxy *> results;
 
@@ -352,6 +353,9 @@ private:
 
 	float _test_motion_toi(const Vector<const b2Shape *> &p_test_shapes, const MotionQueryParameters &p_params, TestMotionTOIResult *r_result);
 
+	bool _solve_position_step(const Vector<const b2Shape *> &p_body_shapes, const MotionQueryParameters &p_params, b2Vec2 &r_correction) const;
+	b2Vec2 _solve_position(const Vector<const b2Shape *> &p_body_shapes, const MotionQueryParameters &p_params, int p_solve_steps = 4) const;
+
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
@@ -384,8 +388,7 @@ public:
 	Array cast_motion(const Ref<Box2DShapeQueryParameters> &p_query);
 
 	// This is by-default continuous collision. Is this slow? TODO test or remove commented code
-	//bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, bool p_continuous_cd, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<PhysicsTestMotionResult2D>());
-	bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, MotionResult *r_result);
+	bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, MotionResult *r_result = nullptr);
 	bool _body_test_motion_binding(const Object *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<PhysicsTestMotionResult2D>());
 
 	// Box2D space query API

@@ -382,7 +382,9 @@ void Box2DPhysicsBody::_notification(int p_what) {
 					prev_sleeping_state = awake;
 				}
 
-				sync_state();
+				if (get_type() == Mode::MODE_RIGID || (get_type() == Mode::MODE_KINEMATIC && kinematic_integrate_velocity)) {
+					sync_state();
+				}
 			}
 		} break;
 
@@ -483,9 +485,9 @@ void Box2DPhysicsBody::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("move_and_collide", "velocity", "rotation", "infinite_inertia", "exclude_raycast_shapes", "test_only"), &Box2DPhysicsBody::_move_and_collide_binding, DEFVAL(true), DEFVAL(true), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("move_and_slide", "linear_velocity", "up_direction", "stop_on_slope", "max_slides", "floor_max_angle", "infinite_inertia"), &Box2DPhysicsBody::move_and_slide, DEFVAL(Vector2(0, 0)), DEFVAL(false), DEFVAL(4), DEFVAL(Math::deg2rad(45.0f)), DEFVAL(true));
-	//ClassDB::bind_method(D_METHOD("move_and_slide_with_snap", "linear_velocity", "snap", "up_direction", "stop_on_slope", "max_slides", "floor_max_angle", "infinite_inertia"), &Box2DPhysicsBody::move_and_slide_with_snap, DEFVAL(Vector2(0, 0)), DEFVAL(false), DEFVAL(4), DEFVAL(Math::deg2rad(45.0f)), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("move_and_slide_with_snap", "linear_velocity", "snap", "up_direction", "stop_on_slope", "max_slides", "floor_max_angle", "infinite_inertia"), &Box2DPhysicsBody::move_and_slide_with_snap, DEFVAL(Vector2(0, 0)), DEFVAL(false), DEFVAL(4), DEFVAL(Math::deg2rad(45.0f)), DEFVAL(true));
 
-	//ClassDB::bind_method(D_METHOD("test_move", "from", "rel_vec", "infinite_inertia"), &Box2DPhysicsBody::test_move, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("test_move", "from", "rel_vec", "infinite_inertia"), &Box2DPhysicsBody::test_move, DEFVAL(true));
 
 	ClassDB::bind_method(D_METHOD("is_on_floor"), &Box2DPhysicsBody::is_on_floor);
 	ClassDB::bind_method(D_METHOD("is_on_ceiling"), &Box2DPhysicsBody::is_on_ceiling);
@@ -507,6 +509,7 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "contact_monitor"), "set_contact_monitor", "is_contact_monitor_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "awake"), "set_awake", "is_awake"); // TODO rename to sleeping, or keep and add sleeping property
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "can_sleep"), "set_can_sleep", "get_can_sleep");
+	ADD_GROUP("Kinematic", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "kinematic_integrate_velocity"), "set_kinematic_integrate_velocity", "is_kinematic_integrating_velocity");
 	//ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sync_to_physics"), "set_sync_to_physics", "is_sync_to_physics_enabled");
 	ADD_GROUP("Linear", "linear_");
@@ -973,6 +976,10 @@ bool Box2DPhysicsBody::move_and_collide(const Vector2 &p_motion, const float p_r
 	return colliding;
 }
 
+bool Box2DPhysicsBody::test_move(const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia) {
+	return _get_world_node()->body_test_motion(this, p_from, p_motion, p_infinite_inertia);
+}
+
 #define FLOOR_ANGLE_THRESHOLD 0.01f // TODO remove this trash
 
 Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const Vector2 &p_up_direction, bool p_stop_on_slope, int p_max_slides, float p_floor_max_angle, bool p_infinite_inertia) {
@@ -1052,6 +1059,45 @@ Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const
 	}
 
 	return body_velocity;
+}
+
+Vector2 Box2DPhysicsBody::move_and_slide_with_snap(const Vector2 &p_linear_velocity, const Vector2 &p_snap, const Vector2 &p_up_direction, bool p_stop_on_slope, int p_max_slides, float p_floor_max_angle, bool p_infinite_inertia) {
+	Vector2 up_direction = p_up_direction.normalized();
+	bool was_on_floor = on_floor;
+
+	Vector2 ret_vel = move_and_slide(p_linear_velocity, up_direction, p_stop_on_slope, p_max_slides, p_floor_max_angle, p_infinite_inertia);
+	if (!was_on_floor || p_snap == Vector2()) {
+		return ret_vel;
+	}
+
+	KinematicCollision col;
+	Transform2D gt = get_global_transform();
+
+	if (move_and_collide(p_snap, 0, p_infinite_inertia, col, false, true)) {
+		bool apply = true;
+		if (up_direction != Vector2()) {
+			if (Math::acos(col.normal.dot(up_direction)) <= p_floor_max_angle + FLOOR_ANGLE_THRESHOLD) {
+				on_floor = true;
+				floor_normal = col.normal;
+				on_floor_body = col.collider_fixture->get_instance_id();
+				floor_velocity = col.collider_vel;
+				if (p_stop_on_slope) {
+					// move and collide may stray the object a bit because of pre un-stucking,
+					// so only ensure that motion happens on floor direction in this case.
+					col.travel = up_direction * up_direction.dot(col.travel);
+				}
+			} else {
+				apply = false;
+			}
+		}
+
+		if (apply) {
+			gt.elements[2] += col.travel;
+			set_global_transform(gt);
+		}
+	}
+
+	return ret_vel;
 }
 
 bool Box2DPhysicsBody::is_on_floor() const {
