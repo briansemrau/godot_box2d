@@ -980,9 +980,9 @@ bool Box2DPhysicsBody::test_move(const Transform2D &p_from, const Vector2 &p_mot
 	return _get_world_node()->body_test_motion(this, p_from, p_motion, p_infinite_inertia);
 }
 
-#define FLOOR_ANGLE_THRESHOLD 0.01f // TODO remove this trash
-
 Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const Vector2 &p_up_direction, bool p_stop_on_slope, int p_max_slides, float p_floor_max_angle, bool p_infinite_inertia) {
+
+	static constexpr float floor_angle_threshold = 0.01f;
 
 	Vector2 body_velocity = p_linear_velocity;
 	Vector2 body_velocity_normal = body_velocity.normalized();
@@ -1025,7 +1025,7 @@ Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const
 				// every collision is a wall
 				on_wall = true;
 			} else {
-				if (Math::acos(collision.normal.dot(up_direction)) <= p_floor_max_angle + FLOOR_ANGLE_THRESHOLD) {
+				if (Math::acos(collision.normal.dot(up_direction)) <= p_floor_max_angle + floor_angle_threshold) {
 
 					on_floor = true;
 					floor_normal = collision.normal;
@@ -1040,7 +1040,7 @@ Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const
 							return Vector2();
 						}
 					}
-				} else if (Math::acos(collision.normal.dot(-up_direction)) <= p_floor_max_angle + FLOOR_ANGLE_THRESHOLD) {
+				} else if (Math::acos(collision.normal.dot(-up_direction)) <= p_floor_max_angle + floor_angle_threshold) {
 					on_ceiling = true;
 				} else {
 					on_wall = true;
@@ -1062,6 +1062,8 @@ Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const
 }
 
 Vector2 Box2DPhysicsBody::move_and_slide_with_snap(const Vector2 &p_linear_velocity, const Vector2 &p_snap, const Vector2 &p_up_direction, bool p_stop_on_slope, int p_max_slides, float p_floor_max_angle, bool p_infinite_inertia) {
+	static constexpr float floor_angle_threshold = 0.01f;
+
 	Vector2 up_direction = p_up_direction.normalized();
 	bool was_on_floor = on_floor;
 
@@ -1076,7 +1078,7 @@ Vector2 Box2DPhysicsBody::move_and_slide_with_snap(const Vector2 &p_linear_veloc
 	if (move_and_collide(p_snap, 0, p_infinite_inertia, col, false, true)) {
 		bool apply = true;
 		if (up_direction != Vector2()) {
-			if (Math::acos(col.normal.dot(up_direction)) <= p_floor_max_angle + FLOOR_ANGLE_THRESHOLD) {
+			if (Math::acos(col.normal.dot(up_direction)) <= p_floor_max_angle + floor_angle_threshold) {
 				on_floor = true;
 				floor_normal = col.normal;
 				on_floor_body = col.collider_fixture->get_instance_id();

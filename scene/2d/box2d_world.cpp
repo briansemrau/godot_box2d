@@ -881,8 +881,6 @@ bool Box2DWorld::_solve_position_step(const Vector<const b2Shape *> &p_body_shap
 
 	float minSeparation = 0.0f;
 
-	b2Vec2 before = r_correction; // TODO remove
-
 	// iterate results
 	for (int i = 0; i < p_body_shapes.size(); ++i) {
 		const b2Shape *body_b2shape = p_body_shapes[i];
@@ -1223,7 +1221,6 @@ bool Box2DWorld::body_test_motion(const Box2DPhysicsBody *p_body, const Transfor
 	// Unstuck body
 
 	const Vector2 correction = b2_to_gd(_solve_position(query_b2shapes, params));
-	ERR_FAIL_COND_V(!(correction.x == correction.x && correction.y == correction.y), false); // TODO remove
 	params.transform.translate(correction);
 
 	// Test motion
@@ -1243,7 +1240,6 @@ bool Box2DWorld::body_test_motion(const Box2DPhysicsBody *p_body, const Transfor
 		r_result->motion += correction;
 		r_result->remainder = p_motion * (1.0f - toi);
 		r_result->t = toi;
-		ERR_FAIL_COND_V(!(r_result->motion.x == r_result->motion.x && r_result->motion.y == r_result->motion.y), false); // TODO remove
 	}
 
 	if (toi >= 1.0f) {
