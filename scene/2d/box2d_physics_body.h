@@ -76,9 +76,10 @@ private:
 
 	Vector<Box2DAreaItem> colliding_areas;
 
-	//Transform2D last_valid_xform; // this is for sync_to_physics, but is it needed?
-	Transform2D old_xform; // For calculating kinematic body movement velocity
+	Transform2D prev_xform; // For calculating kinematic body movement velocity
+	Transform2D next_xform;
 	bool kinematic_integrate_velocity = false; // Default false is Godot behavior, true is Box2D behavior
+	bool sync_to_physics = false;
 
 	Ref<Box2DKinematicCollision> motion_cache;
 
@@ -234,8 +235,8 @@ public:
 	int get_slide_count() const;
 	KinematicCollision get_slide_collision(int p_bounce) const;
 
-	//void set_sync_to_physics(bool p_enable);
-	//bool is_sync_to_physics_enabled() const;
+	void set_sync_to_physics(bool p_enable);
+	bool is_sync_to_physics_enabled() const;
 
 	Box2DPhysicsBody();
 	~Box2DPhysicsBody();
