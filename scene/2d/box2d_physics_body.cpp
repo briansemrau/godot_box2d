@@ -338,19 +338,6 @@ void Box2DPhysicsBody::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
-			// Don't destroy body. It could be exiting/entering.
-			// Body should be destroyed in destructor if node is being freed.
-
-			// TODO What do we do if it exits the tree, the ref is kept (in a script), and it's never destroyed?
-			//      Exiting w/o reentering should destroy body.
-			//      This applies to Box2DFixture and Box2DJoint as well.
-			//
-			// Perhaps body creation/destruction should be queued
-			// - body created: immediate CreateBody request
-			// - body destroyed: queue DestroyBody
-			//     - recreated before pumping -> remove from queue
-			// - world pre-step: pump queue
-
 			set_process_internal(false);
 		} break;
 
