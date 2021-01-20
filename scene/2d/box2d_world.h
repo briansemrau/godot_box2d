@@ -112,7 +112,6 @@ struct MotionQueryParameters {
 	Vector2 motion = Vector2(0, 0);
 	float rotation = 0.0f; // TODO should these be combined to Transform2D?
 	Vector2 local_center = Vector2(0, 0); // TODO rename shape_local_center
-	//bool predict_other_body_motion = false; // naive prediction of other bodys' motion
 	//float motion_timedelta_for_prediction = 1/60;
 };
 
@@ -385,8 +384,7 @@ public:
 	//void shiftOrigin(const Vector2 &newOrigin);
 
 	// Godot space query API
-	// What is collide_shape? Does this return manifold points?
-	//Array collide_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
+	// TODO What is collide_shape? Does this return manifold points? //Array collide_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
 	Array intersect_point(const Vector2 &p_point, int p_max_results = 32, const Vector<int64_t> &p_exclude = Vector<int64_t>(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false, uint32_t p_collision_layer = 0x0, int32_t p_group_index = 0);
 	Dictionary intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Vector<int64_t> &p_exclude = Vector<int64_t>(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false, uint32_t p_collision_layer = 0x0, int32_t p_group_index = 0);
 	Array intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);

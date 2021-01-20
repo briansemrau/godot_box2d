@@ -688,10 +688,14 @@ inline void _get_aabb_from_shapes_with_motion(const Vector<const b2Shape *> &p_b
 struct IntersectionManifoldResult {
 	b2Manifold manifold;
 	bool flipped;
+
+	inline bool intersecting() const {
+		return manifold.pointCount > 0;
+	}
 };
 
 IntersectionManifoldResult _evaluate_intersection_manifold(const b2Shape *p_shapeA, const int p_child_index_A, const b2Transform &p_xfA, const b2Shape *p_shapeB, const int p_child_index_B, const b2Transform &p_xfB) {
-	b2Manifold manifold;
+	b2Manifold manifold{};
 	bool flipped = false;
 
 	// Convert chains to edges
@@ -779,9 +783,6 @@ float Box2DWorld::_test_motion_toi(const Vector<const b2Shape *> &p_test_shapes,
 	// Calculate all TOI pairs and report the closest one
 
 	b2TOIInput input;
-	// if predict_other_body_motion:
-	//     input.tMax = motion_timedelta_for_prediction (i think)
-	// else:
 	input.tMax = 1.0f;
 	input.sweepA.localCenter = gd_to_b2(p_params.local_center);
 	input.sweepA.c0 = xform_t0.p;
@@ -805,15 +806,15 @@ float Box2DWorld::_test_motion_toi(const Vector<const b2Shape *> &p_test_shapes,
 	// iterate test shapes
 	for (int i = 0; i < p_test_shapes.size(); ++i) {
 		const b2Shape *test_b2shape = p_test_shapes[i];
-		// Temporarily expand test shapes by a small margin to prevent rigid body collisions
-		constexpr float buffer = b2_linearSlop * 1.0f;
+		// Increase shape/proxy radii so that the reported TOI is at the position solver separation distance (3.0*linearSlop).
+		// This allows us to return a TOI at resting position.
+		// We must buffer the shape radius (not just proxy radius) or no intersection will be reported.
+		constexpr float buffer = b2_linearSlop;
 		const_cast<b2Shape *>(test_b2shape)->m_radius += buffer;
 
 		for (int test_child_index = 0; test_child_index < test_b2shape->GetChildCount(); ++test_child_index) {
 			input.proxyA.Set(test_b2shape, test_child_index);
-			if (test_b2shape->m_type == b2Shape::e_polygon) {
-				input.proxyA.m_radius += b2_linearSlop * (1.5f);
-			}
+			input.proxyA.m_radius += b2_linearSlop;
 
 			// iterate query result shapes
 			for (int j = 0; j < query_callback.results.size(); ++j) {
@@ -823,21 +824,16 @@ float Box2DWorld::_test_motion_toi(const Vector<const b2Shape *> &p_test_shapes,
 
 				for (int result_child_index = 0; result_child_index < result_b2shape->GetChildCount(); ++result_child_index) {
 					input.proxyB.Set(result_b2shape, result_child_index);
-					if (result_b2shape->m_type == b2Shape::e_polygon) {
-						input.proxyB.m_radius += b2_linearSlop * 1.5f;
-					}
-					input.proxyB.m_radius += b2_linearSlop * 1.0f;
+					input.proxyB.m_radius += b2_linearSlop;
+
 					input.sweepB.localCenter = result_body->GetLocalCenter();
 					input.sweepB.alpha0 = 0.0f;
-					// if predict_other_body_motion:
-					//     calculate sweepB from body
-					// else:
 					input.sweepB.c = result_body->GetWorldCenter();
 					input.sweepB.c0 = input.sweepB.c;
 					input.sweepB.a = result_body->GetAngle();
 					input.sweepB.a0 = input.sweepB.a;
 
-					// Evaluate TOI between test and query result
+					// Evaluate TOI between test and query shape
 
 					b2TimeOfImpact(&output, &input);
 
@@ -858,9 +854,12 @@ float Box2DWorld::_test_motion_toi(const Vector<const b2Shape *> &p_test_shapes,
 										result_b2shape, result_child_index, result_body->GetTransform());
 								b2Manifold local_manifold = intersection.manifold;
 
-								if (local_manifold.pointCount == 0) {
-									// probably e_failed
+								if (!intersection.intersecting()) {
 									// If we can't find any collision, skip
+									if (output.state == b2TOIOutput::State::e_failed) {
+										break;
+									}
+									WARN_PRINT("`test_motion_toi` failed intersection! Report this!");
 									break;
 								}
 
@@ -1247,7 +1246,7 @@ Array Box2DWorld::cast_motion(const Ref<Box2DShapeQueryParameters> &p_query) {
 	float toi = _test_motion_toi(p_query->shape_ref->get_shapes(), p_query->parameters, nullptr);
 
 	const real_t motion_len = p_query->get_motion().length();
-	const float t_safe = MAX(0, toi - (b2_linearSlop * B2_TO_GD / motion_len));
+	const float t_safe = MAX(0, toi);
 
 	Array ret;
 	ret.append(toi);
