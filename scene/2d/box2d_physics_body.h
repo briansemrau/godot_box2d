@@ -189,7 +189,7 @@ public:
 	void set_max_contacts_reported(int p_amount);
 	int get_max_contacts_reported() const;
 
-	Array get_colliding_bodies() const; // Function exists for Godot feature congruency
+	Array get_colliding_bodies() const;
 
 	// TODO for documentation: all contact info is in world space
 	int get_contact_count() const;
@@ -266,8 +266,6 @@ public:
 	Object *get_collider_fixture() const;
 	ObjectID get_collider_fixture_id() const;
 	Vector2 get_collider_velocity() const;
-
-	//Box2DKinematicCollision();
 };
 
 #endif // BOX2D_PHYSICS_BODY_H

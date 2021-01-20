@@ -188,31 +188,6 @@ void Box2DCollisionObject::_notification(int p_what) {
 
 			set_process_internal(false);
 		} break;
-
-		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
-			// Send new transform to physics
-			Transform2D new_xform = get_box2dworld_transform();
-
-			bodyDef.position = gd_to_b2(new_xform.get_origin());
-			bodyDef.angle = new_xform.get_rotation();
-
-			if (body) {
-				body->SetTransform(gd_to_b2(new_xform.get_origin()), new_xform.get_rotation());
-			}
-		} break;
-
-		case NOTIFICATION_INTERNAL_PROCESS: {
-			// Do nothing
-		} break;
-
-		case NOTIFICATION_DRAW: {
-			if (!Engine::get_singleton()->is_editor_hint() && !get_tree()->is_debugging_collisions_hint()) {
-				break;
-			}
-
-			// Probably do nothing here
-			// TODO remove this case
-		}
 	}
 }
 

@@ -111,8 +111,6 @@ void Box2DPhysicsBody::pre_step(float p_delta) {
 		if (!kinematic_integrate_velocity) {
 			Transform2D motion = prev_xform.affine_inverse() * next_xform;
 			// TODO there is a bug here. See this issue: https://github.com/godotengine/godot/issues/34869
-			// Maybe velocities should be differentiated in NOTIF_TRANSFORM_CHANGED(?) but then
-			// we don't have access to the time step... maybe maintain a member var for motion
 			_set_linear_velocity_no_check(motion.get_origin() / p_delta);
 			_set_angular_velocity_no_check(motion.get_rotation() / p_delta);
 		}
@@ -226,8 +224,8 @@ void Box2DPhysicsBody::_update_area_effects() {
 		// Apply default area effects
 		//_compute_area_effects(def_area, gravity, linear_damp, angular_damp);
 		gravity += body->GetWorld()->GetGravity();
-		linear_damp += body->GetLinearDamping();
-		angular_damp += body->GetAngularDamping();
+		linear_damp += get_linear_damping();
+		angular_damp += get_angular_damping();
 	}
 
 	gravity *= get_gravity_scale() * body->GetMass();
@@ -989,9 +987,7 @@ bool Box2DPhysicsBody::move_and_collide(const Vector2 &p_motion, const float p_r
 
 	if (!p_test_only) {
 		gt.elements[2] += result.motion;
-		//set_block_transform_notify(true);
 		set_box2dworld_transform(gt);
-		//set_block_transform_notify(false);
 	}
 
 	return colliding;
@@ -1002,9 +998,8 @@ bool Box2DPhysicsBody::test_move(const Transform2D &p_from, const Vector2 &p_mot
 }
 
 Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const Vector2 &p_up_direction, bool p_stop_on_slope, int p_max_slides, float p_floor_max_angle, bool p_infinite_inertia) {
-
-	static constexpr float floor_angle_threshold = 0.01f;
-
+	constexpr float floor_angle_threshold = 0.01f;
+	
 	Vector2 body_velocity = p_linear_velocity;
 	Vector2 body_velocity_normal = body_velocity.normalized();
 	Vector2 up_direction = p_up_direction.normalized();
@@ -1019,7 +1014,9 @@ Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const
 		}
 	}
 
-	Vector2 motion = (current_floor_velocity + body_velocity) * _get_world_node()->get_last_step_delta();
+	// TODO Check if inside `_world_step` and get world step delta
+	//      Or break Godot compat by adding a delta param or changing velocity param to motion
+	Vector2 motion = (current_floor_velocity + body_velocity) * (Engine::get_singleton()->is_in_physics_frame() ? get_physics_process_delta_time() : get_process_delta_time());
 
 	on_floor = false;
 	on_floor_body = ObjectID();
@@ -1083,7 +1080,7 @@ Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const
 }
 
 Vector2 Box2DPhysicsBody::move_and_slide_with_snap(const Vector2 &p_linear_velocity, const Vector2 &p_snap, const Vector2 &p_up_direction, bool p_stop_on_slope, int p_max_slides, float p_floor_max_angle, bool p_infinite_inertia) {
-	static constexpr float floor_angle_threshold = 0.01f;
+	constexpr float floor_angle_threshold = 0.01f;
 
 	Vector2 up_direction = p_up_direction.normalized();
 	bool was_on_floor = on_floor;
@@ -1124,27 +1121,37 @@ Vector2 Box2DPhysicsBody::move_and_slide_with_snap(const Vector2 &p_linear_veloc
 }
 
 bool Box2DPhysicsBody::is_on_floor() const {
-	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, false, "This function is only available for Kinematic type bodies.");
+	if (get_type() != Mode::MODE_KINEMATIC) {
+		ERR_PRINT_ONCE("This function is only available for Kinematic type bodies.");
+	}
 	return on_floor;
 }
 
 bool Box2DPhysicsBody::is_on_wall() const {
-	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, false, "This function is only available for Kinematic type bodies.");
+	if (get_type() != Mode::MODE_KINEMATIC) {
+		ERR_PRINT_ONCE("This function is only available for Kinematic type bodies.");
+	}
 	return on_ceiling;
 }
 
 bool Box2DPhysicsBody::is_on_ceiling() const {
-	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, false, "This function is only available for Kinematic type bodies.");
+	if (get_type() != Mode::MODE_KINEMATIC) {
+		ERR_PRINT_ONCE("This function is only available for Kinematic type bodies.");
+	}
 	return on_wall;
 }
 
 Vector2 Box2DPhysicsBody::get_floor_normal() const {
-	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, Vector2(), "This function is only available for Kinematic type bodies.");
+	if (get_type() != Mode::MODE_KINEMATIC) {
+		ERR_PRINT_ONCE("This function is only available for Kinematic type bodies.");
+	}
 	return floor_normal;
 }
 
 Vector2 Box2DPhysicsBody::get_floor_velocity() const {
-	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, Vector2(), "This function is only available for Kinematic type bodies.");
+	if (get_type() != Mode::MODE_KINEMATIC) {
+		ERR_PRINT_ONCE("This function is only available for Kinematic type bodies.");
+	}
 	return floor_velocity;
 }
 

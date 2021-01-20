@@ -106,6 +106,7 @@ struct MotionQueryParameters {
 	b2Filter filter; // TODO If/when we fork Box2D, filters get 32bit data
 	bool collide_with_bodies = true; // TODO might be better named as "collide_with_solids"
 	bool collide_with_sensors = false;
+	bool ignore_dynamic = false;
 
 	// Properties exclusive for cast_motion
 	Vector2 motion = Vector2(0, 0);
@@ -163,6 +164,9 @@ public:
 	void set_collide_with_sensors(bool p_enable);
 	bool is_collide_with_sensors_enabled() const;
 
+	void set_ignore_rigid(bool p_enable);
+	bool is_ignoring_rigid() const;
+
 	// Using ObjectIDs as int64_t so that we can bind these methods
 	void set_exclude(const Vector<int64_t> &p_exclude);
 	Vector<int64_t> get_exclude() const;
@@ -181,6 +185,7 @@ public:
 		Vector2 motion;
 		Vector2 remainder;
 		float t; // TOI with respect to motion [0, 1]
+		bool colliding;
 
 		Vector2 collision_point;
 		Vector2 collision_normal;
@@ -404,18 +409,13 @@ class Box2DPhysicsTestMotionResult : public Reference {
 
 	friend class Box2DWorld;
 
-	// TODO find the best place to put this struct
-	// Godot API includes it in the space2d class but it only seems relevant here.
-	// Perhaps this struct wrapping should not exist at all and params should
-	//     just sit in this class?
-
 	Box2DWorld::MotionResult result;
 
 protected:
 	static void _bind_methods();
 
 public:
-	//bool is_colliding() const; // TODO return toi < 1.0f
+	bool is_colliding() const;
 	Vector2 get_motion() const;
 	Vector2 get_motion_remainder() const;
 
@@ -426,8 +426,6 @@ public:
 	ObjectID get_collider_fixture_id() const;
 	Box2DFixture *get_local_fixture() const;
 	ObjectID get_local_fixture_id() const;
-
-	//Box2DPhysicsTestMotionResult();
 };
 
 #endif // BOX2D_WORLD_H
