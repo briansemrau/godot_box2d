@@ -108,7 +108,7 @@ void Box2DPhysicsBody::on_b2Body_created() {
 
 void Box2DPhysicsBody::pre_step(float p_delta) {
 	if (get_type() == Mode::MODE_KINEMATIC) {
-		if (!kinematic_integrate_velocity) {
+		if (!integrate_position) {
 			Transform2D motion = prev_xform.affine_inverse() * next_xform;
 			// TODO there is a bug here. See this issue: https://github.com/godotengine/godot/issues/34869
 			_set_linear_velocity_no_check(motion.get_origin() / p_delta);
@@ -356,7 +356,7 @@ void Box2DPhysicsBody::_notification(int p_what) {
 					set_box2dworld_transform(prev_xform);
 					set_block_transform_notify(false);
 
-				} else if (kinematic_integrate_velocity) {
+				} else if (integrate_position) {
 					teleport(next_xform);
 					prev_xform = next_xform;
 				}
@@ -380,7 +380,7 @@ void Box2DPhysicsBody::_notification(int p_what) {
 					prev_sleeping_state = awake;
 				}
 
-				if (get_type() == Mode::MODE_RIGID || (get_type() == Mode::MODE_KINEMATIC && (sync_to_physics || kinematic_integrate_velocity))) {
+				if (get_type() == Mode::MODE_RIGID || (get_type() == Mode::MODE_KINEMATIC && (sync_to_physics || integrate_position))) {
 					sync_state();
 				}
 			}
@@ -478,8 +478,8 @@ void Box2DPhysicsBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("apply_central_linear_impulse", "impulse"), &Box2DPhysicsBody::apply_central_linear_impulse, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("apply_torque_impulse", "impulse"), &Box2DPhysicsBody::apply_torque_impulse, DEFVAL(true));
 
-	ClassDB::bind_method(D_METHOD("set_kinematic_integrate_velocity", "enabled"), &Box2DPhysicsBody::set_kinematic_integrate_velocity);
-	ClassDB::bind_method(D_METHOD("is_kinematic_integrating_velocity"), &Box2DPhysicsBody::is_kinematic_integrating_velocity);
+	ClassDB::bind_method(D_METHOD("set_integrate_position", "enabled"), &Box2DPhysicsBody::set_integrate_position);
+	ClassDB::bind_method(D_METHOD("is_integrate_position_enabled"), &Box2DPhysicsBody::is_integrate_position_enabled);
 
 	ClassDB::bind_method(D_METHOD("move_and_collide", "velocity", "rotation", "infinite_inertia", "exclude_raycast_shapes", "test_only"), &Box2DPhysicsBody::_move_and_collide_binding, DEFVAL(true), DEFVAL(true), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("move_and_slide", "linear_velocity", "up_direction", "stop_on_slope", "max_slides", "floor_max_angle", "infinite_inertia"), &Box2DPhysicsBody::move_and_slide, DEFVAL(Vector2(0, 0)), DEFVAL(false), DEFVAL(4), DEFVAL(Math::deg2rad(45.0f)), DEFVAL(true));
@@ -508,7 +508,7 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "awake"), "set_awake", "is_awake"); // TODO rename to sleeping, or keep and add sleeping property
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "can_sleep"), "set_can_sleep", "get_can_sleep");
 	ADD_GROUP("Kinematic", "");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "kinematic_integrate_velocity"), "set_kinematic_integrate_velocity", "is_kinematic_integrating_velocity");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "integrate_position"), "set_integrate_position", "is_integrate_position_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sync_to_physics"), "set_sync_to_physics", "is_sync_to_physics_enabled");
 	ADD_GROUP("Linear", "linear_");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "linear_velocity"), "set_linear_velocity", "get_linear_velocity");
@@ -599,7 +599,7 @@ void Box2DPhysicsBody::_set_linear_velocity_no_check(const Vector2 &p_vel) {
 }
 
 void Box2DPhysicsBody::set_linear_velocity(const Vector2 &p_vel) {
-	ERR_FAIL_COND_MSG(get_type() == Mode::MODE_KINEMATIC && !kinematic_integrate_velocity, "Kinematic type bodies do not support setting linear_velocity without enabling `kinematic_integrate_velocity`.");
+	ERR_FAIL_COND_MSG(get_type() == Mode::MODE_KINEMATIC && !integrate_position, "Kinematic type bodies do not support setting linear_velocity without enabling `integrate_position`.");
 	_set_linear_velocity_no_check(p_vel);
 }
 
@@ -618,7 +618,7 @@ void Box2DPhysicsBody::_set_angular_velocity_no_check(const real_t p_omega) {
 }
 
 void Box2DPhysicsBody::set_angular_velocity(const real_t p_omega) {
-	ERR_FAIL_COND_MSG(get_type() == Mode::MODE_KINEMATIC && !kinematic_integrate_velocity, "Kinematic type bodies do not support setting linear_velocity without enabling `kinematic_integrate_velocity`.");
+	ERR_FAIL_COND_MSG(get_type() == Mode::MODE_KINEMATIC && !integrate_position, "Kinematic type bodies do not support setting linear_velocity without enabling `integrate_position`.");
 	_set_angular_velocity_no_check(p_omega);
 }
 
@@ -922,29 +922,29 @@ void Box2DPhysicsBody::apply_torque_impulse(real_t impulse, bool wake) {
 	_get_b2Body()->ApplyAngularImpulse(impulse * GD_TO_B2, wake);
 }
 
-void Box2DPhysicsBody::set_kinematic_integrate_velocity(bool p_integrate_vel) {
-	if (kinematic_integrate_velocity == p_integrate_vel) {
+void Box2DPhysicsBody::set_integrate_position(bool p_integrate_pos) {
+	if (integrate_position == p_integrate_pos) {
 		return;
 	}
-	ERR_FAIL_COND_MSG(get_type() != Mode::MODE_KINEMATIC, "The property kinematic_integrate_velocity has no effect on non-kinematic bodies.");
+	ERR_FAIL_COND_MSG(get_type() != Mode::MODE_KINEMATIC, "The property integrate_position has no effect on non-kinematic bodies.");
 
-	kinematic_integrate_velocity = p_integrate_vel;
+	integrate_position = p_integrate_pos;
 
-	if (kinematic_integrate_velocity) {
+	if (integrate_position) {
 		// Make sure any transform changes between last step and now are integrated
 		teleport(get_box2dworld_transform());
 	}
 
-	_change_notify("kinematic_integrate_velocity");
+	_change_notify("integrate_position");
 
-	if (kinematic_integrate_velocity && sync_to_physics) {
-		WARN_PRINT("Enabling both sync_to_physics and kinematic_integrate_velocity is not supported. Disabling sync_to_physics.");
+	if (integrate_position && sync_to_physics) {
+		WARN_PRINT("Enabling both sync_to_physics and integrate_position is not supported. Disabling sync_to_physics.");
 		set_sync_to_physics(false);
 	}
 }
 
-bool Box2DPhysicsBody::is_kinematic_integrating_velocity() const {
-	return kinematic_integrate_velocity;
+bool Box2DPhysicsBody::is_integrate_position_enabled() const {
+	return integrate_position;
 }
 
 bool Box2DPhysicsBody::move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia, KinematicCollision &r_collision, const bool p_exclude_raycast_shapes, const bool p_test_only) {
@@ -952,8 +952,8 @@ bool Box2DPhysicsBody::move_and_collide(const Vector2 &p_motion, const float p_r
 	if (get_type() != Mode::MODE_KINEMATIC) {
 		ERR_PRINT("This function is only meant to be used with Kinematic body types.");
 	}
-	if (sync_to_physics || kinematic_integrate_velocity) {
-		ERR_PRINT("Functions move_and_slide and move_and_collide do not work together with 'sync to physics' or 'kinematic_integrate_velocity' options.");
+	if (sync_to_physics || integrate_position) {
+		ERR_PRINT("Functions move_and_slide and move_and_collide do not work together with 'sync to physics' or 'integrate_position' options.");
 	}
 
 	Transform2D gt = get_box2dworld_transform();
@@ -1160,9 +1160,9 @@ void Box2DPhysicsBody::set_sync_to_physics(bool p_enable) {
 
 	_change_notify("sync_to_physics");
 
-	if (kinematic_integrate_velocity && sync_to_physics) {
-		WARN_PRINT("Enabling both sync_to_physics and kinematic_integrate_velocity is not supported. Disabling kinematic_integrate_velocity.");
-		set_kinematic_integrate_velocity(false);
+	if (integrate_position && sync_to_physics) {
+		WARN_PRINT("Enabling both sync_to_physics and integrate_position is not supported. Disabling integrate_position.");
+		set_integrate_position(false);
 	}
 }
 

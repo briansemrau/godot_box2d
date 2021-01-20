@@ -78,7 +78,7 @@ private:
 
 	Transform2D prev_xform; // For calculating kinematic body movement velocity
 	Transform2D next_xform;
-	bool kinematic_integrate_velocity = false; // Default false is Godot behavior, true is Box2D behavior
+	bool integrate_position = false; // Default false is Godot behavior, true is Box2D behavior
 	bool sync_to_physics = false;
 
 	Ref<Box2DKinematicCollision> motion_cache;
@@ -216,8 +216,8 @@ public:
 
 	// Kinematic body functions
 
-	void set_kinematic_integrate_velocity(bool p_integrate_vel);
-	bool is_kinematic_integrating_velocity() const;
+	void set_integrate_position(bool p_integrate_pos);
+	bool is_integrate_position_enabled() const;
 
 	// p_exclude_raycast_shapes is unused
 	bool move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia, KinematicCollision &r_collision, const bool p_exclude_raycast_shapes = true, const bool p_test_only = false);
