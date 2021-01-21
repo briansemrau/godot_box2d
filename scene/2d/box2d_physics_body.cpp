@@ -108,23 +108,22 @@ void Box2DPhysicsBody::on_b2Body_created() {
 
 void Box2DPhysicsBody::pre_step(float p_delta) {
 	if (get_type() == Mode::MODE_KINEMATIC) {
-		if (!kinematic_integrate_velocity) {
-			Transform2D motion = old_xform.affine_inverse() * get_box2dworld_transform();
+		if (!integrate_position) {
+			Transform2D motion = prev_xform.affine_inverse() * next_xform;
 			// TODO there is a bug here. See this issue: https://github.com/godotengine/godot/issues/34869
-			// Maybe velocities should be differentiated in NOTIF_TRANSFORM_CHANGED(?) but then
-			// we don't have access to the time step... maybe maintain a member var for motion
 			_set_linear_velocity_no_check(motion.get_origin() / p_delta);
 			_set_angular_velocity_no_check(motion.get_rotation() / p_delta);
 		}
-		old_xform = get_box2dworld_transform();
+		prev_xform = next_xform;
 	}
 
 	_update_area_effects();
 }
 
 void Box2DPhysicsBody::sync_state() {
+	const Transform2D physics_xform = b2_to_gd(_get_b2Body()->GetTransform());
 	set_block_transform_notify(true);
-	set_box2dworld_transform(b2_to_gd(_get_b2Body()->GetTransform()));
+	set_box2dworld_transform(physics_xform);
 	set_block_transform_notify(false);
 
 	// At the moment, code meant for "_integrate_forces" goes in _physics_process
@@ -144,8 +143,6 @@ void Box2DPhysicsBody::teleport(const Transform2D &p_transform) {
 			body->SetTransform(new_b2pos, new_b2ang);
 		}
 	}
-
-	old_xform = p_transform;
 }
 
 void Box2DPhysicsBody::_compute_area_effects(const Box2DArea *p_area, b2Vec2 &r_gravity, float &r_lin_damp, float &r_ang_damp) {
@@ -227,8 +224,8 @@ void Box2DPhysicsBody::_update_area_effects() {
 		// Apply default area effects
 		//_compute_area_effects(def_area, gravity, linear_damp, angular_damp);
 		gravity += body->GetWorld()->GetGravity();
-		linear_damp += body->GetLinearDamping();
-		angular_damp += body->GetAngularDamping();
+		linear_damp += get_linear_damping();
+		angular_damp += get_angular_damping();
 	}
 
 	gravity *= get_gravity_scale() * body->GetMass();
@@ -323,8 +320,8 @@ void Box2DPhysicsBody::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_ENTER_TREE: {
-			//last_valid_xform = get_box2dworld_transform();
-			old_xform = get_box2dworld_transform();
+			prev_xform = get_box2dworld_transform();
+			next_xform = get_box2dworld_transform();
 
 			// Reset move_and_slide data
 			on_floor = false;
@@ -341,27 +338,28 @@ void Box2DPhysicsBody::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
-			// Don't destroy body. It could be exiting/entering.
-			// Body should be destroyed in destructor if node is being freed.
-
-			// TODO What do we do if it exits the tree, the ref is kept (in a script), and it's never destroyed?
-			//      Exiting w/o reentering should destroy body.
-			//      This applies to Box2DFixture and Box2DJoint as well.
-			//
-			// Perhaps body creation/destruction should be queued
-			// - body created: immediate CreateBody request
-			// - body destroyed: queue DestroyBody
-			//     - recreated before pumping -> remove from queue
-			// - world pre-step: pump queue
-
 			set_process_internal(false);
 		} break;
 
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
-			if (get_type() != Mode::MODE_KINEMATIC || kinematic_integrate_velocity) {
-				// Send new transform to physics
-				Transform2D new_xform = get_box2dworld_transform();
+			Mode type = get_type();
+			Transform2D new_xform = get_box2dworld_transform();
+
+			if (type == Mode::MODE_RIGID || type == Mode::MODE_STATIC) {
 				teleport(new_xform);
+
+			} else { // type = KINEMATIC
+				next_xform = new_xform;
+				if (sync_to_physics) {
+					// undo node transform, will be updated on physics state sync
+					set_block_transform_notify(true);
+					set_box2dworld_transform(prev_xform);
+					set_block_transform_notify(false);
+
+				} else if (integrate_position) {
+					teleport(next_xform);
+					prev_xform = next_xform;
+				}
 			}
 
 			// Inform joints in editor that we moved
@@ -382,7 +380,9 @@ void Box2DPhysicsBody::_notification(int p_what) {
 					prev_sleeping_state = awake;
 				}
 
-				sync_state();
+				if (get_type() == Mode::MODE_RIGID || (get_type() == Mode::MODE_KINEMATIC && (sync_to_physics || integrate_position))) {
+					sync_state();
+				}
 			}
 		} break;
 
@@ -478,14 +478,14 @@ void Box2DPhysicsBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("apply_central_linear_impulse", "impulse"), &Box2DPhysicsBody::apply_central_linear_impulse, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("apply_torque_impulse", "impulse"), &Box2DPhysicsBody::apply_torque_impulse, DEFVAL(true));
 
-	ClassDB::bind_method(D_METHOD("set_kinematic_integrate_velocity", "enabled"), &Box2DPhysicsBody::set_kinematic_integrate_velocity);
-	ClassDB::bind_method(D_METHOD("is_kinematic_integrating_velocity"), &Box2DPhysicsBody::is_kinematic_integrating_velocity);
+	ClassDB::bind_method(D_METHOD("set_integrate_position", "enabled"), &Box2DPhysicsBody::set_integrate_position);
+	ClassDB::bind_method(D_METHOD("is_integrate_position_enabled"), &Box2DPhysicsBody::is_integrate_position_enabled);
 
 	ClassDB::bind_method(D_METHOD("move_and_collide", "velocity", "rotation", "infinite_inertia", "exclude_raycast_shapes", "test_only"), &Box2DPhysicsBody::_move_and_collide_binding, DEFVAL(true), DEFVAL(true), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("move_and_slide", "linear_velocity", "up_direction", "stop_on_slope", "max_slides", "floor_max_angle", "infinite_inertia"), &Box2DPhysicsBody::move_and_slide, DEFVAL(Vector2(0, 0)), DEFVAL(false), DEFVAL(4), DEFVAL(Math::deg2rad(45.0f)), DEFVAL(true));
-	//ClassDB::bind_method(D_METHOD("move_and_slide_with_snap", "linear_velocity", "snap", "up_direction", "stop_on_slope", "max_slides", "floor_max_angle", "infinite_inertia"), &Box2DPhysicsBody::move_and_slide_with_snap, DEFVAL(Vector2(0, 0)), DEFVAL(false), DEFVAL(4), DEFVAL(Math::deg2rad(45.0f)), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("move_and_slide_with_snap", "linear_velocity", "snap", "up_direction", "stop_on_slope", "max_slides", "floor_max_angle", "infinite_inertia"), &Box2DPhysicsBody::move_and_slide_with_snap, DEFVAL(Vector2(0, 0)), DEFVAL(false), DEFVAL(4), DEFVAL(Math::deg2rad(45.0f)), DEFVAL(true));
 
-	//ClassDB::bind_method(D_METHOD("test_move", "from", "rel_vec", "infinite_inertia"), &Box2DPhysicsBody::test_move, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("test_move", "from", "rel_vec", "infinite_inertia"), &Box2DPhysicsBody::test_move, DEFVAL(true));
 
 	ClassDB::bind_method(D_METHOD("is_on_floor"), &Box2DPhysicsBody::is_on_floor);
 	ClassDB::bind_method(D_METHOD("is_on_ceiling"), &Box2DPhysicsBody::is_on_ceiling);
@@ -496,8 +496,8 @@ void Box2DPhysicsBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_slide_count"), &Box2DPhysicsBody::get_slide_count);
 	ClassDB::bind_method(D_METHOD("get_slide_collision", "slide_idx"), &Box2DPhysicsBody::_get_slide_collision_binding);
 
-	//ClassDB::bind_method(D_METHOD("set_sync_to_physics", "enable"), &Box2DPhysicsBody::set_sync_to_physics);
-	//ClassDB::bind_method(D_METHOD("is_sync_to_physics_enabled"), &Box2DPhysicsBody::is_sync_to_physics_enabled);
+	ClassDB::bind_method(D_METHOD("set_sync_to_physics", "enable"), &Box2DPhysicsBody::set_sync_to_physics);
+	ClassDB::bind_method(D_METHOD("is_sync_to_physics_enabled"), &Box2DPhysicsBody::is_sync_to_physics_enabled);
 
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_scale", PROPERTY_HINT_RANGE, "-128,128,0.01"), "set_gravity_scale", "get_gravity_scale");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM, "Static,Kinematic,Rigid"), "set_type", "get_type");
@@ -507,8 +507,9 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "contact_monitor"), "set_contact_monitor", "is_contact_monitor_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "awake"), "set_awake", "is_awake"); // TODO rename to sleeping, or keep and add sleeping property
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "can_sleep"), "set_can_sleep", "get_can_sleep");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "kinematic_integrate_velocity"), "set_kinematic_integrate_velocity", "is_kinematic_integrating_velocity");
-	//ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sync_to_physics"), "set_sync_to_physics", "is_sync_to_physics_enabled");
+	ADD_GROUP("Kinematic", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "integrate_position"), "set_integrate_position", "is_integrate_position_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sync_to_physics"), "set_sync_to_physics", "is_sync_to_physics_enabled");
 	ADD_GROUP("Linear", "linear_");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "linear_velocity"), "set_linear_velocity", "get_linear_velocity");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "linear_damping", PROPERTY_HINT_RANGE, "-1,1,0.001"), "set_linear_damping", "get_linear_damping");
@@ -598,7 +599,7 @@ void Box2DPhysicsBody::_set_linear_velocity_no_check(const Vector2 &p_vel) {
 }
 
 void Box2DPhysicsBody::set_linear_velocity(const Vector2 &p_vel) {
-	ERR_FAIL_COND_MSG(get_type() == Mode::MODE_KINEMATIC && !kinematic_integrate_velocity, "Kinematic type bodies do not support setting linear_velocity without enabling `kinematic_integrate_velocity`.");
+	ERR_FAIL_COND_MSG(get_type() == Mode::MODE_KINEMATIC && !integrate_position, "Kinematic type bodies do not support setting linear_velocity without enabling `integrate_position`.");
 	_set_linear_velocity_no_check(p_vel);
 }
 
@@ -617,7 +618,7 @@ void Box2DPhysicsBody::_set_angular_velocity_no_check(const real_t p_omega) {
 }
 
 void Box2DPhysicsBody::set_angular_velocity(const real_t p_omega) {
-	ERR_FAIL_COND_MSG(get_type() == Mode::MODE_KINEMATIC && !kinematic_integrate_velocity, "Kinematic type bodies do not support setting linear_velocity without enabling `kinematic_integrate_velocity`.");
+	ERR_FAIL_COND_MSG(get_type() == Mode::MODE_KINEMATIC && !integrate_position, "Kinematic type bodies do not support setting linear_velocity without enabling `integrate_position`.");
 	_set_angular_velocity_no_check(p_omega);
 }
 
@@ -921,31 +922,39 @@ void Box2DPhysicsBody::apply_torque_impulse(real_t impulse, bool wake) {
 	_get_b2Body()->ApplyAngularImpulse(impulse * GD_TO_B2, wake);
 }
 
-void Box2DPhysicsBody::set_kinematic_integrate_velocity(bool p_integrate_vel) {
-	if (kinematic_integrate_velocity == p_integrate_vel) {
+void Box2DPhysicsBody::set_integrate_position(bool p_integrate_pos) {
+	if (integrate_position == p_integrate_pos) {
 		return;
 	}
-	ERR_FAIL_COND_MSG(get_type() != Mode::MODE_KINEMATIC, "The property kinematic_integrate_velocity has no effect on non-kinematic bodies.");
+	ERR_FAIL_COND_MSG(get_type() != Mode::MODE_KINEMATIC, "The property integrate_position has no effect on non-kinematic bodies.");
 
-	kinematic_integrate_velocity = p_integrate_vel;
+	integrate_position = p_integrate_pos;
 
-	if (kinematic_integrate_velocity) {
+	if (integrate_position) {
 		// Make sure any transform changes between last step and now are integrated
 		teleport(get_box2dworld_transform());
 	}
+
+	_change_notify("integrate_position");
+
+	if (integrate_position && sync_to_physics) {
+		WARN_PRINT("Enabling both sync_to_physics and integrate_position is not supported. Disabling sync_to_physics.");
+		set_sync_to_physics(false);
+	}
 }
 
-bool Box2DPhysicsBody::is_kinematic_integrating_velocity() const {
-	return kinematic_integrate_velocity;
+bool Box2DPhysicsBody::is_integrate_position_enabled() const {
+	return integrate_position;
 }
 
 bool Box2DPhysicsBody::move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia, KinematicCollision &r_collision, const bool p_exclude_raycast_shapes, const bool p_test_only) {
-	if (get_type() != Mode::MODE_KINEMATIC) {
-		ERR_PRINT_ONCE("This function is only meant to be used with Kinematic body types.");
-	}
 	ERR_FAIL_COND_V(!_get_world_node(), false);
-
-	// TODO check sync_to_physics property?
+	if (get_type() != Mode::MODE_KINEMATIC) {
+		ERR_PRINT("This function is only meant to be used with Kinematic body types.");
+	}
+	if (sync_to_physics || integrate_position) {
+		ERR_PRINT("Functions move_and_slide and move_and_collide do not work together with 'sync to physics' or 'integrate_position' options.");
+	}
 
 	Transform2D gt = get_box2dworld_transform();
 
@@ -965,18 +974,19 @@ bool Box2DPhysicsBody::move_and_collide(const Vector2 &p_motion, const float p_r
 
 	if (!p_test_only) {
 		gt.elements[2] += result.motion;
-		set_block_transform_notify(true);
 		set_box2dworld_transform(gt);
-		set_block_transform_notify(false);
 	}
 
 	return colliding;
 }
 
-#define FLOOR_ANGLE_THRESHOLD 0.01f // TODO remove this trash
+bool Box2DPhysicsBody::test_move(const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia) {
+	return _get_world_node()->body_test_motion(this, p_from, p_motion, p_infinite_inertia);
+}
 
 Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const Vector2 &p_up_direction, bool p_stop_on_slope, int p_max_slides, float p_floor_max_angle, bool p_infinite_inertia) {
-
+	constexpr float floor_angle_threshold = 0.01f;
+	
 	Vector2 body_velocity = p_linear_velocity;
 	Vector2 body_velocity_normal = body_velocity.normalized();
 	Vector2 up_direction = p_up_direction.normalized();
@@ -991,7 +1001,9 @@ Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const
 		}
 	}
 
-	Vector2 motion = (current_floor_velocity + body_velocity) * _get_world_node()->get_last_step_delta();
+	// TODO Check if inside `_world_step` and get world step delta
+	//      Or break Godot compat by adding a delta param or changing velocity param to motion
+	Vector2 motion = (current_floor_velocity + body_velocity) * (Engine::get_singleton()->is_in_physics_frame() ? get_physics_process_delta_time() : get_process_delta_time());
 
 	on_floor = false;
 	on_floor_body = ObjectID();
@@ -1018,7 +1030,7 @@ Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const
 				// every collision is a wall
 				on_wall = true;
 			} else {
-				if (Math::acos(collision.normal.dot(up_direction)) <= p_floor_max_angle + FLOOR_ANGLE_THRESHOLD) {
+				if (Math::acos(collision.normal.dot(up_direction)) <= p_floor_max_angle + floor_angle_threshold) {
 
 					on_floor = true;
 					floor_normal = collision.normal;
@@ -1033,7 +1045,7 @@ Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const
 							return Vector2();
 						}
 					}
-				} else if (Math::acos(collision.normal.dot(-up_direction)) <= p_floor_max_angle + FLOOR_ANGLE_THRESHOLD) {
+				} else if (Math::acos(collision.normal.dot(-up_direction)) <= p_floor_max_angle + floor_angle_threshold) {
 					on_ceiling = true;
 				} else {
 					on_wall = true;
@@ -1054,28 +1066,79 @@ Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const
 	return body_velocity;
 }
 
+Vector2 Box2DPhysicsBody::move_and_slide_with_snap(const Vector2 &p_linear_velocity, const Vector2 &p_snap, const Vector2 &p_up_direction, bool p_stop_on_slope, int p_max_slides, float p_floor_max_angle, bool p_infinite_inertia) {
+	constexpr float floor_angle_threshold = 0.01f;
+
+	Vector2 up_direction = p_up_direction.normalized();
+	bool was_on_floor = on_floor;
+
+	Vector2 ret_vel = move_and_slide(p_linear_velocity, up_direction, p_stop_on_slope, p_max_slides, p_floor_max_angle, p_infinite_inertia);
+	if (!was_on_floor || p_snap == Vector2()) {
+		return ret_vel;
+	}
+
+	KinematicCollision col;
+	Transform2D gt = get_global_transform();
+
+	if (move_and_collide(p_snap, 0, p_infinite_inertia, col, false, true)) {
+		bool apply = true;
+		if (up_direction != Vector2()) {
+			if (Math::acos(col.normal.dot(up_direction)) <= p_floor_max_angle + floor_angle_threshold) {
+				on_floor = true;
+				floor_normal = col.normal;
+				on_floor_body = col.collider_fixture->get_instance_id();
+				floor_velocity = col.collider_vel;
+				if (p_stop_on_slope) {
+					// move and collide may stray the object a bit because of pre un-stucking,
+					// so only ensure that motion happens on floor direction in this case.
+					col.travel = up_direction * up_direction.dot(col.travel);
+				}
+			} else {
+				apply = false;
+			}
+		}
+
+		if (apply) {
+			gt.elements[2] += col.travel;
+			set_global_transform(gt);
+		}
+	}
+
+	return ret_vel;
+}
+
 bool Box2DPhysicsBody::is_on_floor() const {
-	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, false, "This function is only available for Kinematic type bodies.");
+	if (get_type() != Mode::MODE_KINEMATIC) {
+		ERR_PRINT_ONCE("This function is only available for Kinematic type bodies.");
+	}
 	return on_floor;
 }
 
 bool Box2DPhysicsBody::is_on_wall() const {
-	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, false, "This function is only available for Kinematic type bodies.");
+	if (get_type() != Mode::MODE_KINEMATIC) {
+		ERR_PRINT_ONCE("This function is only available for Kinematic type bodies.");
+	}
 	return on_ceiling;
 }
 
 bool Box2DPhysicsBody::is_on_ceiling() const {
-	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, false, "This function is only available for Kinematic type bodies.");
+	if (get_type() != Mode::MODE_KINEMATIC) {
+		ERR_PRINT_ONCE("This function is only available for Kinematic type bodies.");
+	}
 	return on_wall;
 }
 
 Vector2 Box2DPhysicsBody::get_floor_normal() const {
-	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, Vector2(), "This function is only available for Kinematic type bodies.");
+	if (get_type() != Mode::MODE_KINEMATIC) {
+		ERR_PRINT_ONCE("This function is only available for Kinematic type bodies.");
+	}
 	return floor_normal;
 }
 
 Vector2 Box2DPhysicsBody::get_floor_velocity() const {
-	//ERR_FAIL_COND_V_MSG(get_type() != Mode::MODE_KINEMATIC, Vector2(), "This function is only available for Kinematic type bodies.");
+	if (get_type() != Mode::MODE_KINEMATIC) {
+		ERR_PRINT_ONCE("This function is only available for Kinematic type bodies.");
+	}
 	return floor_velocity;
 }
 
@@ -1086,6 +1149,25 @@ int Box2DPhysicsBody::get_slide_count() const {
 Box2DPhysicsBody::KinematicCollision Box2DPhysicsBody::get_slide_collision(int p_bounce) const {
 	ERR_FAIL_INDEX_V(p_bounce, kinematic_colliders.size(), KinematicCollision());
 	return kinematic_colliders[p_bounce];
+}
+
+void Box2DPhysicsBody::set_sync_to_physics(bool p_enable) {
+	if (sync_to_physics == p_enable) {
+		return;
+	}
+	ERR_FAIL_COND_MSG(get_type() != Mode::MODE_KINEMATIC, "The property sync_to_physics has no effect on non-kinematic bodies.");
+	sync_to_physics = p_enable;
+
+	_change_notify("sync_to_physics");
+
+	if (integrate_position && sync_to_physics) {
+		WARN_PRINT("Enabling both sync_to_physics and integrate_position is not supported. Disabling integrate_position.");
+		set_integrate_position(false);
+	}
+}
+
+bool Box2DPhysicsBody::is_sync_to_physics_enabled() const {
+	return sync_to_physics;
 }
 
 Box2DPhysicsBody::Box2DPhysicsBody() {

@@ -91,6 +91,20 @@ void Box2DArea::_notification(int p_what) {
 			// Don't sync physics position
 			// This allows areas to move with the scene transform under other physics objects
 		} break;
+		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
+			// Send new transform to physics
+			Transform2D new_xform = get_box2dworld_transform();
+
+			bodyDef.position = gd_to_b2(new_xform.get_origin());
+			bodyDef.angle = new_xform.get_rotation();
+
+			b2Body *body = _get_b2Body();
+			if (body) {
+				body->SetTransform(gd_to_b2(new_xform.get_origin()), new_xform.get_rotation());
+			}
+
+			last_step_xform = new_xform;
+		} break;
 	}
 }
 

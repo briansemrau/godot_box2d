@@ -76,9 +76,10 @@ private:
 
 	Vector<Box2DAreaItem> colliding_areas;
 
-	//Transform2D last_valid_xform; // this is for sync_to_physics, but is it needed?
-	Transform2D old_xform; // For calculating kinematic body movement velocity
-	bool kinematic_integrate_velocity = false; // Default false is Godot behavior, true is Box2D behavior
+	Transform2D prev_xform; // For calculating kinematic body movement velocity
+	Transform2D next_xform;
+	bool integrate_position = false; // Default false is Godot behavior, true is Box2D behavior
+	bool sync_to_physics = false;
 
 	Ref<Box2DKinematicCollision> motion_cache;
 
@@ -188,7 +189,7 @@ public:
 	void set_max_contacts_reported(int p_amount);
 	int get_max_contacts_reported() const;
 
-	Array get_colliding_bodies() const; // Function exists for Godot feature congruency
+	Array get_colliding_bodies() const;
 
 	// TODO for documentation: all contact info is in world space
 	int get_contact_count() const;
@@ -215,16 +216,16 @@ public:
 
 	// Kinematic body functions
 
-	void set_kinematic_integrate_velocity(bool p_integrate_vel);
-	bool is_kinematic_integrating_velocity() const;
+	void set_integrate_position(bool p_integrate_pos);
+	bool is_integrate_position_enabled() const;
 
 	// p_exclude_raycast_shapes is unused
 	bool move_and_collide(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia, KinematicCollision &r_collision, const bool p_exclude_raycast_shapes = true, const bool p_test_only = false);
-	// TODO bool test_move(const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia = true);
+	bool test_move(const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia = true);
 
 	// TODO missing rotation param, maybe pass a Transform2D
 	Vector2 move_and_slide(const Vector2 &p_linear_velocity, const Vector2 &p_up_direction = Vector2(0, 0), bool p_stop_on_slope = false, int p_max_slides = 4, float p_floor_max_angle = Math::deg2rad(45.0f), bool p_infinite_inertia = true);
-	// TODO Vector2 move_and_slide_with_snap(const Vector2 &p_linear_velocity, const Vector2 &p_snap, const Vector2 &p_up_direction = Vector2(0, 0), bool p_stop_on_slope = false, int p_max_slides = 4, float p_floor_max_angle = Math::deg2rad((float)45), bool p_infinite_inertia = true);
+	Vector2 move_and_slide_with_snap(const Vector2 &p_linear_velocity, const Vector2 &p_snap, const Vector2 &p_up_direction = Vector2(0, 0), bool p_stop_on_slope = false, int p_max_slides = 4, float p_floor_max_angle = Math::deg2rad(45.0f), bool p_infinite_inertia = true);
 	bool is_on_floor() const;
 	bool is_on_wall() const;
 	bool is_on_ceiling() const;
@@ -234,8 +235,8 @@ public:
 	int get_slide_count() const;
 	KinematicCollision get_slide_collision(int p_bounce) const;
 
-	//void set_sync_to_physics(bool p_enable);
-	//bool is_sync_to_physics_enabled() const;
+	void set_sync_to_physics(bool p_enable);
+	bool is_sync_to_physics_enabled() const;
 
 	Box2DPhysicsBody();
 	~Box2DPhysicsBody();
@@ -265,8 +266,6 @@ public:
 	Object *get_collider_fixture() const;
 	ObjectID get_collider_fixture_id() const;
 	Vector2 get_collider_velocity() const;
-
-	//Box2DKinematicCollision();
 };
 
 #endif // BOX2D_PHYSICS_BODY_H

@@ -106,12 +106,12 @@ struct MotionQueryParameters {
 	b2Filter filter; // TODO If/when we fork Box2D, filters get 32bit data
 	bool collide_with_bodies = true; // TODO might be better named as "collide_with_solids"
 	bool collide_with_sensors = false;
+	bool ignore_dynamic = false;
 
 	// Properties exclusive for cast_motion
 	Vector2 motion = Vector2(0, 0);
 	float rotation = 0.0f; // TODO should these be combined to Transform2D?
 	Vector2 local_center = Vector2(0, 0); // TODO rename shape_local_center
-	//bool predict_other_body_motion = false; // naive prediction of other bodys' motion
 	//float motion_timedelta_for_prediction = 1/60;
 };
 
@@ -163,6 +163,9 @@ public:
 	void set_collide_with_sensors(bool p_enable);
 	bool is_collide_with_sensors_enabled() const;
 
+	void set_ignore_rigid(bool p_enable);
+	bool is_ignoring_rigid() const;
+
 	// Using ObjectIDs as int64_t so that we can bind these methods
 	void set_exclude(const Vector<int64_t> &p_exclude);
 	Vector<int64_t> get_exclude() const;
@@ -181,6 +184,7 @@ public:
 		Vector2 motion;
 		Vector2 remainder;
 		float t; // TOI with respect to motion [0, 1]
+		bool colliding;
 
 		Vector2 collision_point;
 		Vector2 collision_normal;
@@ -249,10 +253,11 @@ private:
 		virtual float ReportFixture(b2Fixture *fixture, const b2Vec2 &point, const b2Vec2 &normal, float fraction) override;
 	};
 
-	struct CastQueryWrapper {
+	struct CastQueryWrapper { // TODO rename this. It's no longer relevant to just cast_motion
 		const b2BroadPhase *broadPhase;
 
 		MotionQueryParameters params;
+		int max_results = -1;
 
 		Vector<b2FixtureProxy *> results;
 
@@ -352,6 +357,9 @@ private:
 
 	float _test_motion_toi(const Vector<const b2Shape *> &p_test_shapes, const MotionQueryParameters &p_params, TestMotionTOIResult *r_result);
 
+	bool _solve_position_step(const Vector<const b2Shape *> &p_body_shapes, const MotionQueryParameters &p_params, b2Vec2 &r_correction) const;
+	b2Vec2 _solve_position(const Vector<const b2Shape *> &p_body_shapes, const MotionQueryParameters &p_params, int p_solve_steps = 4) const;
+
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
@@ -376,16 +384,14 @@ public:
 	//void shiftOrigin(const Vector2 &newOrigin);
 
 	// Godot space query API
-	// What is collide_shape? Does this return manifold points?
-	//Array collide_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
+	// TODO What is collide_shape? Does this return manifold points? //Array collide_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
 	Array intersect_point(const Vector2 &p_point, int p_max_results = 32, const Vector<int64_t> &p_exclude = Vector<int64_t>(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false, uint32_t p_collision_layer = 0x0, int32_t p_group_index = 0);
 	Dictionary intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Vector<int64_t> &p_exclude = Vector<int64_t>(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false, uint32_t p_collision_layer = 0x0, int32_t p_group_index = 0);
 	Array intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
 	Array cast_motion(const Ref<Box2DShapeQueryParameters> &p_query);
 
 	// This is by-default continuous collision. Is this slow? TODO test or remove commented code
-	//bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, bool p_continuous_cd, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<PhysicsTestMotionResult2D>());
-	bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, MotionResult *r_result);
+	bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, MotionResult *r_result = nullptr);
 	bool _body_test_motion_binding(const Object *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<PhysicsTestMotionResult2D>());
 
 	// Box2D space query API
@@ -401,18 +407,13 @@ class Box2DPhysicsTestMotionResult : public Reference {
 
 	friend class Box2DWorld;
 
-	// TODO find the best place to put this struct
-	// Godot API includes it in the space2d class but it only seems relevant here.
-	// Perhaps this struct wrapping should not exist at all and params should
-	//     just sit in this class?
-
 	Box2DWorld::MotionResult result;
 
 protected:
 	static void _bind_methods();
 
 public:
-	//bool is_colliding() const; // TODO return toi < 1.0f
+	bool is_colliding() const;
 	Vector2 get_motion() const;
 	Vector2 get_motion_remainder() const;
 
@@ -423,8 +424,6 @@ public:
 	ObjectID get_collider_fixture_id() const;
 	Box2DFixture *get_local_fixture() const;
 	ObjectID get_local_fixture_id() const;
-
-	//Box2DPhysicsTestMotionResult();
 };
 
 #endif // BOX2D_WORLD_H
