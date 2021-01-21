@@ -59,10 +59,6 @@ protected:
 	inline Box2DWorld *_get_world_node() const { return world_node; };
 	inline b2Body *_get_b2Body() const { return body; }
 
-	// Moving to and from world transform
-	void set_box2dworld_transform(const Transform2D &p_transform);
-	Transform2D get_box2dworld_transform();
-
 	virtual void on_b2Body_created(){};
 	virtual void on_b2Body_destroyed(){};
 
@@ -82,6 +78,10 @@ protected:
 
 public:
 	virtual String get_configuration_warning() const override;
+
+	// Moving to and from world transform
+	void set_box2dworld_transform(const Transform2D &p_transform);
+	Transform2D get_box2dworld_transform() const;
 
 	void set_enabled(bool p_enabled);
 	bool is_enabled() const;
