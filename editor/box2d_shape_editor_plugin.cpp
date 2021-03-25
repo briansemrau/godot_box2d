@@ -148,8 +148,6 @@ void Box2DShapeEditor::set_handle(int idx, Point2 &p_point) {
 			ERR_PRINT("Invalid shape type");
 		} break;
 	}
-
-	node->get_shape()->_change_notify();
 }
 
 void Box2DShapeEditor::commit_handle(int idx, Variant &p_org) {
@@ -249,7 +247,7 @@ bool Box2DShapeEditor::forward_canvas_gui_input(const Ref<InputEvent> &p_event) 
 
 		Vector2 gpoint = mb->get_position();
 
-		if (mb->get_button_index() == BUTTON_LEFT) {
+		if (mb->get_button_index() == MouseButton::MOUSE_BUTTON_LEFT) {
 			if (mb->is_pressed()) {
 				for (int i = 0; i < handles.size(); i++) {
 					if (xform.xform(handles[i]).distance_to(gpoint) < 8) {

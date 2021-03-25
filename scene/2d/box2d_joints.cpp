@@ -103,8 +103,6 @@ void Box2DJoint::on_editor_transforms_changed() {
 		//   TODO don't bother using b2bodies, just use the node
 		anchor_a = to_local(b2_to_gd(jointDef->bodyA->GetWorldPoint(gd_to_b2(get_body_local_anchor_a())))); // TODO should to_local be replaced with usage of box2dworld_global_transform?
 		anchor_b = to_local(b2_to_gd(jointDef->bodyB->GetWorldPoint(gd_to_b2(get_body_local_anchor_b()))));
-		_change_notify("anchor_a");
-		_change_notify("anchor_b");
 		update();
 	} else {
 		// Keep our local anchors in-place
@@ -445,7 +443,6 @@ void Box2DJoint::set_anchor_a(const Vector2 &p_anchor) {
 	const bool recreate = anchor_b != p_anchor;
 
 	anchor_a = p_anchor;
-	_change_notify("anchor_a");
 
 	if (recreate)
 		recreate_joint(true);
@@ -465,7 +462,6 @@ void Box2DJoint::set_anchor_b(const Vector2 &p_anchor) {
 	const bool recreate = anchor_b != p_anchor;
 
 	anchor_b = p_anchor;
-	_change_notify("anchor_b");
 
 	if (recreate)
 		recreate_joint(true);
@@ -485,9 +481,6 @@ void Box2DJoint::reset_joint_anchors() {
 
 	if (recreate)
 		recreate_joint(true);
-
-	_change_notify("anchor_a");
-	_change_notify("anchor_b");
 }
 
 void Box2DJoint::set_collide_connected(bool p_collide) {
@@ -773,7 +766,6 @@ void Box2DRevoluteJoint::set_limit_enabled(bool p_enabled) {
 	if (get_b2Joint())
 		static_cast<b2RevoluteJoint *>(get_b2Joint())->EnableLimit(p_enabled);
 	jointDef.enableLimit = p_enabled;
-	_change_notify("limit_enabled");
 }
 
 bool Box2DRevoluteJoint::is_limit_enabled() const {
@@ -789,8 +781,6 @@ void Box2DRevoluteJoint::set_upper_limit(real_t p_angle) {
 	if (get_b2Joint())
 		static_cast<b2RevoluteJoint *>(get_b2Joint())->SetLimits(get_lower_limit(), p_angle);
 	jointDef.upperAngle = p_angle;
-
-	_change_notify("upper_limit");
 }
 
 real_t Box2DRevoluteJoint::get_upper_limit() const {
@@ -806,8 +796,6 @@ void Box2DRevoluteJoint::set_lower_limit(real_t p_angle) {
 	if (get_b2Joint())
 		static_cast<b2RevoluteJoint *>(get_b2Joint())->SetLimits(p_angle, get_upper_limit());
 	jointDef.lowerAngle = p_angle;
-
-	_change_notify("lower_limit");
 }
 
 real_t Box2DRevoluteJoint::get_lower_limit() const {
@@ -821,9 +809,6 @@ void Box2DRevoluteJoint::set_limits(real_t p_lower, real_t p_upper) {
 		static_cast<b2RevoluteJoint *>(get_b2Joint())->SetLimits(p_lower, p_upper);
 	jointDef.lowerAngle = p_lower;
 	jointDef.upperAngle = p_upper;
-
-	_change_notify("upper_limit");
-	_change_notify("lower_limit");
 }
 
 //void Box2DRevoluteJoint::set_reference_angle(real_t p_angle) {
@@ -1045,8 +1030,6 @@ void Box2DPrismaticJoint::set_local_axis(const Vector2 &p_axis) {
 
 	if (recreate && is_inside_tree())
 		recreate_joint(true);
-
-	_change_notify("local_axis");
 }
 
 Vector2 Box2DPrismaticJoint::get_local_axis() const {
@@ -1082,8 +1065,6 @@ void Box2DPrismaticJoint::set_upper_limit(real_t p_distance) {
 	if (get_b2Joint())
 		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetLimits(jointDef.lowerTranslation, distance);
 	jointDef.upperTranslation = distance;
-
-	_change_notify("upper_limit");
 }
 
 real_t Box2DPrismaticJoint::get_upper_limit() const {
@@ -1100,8 +1081,6 @@ void Box2DPrismaticJoint::set_lower_limit(real_t p_distance) {
 	if (get_b2Joint())
 		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetLimits(distance, jointDef.upperTranslation);
 	jointDef.lowerTranslation = distance;
-
-	_change_notify("lower_limit");
 }
 
 real_t Box2DPrismaticJoint::get_lower_limit() const {
@@ -1118,9 +1097,6 @@ void Box2DPrismaticJoint::set_limits(real_t p_lower, real_t p_upper) {
 		static_cast<b2PrismaticJoint *>(get_b2Joint())->SetLimits(lower, upper);
 	jointDef.lowerTranslation = lower;
 	jointDef.upperTranslation = upper;
-
-	_change_notify("lower_limit");
-	_change_notify("upper_limit");
 }
 
 void Box2DPrismaticJoint::set_motor_enabled(bool p_enabled) {
@@ -1177,8 +1153,6 @@ Box2DPrismaticJoint::Box2DPrismaticJoint() :
 	//		anchor_b = to_local(b2_to_gd(jointDef.bodyB->GetWorldPoint(jointDef.localAnchorB)));
 	//		if (editor_use_default_rest_length)
 	//			reset_rest_length();
-	//		_change_notify("anchor_a");
-	//		_change_notify("anchor_b");
 	//	}
 	//}
 //}
@@ -1288,8 +1262,6 @@ void Box2DDistanceJoint::set_rest_length(real_t p_length) {
 	if (rest_length > max_length) {
 		set_max_length(rest_length);
 	}
-
-	_change_notify("rest_length");
 }
 
 real_t Box2DDistanceJoint::get_rest_length() const {
@@ -1320,8 +1292,6 @@ void Box2DDistanceJoint::set_min_length(real_t p_length) {
 	if (get_b2Joint())
 		static_cast<b2DistanceJoint *>(get_b2Joint())->SetMinLength(length);
 	jointDef.length = length;
-
-	_change_notify("min_length");
 }
 
 real_t Box2DDistanceJoint::get_min_length() const {
@@ -1343,8 +1313,6 @@ void Box2DDistanceJoint::set_max_length(real_t p_length) {
 	if (get_b2Joint())
 		static_cast<b2DistanceJoint *>(get_b2Joint())->SetMaxLength(length);
 	jointDef.length = length;
-
-	_change_notify("max_length");
 }
 
 real_t Box2DDistanceJoint::get_max_length() const {
