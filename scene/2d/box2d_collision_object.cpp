@@ -68,51 +68,51 @@ void Box2DCollisionObject::update_filterdata() {
 	}
 }
 
-Transform2D Box2DCollisionObject::get_box2dworld_transform() {
-	std::vector<Transform2D> transforms{};
-	transforms.push_back(get_transform());
-	Node* parent = get_parent();
-	while(parent) {
-		if(parent == world_node) {
-			break;
-		}
-		CanvasItem* cv = Object::cast_to<CanvasItem>(parent);
-		if(cv) {
-			transforms.push_back(cv->get_transform());
-		}
-		parent = parent->get_parent();
-	}
-
-	Transform2D returned{};
-	while(transforms.size() > 0) {
-		returned = returned * transforms.back();
-		transforms.pop_back();
-	}
-
-	return returned;
-}
-
 void Box2DCollisionObject::set_box2dworld_transform(const Transform2D &p_transform) {
 	std::vector<Transform2D> transforms{};
 	transforms.push_back(p_transform);
-	Node* parent = get_parent();
-	while(parent) {
-		if(parent == world_node) {
+	Node *parent = get_parent();
+	while (parent) {
+		if (parent == world_node) {
 			break;
 		}
-		CanvasItem* cv = Object::cast_to<CanvasItem>(parent);
-		if(cv) {
+		CanvasItem *cv = Object::cast_to<CanvasItem>(parent);
+		if (cv) {
 			transforms.push_back(cv->get_transform().affine_inverse());
 		}
 		parent = parent->get_parent();
 	}
 
 	Transform2D target_xform{};
-	while(transforms.size() > 0) {
+	while (transforms.size() > 0) {
 		target_xform = target_xform * transforms.back();
 		transforms.pop_back();
 	}
 	set_transform(target_xform);
+}
+
+Transform2D Box2DCollisionObject::get_box2dworld_transform() {
+	std::vector<Transform2D> transforms{};
+	transforms.push_back(get_transform());
+	Node *parent = get_parent();
+	while (parent) {
+		if (parent == world_node) {
+			break;
+		}
+		CanvasItem *cv = Object::cast_to<CanvasItem>(parent);
+		if (cv) {
+			transforms.push_back(cv->get_transform());
+		}
+		parent = parent->get_parent();
+	}
+
+	Transform2D returned{};
+	while (transforms.size() > 0) {
+		returned = returned * transforms.back();
+		transforms.pop_back();
+	}
+
+	return returned;
 }
 
 void Box2DCollisionObject::_set_contact_monitor(bool p_enabled) {
@@ -185,34 +185,15 @@ void Box2DCollisionObject::_notification(int p_what) {
 			// TODO What do we do if it exits the tree, the ref is kept (in a script), and it's never destroyed?
 			//      Exiting w/o reentering should destroy body.
 			//      This applies to Box2DFixture and Box2DJoint as well.
+			//
+			// Perhaps body creation/destruction should be queued
+			// - body created: immediate CreateBody request
+			// - body destroyed: queue DestroyBody
+			//     - recreated before pumping -> remove from queue
+			// - world pre-step: pump queue
 
 			set_process_internal(false);
 		} break;
-
-		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
-			// Send new transform to physics
-			Transform2D new_xform = get_box2dworld_transform();
-
-			bodyDef.position = gd_to_b2(new_xform.get_origin());
-			bodyDef.angle = new_xform.get_rotation();
-
-			if (body) {
-				body->SetTransform(gd_to_b2(new_xform.get_origin()), new_xform.get_rotation());
-			}
-		} break;
-
-		case NOTIFICATION_INTERNAL_PROCESS: {
-			// Do nothing
-		} break;
-
-		case NOTIFICATION_DRAW: {
-			if (!Engine::get_singleton()->is_editor_hint() && !get_tree()->is_debugging_collisions_hint()) {
-				break;
-			}
-
-			// Probably do nothing here
-			// TODO remove this case
-		}
 	}
 }
 

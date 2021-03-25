@@ -67,6 +67,23 @@ void Box2DArea::_on_fixture_exited(Box2DFixture *p_fixture) {
 	}
 }
 
+void Box2DArea::_notification(int p_what) {
+	switch (p_what) {
+		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
+			// Send new transform to physics
+			Transform2D new_xform = get_box2dworld_transform();
+
+			bodyDef.position = gd_to_b2(new_xform.get_origin());
+			bodyDef.angle = new_xform.get_rotation();
+
+			b2Body *body = _get_b2Body();
+			if (body) {
+				body->SetTransform(gd_to_b2(new_xform.get_origin()), new_xform.get_rotation());
+			}
+		} break;
+	}
+}
+
 void Box2DArea::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_space_override_mode", "space_override_mode"), &Box2DArea::set_space_override_mode);
 	ClassDB::bind_method(D_METHOD("get_space_override_mode"), &Box2DArea::get_space_override_mode);

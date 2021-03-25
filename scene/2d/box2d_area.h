@@ -50,6 +50,7 @@ private:
 	virtual void _on_fixture_exited(Box2DFixture *p_fixture) override;
 
 protected:
+	void _notification(int p_what);
 	static void _bind_methods();
 	void _validate_property(PropertyInfo &property) const override;
 

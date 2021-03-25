@@ -23,7 +23,9 @@ void register_godot_box2d_types() {
 	ClassDB::register_class<Box2DWorld>();
 
 	ClassDB::register_virtual_class<Box2DCollisionObject>();
+	ClassDB::register_class<Box2DPhysicsTestMotionResult>();
 	ClassDB::register_class<Box2DPhysicsBody>();
+	ClassDB::register_class<Box2DKinematicCollision>();
 	ClassDB::register_class<Box2DArea>();
 
 	ClassDB::register_class<Box2DFixture>();

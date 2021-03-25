@@ -98,33 +98,37 @@ struct ContactBufferManifold {
 class Box2DWorld;
 class Box2DPhysicsBody;
 
+struct MotionQueryParameters {
+	Transform2D transform = Transform2D();
+
+	Set<const Box2DPhysicsBody *> exclude;
+	// potential addition: exclude fixtures
+	b2Filter filter; // TODO If/when we fork Box2D, filters get 32bit data
+	bool collide_with_bodies = true; // TODO might be better named as "collide_with_solids"
+	bool collide_with_sensors = false;
+	bool ignore_dynamic = false;
+
+	// Properties exclusive for cast_motion
+	Vector2 motion = Vector2(0, 0);
+	float rotation = 0.0f; // TODO should these be combined to Transform2D?
+	Vector2 local_center = Vector2(0, 0); // TODO rename shape_local_center
+	//float motion_timedelta_for_prediction = 1/60;
+};
+
 class Box2DShapeQueryParameters : public Reference {
 	GDCLASS(Box2DShapeQueryParameters, Reference);
 
 	friend class Box2DWorld;
 
 	Ref<Box2DShape> shape_ref;
-	Transform2D transform = Transform2D();
-
-	Set<Box2DPhysicsBody *> exclude;
-	// potential addition: exclude fixtures
-	b2Filter filter; // TODO If/when we fork Box2D, filters get 32bit data
-	bool collide_with_bodies = true; // TODO might be better named as "collide_with_solids"
-	bool collide_with_sensors = false;
-
-	// Properties exclusive for cast_motion
-	Vector2 motion = Vector2(0, 0);
-	float rotation = 0.0f;
-	Vector2 local_center = Vector2(0, 0);
-	//bool predict_other_body_motion = false;
-	//float motion_timedelta_for_prediction = 1/60;
+	MotionQueryParameters parameters;
 
 protected:
 	static void _bind_methods();
 
 public:
 	const b2Filter &_get_filter() const;
-	Set<Box2DPhysicsBody *> _get_exclude() const;
+	Set<const Box2DPhysicsBody *> _get_exclude() const;
 
 	void set_shape(const RES &p_shape_ref);
 	RES get_shape() const;
@@ -159,16 +163,35 @@ public:
 	void set_collide_with_sensors(bool p_enable);
 	bool is_collide_with_sensors_enabled() const;
 
+	void set_ignore_rigid(bool p_enable);
+	bool is_ignoring_rigid() const;
+
 	// Using ObjectIDs as int64_t so that we can bind these methods
 	void set_exclude(const Vector<int64_t> &p_exclude);
 	Vector<int64_t> get_exclude() const;
 };
+
+class Box2DPhysicsTestMotionResult;
 
 class Box2DWorld : public Node2D, public virtual b2DestructionListener, public virtual b2ContactFilter, public virtual b2ContactListener {
 	GDCLASS(Box2DWorld, Node2D);
 
 	friend class Box2DCollisionObject;
 	friend class Box2DJoint;
+
+public:
+	struct MotionResult {
+		Vector2 motion;
+		Vector2 remainder;
+		float t; // TOI with respect to motion [0, 1]
+		bool colliding;
+
+		Vector2 collision_point;
+		Vector2 collision_normal;
+		Vector2 collider_velocity;
+		Box2DFixture *collider_fixture = nullptr;
+		Box2DFixture *local_fixture = nullptr;
+	};
 
 private:
 	class PointQueryCallback : public b2QueryCallback {
@@ -177,7 +200,7 @@ private:
 
 		b2Vec2 point;
 		int max_results;
-		Set<Box2DPhysicsBody *> exclude;
+		Set<const Box2DPhysicsBody *> exclude;
 		b2Filter filter;
 		bool collide_with_bodies;
 		bool collide_with_sensors;
@@ -206,7 +229,7 @@ private:
 
 		Result result;
 
-		Set<Box2DPhysicsBody *> exclude;
+		Set<const Box2DPhysicsBody *> exclude;
 		b2Filter filter;
 		bool collide_with_bodies;
 		bool collide_with_sensors;
@@ -230,6 +253,17 @@ private:
 		virtual float ReportFixture(b2Fixture *fixture, const b2Vec2 &point, const b2Vec2 &normal, float fraction) override;
 	};
 
+	struct CastQueryWrapper { // TODO rename this. It's no longer relevant to just cast_motion
+		const b2BroadPhase *broadPhase;
+
+		MotionQueryParameters params;
+		int max_results = -1;
+
+		Vector<b2FixtureProxy *> results;
+
+		bool QueryCallback(int32 proxyId);
+	};
+	
 	template <class P, void (Box2DCollisionObject::*on_thing_inout)(P *)>
 	class CollisionUpdateQueue {
 	private:
@@ -256,21 +290,29 @@ private:
 private:
 	Vector2 gravity;
 	bool auto_step{true};
+
 	b2World *world = NULL;
+
+	float last_step_delta = 0.0f;
 
 	CollisionUpdateQueue<Box2DCollisionObject, &Box2DCollisionObject::_on_object_entered> object_entered_queue;
 	CollisionUpdateQueue<Box2DCollisionObject, &Box2DCollisionObject::_on_object_exited> object_exited_queue;
 	CollisionUpdateQueue<Box2DFixture, &Box2DCollisionObject::_on_fixture_entered> fixture_entered_queue;
 	CollisionUpdateQueue<Box2DFixture, &Box2DCollisionObject::_on_fixture_exited> fixture_exited_queue;
 
+	// TODO make sure these are using the best data structure
 	Set<Box2DCollisionObject *> body_owners;
 	Set<Box2DJoint *> joint_owners;
+
+	// b2World Callbacks
+	// TODO extract into classes
 
 	virtual void SayGoodbye(b2Joint *joint) override;
 	virtual void SayGoodbye(b2Fixture *fixture) override;
 
 	virtual bool ShouldCollide(b2Fixture *fixtureA, b2Fixture *fixtureB) override;
 
+	// TODO class ContactManager
 	int32_t next_contact_id = 0;
 	bool flag_rescan_contacts_monitored = false;
 	HashMap<uint64_t, ContactBufferManifold> contact_buffer;
@@ -288,6 +330,7 @@ private:
 	/// in a separate data structure.
 	/// Note: this is only called for contacts that are touching, solid, and awake.
 	virtual void PostSolve(b2Contact *contact, const b2ContactImpulse *impulse) override;
+	// end TODO
 
 	PointQueryCallback point_callback;
 	RaycastQueryCallback ray_callback;
@@ -298,6 +341,24 @@ private:
 
 	void create_b2World();
 	void destroy_b2World();
+
+	struct TestMotionTOIResult {
+		bool collision;
+
+		b2Fixture *col_fixture;
+		int col_child_index;
+
+		int test_shape_index;
+		int test_shape_child_index;
+
+		int manifold_pt_count;
+		b2WorldManifold manifold;
+	};
+
+	float _test_motion_toi(const Vector<const b2Shape *> &p_test_shapes, const MotionQueryParameters &p_params, TestMotionTOIResult *r_result);
+
+	bool _solve_position_step(const Vector<const b2Shape *> &p_body_shapes, const MotionQueryParameters &p_params, b2Vec2 &r_correction) const;
+	b2Vec2 _solve_position(const Vector<const b2Shape *> &p_body_shapes, const MotionQueryParameters &p_params, int p_solve_steps = 4) const;
 
 protected:
 	void _notification(int p_what);
@@ -310,6 +371,8 @@ public:
 
 	void step(float p_step);
 
+	float get_last_step_delta() const;
+
 	void set_gravity(const Vector2 &gravity);
 	Vector2 get_gravity() const;
 
@@ -321,12 +384,15 @@ public:
 	//void shiftOrigin(const Vector2 &newOrigin);
 
 	// Godot space query API
-	// What is collide_shape? Does this return manifold points?
-	//Array collide_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
+	// TODO What is collide_shape? Does this return manifold points? //Array collide_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
 	Array intersect_point(const Vector2 &p_point, int p_max_results = 32, const Vector<int64_t> &p_exclude = Vector<int64_t>(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false, uint32_t p_collision_layer = 0x0, int32_t p_group_index = 0);
 	Dictionary intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Vector<int64_t> &p_exclude = Vector<int64_t>(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false, uint32_t p_collision_layer = 0x0, int32_t p_group_index = 0);
 	Array intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
 	Array cast_motion(const Ref<Box2DShapeQueryParameters> &p_query);
+
+	// This is by-default continuous collision. Is this slow? TODO test or remove commented code
+	bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, MotionResult *r_result = nullptr);
+	bool _body_test_motion_binding(const Object *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<PhysicsTestMotionResult2D>());
 
 	// Box2D space query API
 	void query_aabb(const Rect2 &p_aabb, const Callable &p_callback);
@@ -334,6 +400,30 @@ public:
 
 	Box2DWorld();
 	~Box2DWorld();
+};
+
+class Box2DPhysicsTestMotionResult : public Reference {
+	GDCLASS(Box2DPhysicsTestMotionResult, Reference);
+
+	friend class Box2DWorld;
+
+	Box2DWorld::MotionResult result;
+
+protected:
+	static void _bind_methods();
+
+public:
+	bool is_colliding() const;
+	Vector2 get_motion() const;
+	Vector2 get_motion_remainder() const;
+
+	Vector2 get_collision_point() const;
+	Vector2 get_collision_normal() const;
+	Vector2 get_collider_velocity() const;
+	Box2DFixture *get_collider_fixture() const;
+	ObjectID get_collider_fixture_id() const;
+	Box2DFixture *get_local_fixture() const;
+	ObjectID get_local_fixture_id() const;
 };
 
 #endif // BOX2D_WORLD_H

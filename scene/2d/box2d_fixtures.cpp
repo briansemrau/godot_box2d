@@ -32,13 +32,13 @@ void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDe
 	// Transform shape with local transform
 	switch (p_def.shape->m_type) {
 		case b2Shape::Type::e_circle: {
-			b2CircleShape shp = b2CircleShape(*dynamic_cast<const b2CircleShape *>(p_def.shape));
+			b2CircleShape shp = b2CircleShape(*static_cast<const b2CircleShape *>(p_def.shape));
 			shp.m_p = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_p)));
 			finalDef.shape = &shp;
 			p_fixture_out = owner_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
 		} break;
 		case b2Shape::Type::e_edge: {
-			b2EdgeShape shp = b2EdgeShape(*dynamic_cast<const b2EdgeShape *>(p_def.shape));
+			b2EdgeShape shp = b2EdgeShape(*static_cast<const b2EdgeShape *>(p_def.shape));
 			shp.m_vertex0 = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertex0)));
 			shp.m_vertex1 = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertex1)));
 			shp.m_vertex2 = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertex2)));
@@ -47,7 +47,7 @@ void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDe
 			p_fixture_out = owner_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
 		} break;
 		case b2Shape::Type::e_polygon: {
-			b2PolygonShape shp = b2PolygonShape(*dynamic_cast<const b2PolygonShape *>(p_def.shape));
+			b2PolygonShape shp = b2PolygonShape(*static_cast<const b2PolygonShape *>(p_def.shape));
 			for (int i = 0; i < shp.m_count; i++) {
 				shp.m_vertices[i] = gd_to_b2(p_shape_xform.xform(b2_to_gd(shp.m_vertices[i])));
 				shp.m_normals[i] = gd_to_b2(p_shape_xform.basis_xform(b2_to_gd(shp.m_normals[i])));
@@ -57,7 +57,7 @@ void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDe
 			p_fixture_out = owner_node->body->CreateFixture(&finalDef); // Write here because shp is in scope
 		} break;
 		case b2Shape::Type::e_chain: {
-			const b2ChainShape *p_def_chain_shape = dynamic_cast<const b2ChainShape *>(p_def.shape);
+			const b2ChainShape *p_def_chain_shape = static_cast<const b2ChainShape *>(p_def.shape);
 			b2ChainShape shp;
 			shp.CreateChain(p_def_chain_shape->m_vertices, p_def_chain_shape->m_count, p_def_chain_shape->m_prevVertex, p_def_chain_shape->m_nextVertex);
 			for (int i = 0; i < shp.m_count; i++) {
@@ -264,6 +264,8 @@ void Box2DFixture::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_collision_exceptions"), &Box2DFixture::get_collision_exceptions);
 	ClassDB::bind_method(D_METHOD("add_collision_exception_with", "fixture"), &Box2DFixture::add_collision_exception_with);
 	ClassDB::bind_method(D_METHOD("remove_collision_exception_with", "fixture"), &Box2DFixture::remove_collision_exception_with);
+
+	ClassDB::bind_method(D_METHOD("get_collision_object"), &Box2DFixture::get_owner);
 
 	ClassDB::bind_method(D_METHOD("_shape_changed"), &Box2DFixture::_shape_changed);
 
