@@ -14,7 +14,7 @@ Using [Box2D v2.4.1](https://github.com/erincatto/box2d)
 This module should work on all platforms.
 
 This module supports Godot 4.0.
-There is an occasionally update 3.2 branch.
+There is an occasionally updated 3.2 branch.
 
 ## Purpose
 
@@ -27,9 +27,7 @@ This module also bridges the gap between Box2D features and Godot 2D physics fea
 This is a list of unimplemented features that are planned:
 
 - All remaining Box2D joints not yet implemented
-- Area2D equivalent area effects (gravity/damping modifiers)
-- Run Box2D computation on a separate thread
-- Look into a [multithreaded implementation of Box2D](https://github.com/jhoffman0x/Box2D-MT)
+- Multithreading
 
 If this list is missing anything important or desirable, feel free to submit an issue so that it can be discussed.
 
@@ -43,7 +41,7 @@ Unlike Godot 2D physics, this module does not add a physics server (..yet). Inst
 
 To use this module, first add a `Box2DWorld` node to the scene. This node must be the "ancestor" to any and all `Box2D` nodes you use within this world. (It's okay to have multiple `Box2DWorld` nodes in one scene, but they will not interact, nor their bodies nor joints.)
 
-To create a body, add a `Box2DPhysicsBody` in the node hierarchy beneath the world. This node will do nothing until you add a `Box2DFixture` node as a direct child. The body type (rigid/static/kinematic) is selected with the property `Box2DPhysicsBody.type`.
+To create a body, add a `Box2DPhysicsBody` in the node hierarchy beneath the world. To add collision, add a `Box2DFixture` node as a child. The body type (rigid/static/kinematic) is selected with the property `Box2DPhysicsBody.type`.
 
 Here is an example of a functional scene tree:
 
@@ -89,7 +87,7 @@ For Godot 3.2 use: `git clone -b 3.2 https://github.com/godotengine/godot.git go
 2. Clone this module and init submodules (box2d) inside the modules folder:
 ```
 cd ./godot/modules
-git clone https://github.com/briansemrau/
+git clone https://github.com/briansemrau/godot_box2d.git
 cd godot_box2d
 git submodule update --init --recursive
 ```
@@ -104,7 +102,7 @@ https://docs.godotengine.org/en/latest/development/compiling/index.html
 Box2D has...
 -  A _lot_ of new joints:
     - [Distance joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md85) (Equivalent to `GrooveJoint2D` or `DampedSpringJoint2D`)
-    - [Revolute joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md86) (`PinJoint2D`, but with limits and a motor)
+    - [Revolute joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md86) (`PinJoint2D`, but with configurable limits and a motor)
     - [Prismatic joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md87) (Similar to `GrooveJoint2D`, but with fixed rotation)
     - [Pulley joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md88) (⚠ unimplemented)
     - [Gear joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md89) (⚠ unimplemented)
@@ -113,13 +111,13 @@ Box2D has...
     - [Rope](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md93) (⚠ unimplemented)
     - [Friction joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md94) (⚠ unimplemented)
     - [Motor joint](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md95) (⚠ unimplemented)
-- Continuous collision detection (CCD) between dynamic rigid bodies and other dynamic rigid bodies.  In Godot 2D physics, CCD is limited to dynamic and static bodies (and somewhat currently broken).  In Box2D, you can fire a high-speed bullet at a stack of bricks and blow them up.
-- Improved physics stability in some cases.  For the same input, and same binary, Box2D will reproduce any simulation. 
+- Continuous collision detection (CCD) between dynamic rigid bodies and other dynamic rigid bodies.  In Godot 2D physics, CCD is limited to dynamic and static bodies (and somewhat currently broken). In Box2D, you can fire a high-speed bullet at a stack of bricks and blow them up.
+- Improved physics stability in some cases. For the same input, and same binary, Box2D will reproduce any simulation.
 - Features that support game mechanics that are near-impossible with Godot:
-    - Automatically calculated mass properties (body center of mass, body mass given material density, etc.)
-    - Joints report what forces they're exerting (allows for breakable joints)
-    - Contacts report collision impulse (necessary for destructible bodies)
-    - Material (collision) property settings *per shape*, not just per body.  For exampe, this allows you to have a bumper shape attached to a car body with a different restitution property than say a side panel shape.
+    - Automatically calculated mass properties from shape density
+    - Joints measure the linear/angular forces they're exerting (allows for breakable joints)
+    - Contacts report collision impulse (necessary for destructible/crushable bodies)
+    - Material (collision) property settings *per shape*, not just per body.  For example, this allows you to have a bumper shape attached to a car body with a different restitution property than say a side panel shape.
     
 
 ### Guide for Switching from Godot Physics to Box2D:
@@ -128,8 +126,8 @@ Many features of Box2D have very clear parallels to Godot physics. Here are a fe
 
 | Godot Physics feature | Godot Box2D module equivalent |
 |-|-|
-| `PhysicsBody2D` nodes (Rigid, Static, Kinematic) | Use `Box2DPhysicsBody`. Use `type` property to change body type. Material properties are set using fixtures. |
-| `Area2D` node | Use a `Box2DFixture` with the `sensor` property enabled. Be sure to enable contact monitoring on the body. |
+| `PhysicsBody2D` nodes (Rigid, Static, Kinematic) | Use `Box2DPhysicsBody`. Use the `type` property to change body type. Material properties are set using fixtures. |
+| `Area2D` node | Use `Box2DArea`. They should behave nearly identically. |
 | `CollisionShape2D`/`CollisionPolygon2D` nodes | Use `Box2DFixture` and set the `shape` property. |
 | `Joint2D` nodes (Pin, Groove, Spring) | Use variants of `Box2DJoint`. |
 
@@ -143,7 +141,7 @@ Gives joints new properties:
 - `max_force` and `max_torque`: Maximum linear force and torque. Either can be disabled by setting the property to 0.
 
 ### Flexible Box2DWorld node transformations 
-The physics body/fixture transformations are synced to nearest ancestor Box2dWorld node's coordinate space.  That means that none of your physics objects are transformed into the global space.  This is more flexible than a global space sync because it means that any transformations ABOVE your Box2DWorld node will 'just work' as expected.  This also means, you don't need an additional viewport or camera to do things like a HUD layer, while transforming your view of the physics space.  You can simply move, rotate, and scale your world node, (or any node ABOVE it), like any other node in your scene tree, and things will just work as expected.
+The physics body/fixture transformations are synced to nearest ancestor Box2DWorld node's coordinate space.  That means that none of your physics objects are transformed into the global space.  This is more flexible than a global space sync because it means that any transformations ABOVE your Box2DWorld node will 'just work' as expected.  This also means, you don't need an additional viewport or camera to do things like a HUD layer, while transforming your view of the physics space.  You can simply move, rotate, and scale your world node, (or any node ABOVE it), like any other node in your scene tree, and things will just work as expected.
 
 # Contributing
 

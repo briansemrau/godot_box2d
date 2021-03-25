@@ -1,9 +1,9 @@
 #ifndef BOX2D_FIXTURES_H
 #define BOX2D_FIXTURES_H
 
-#include <core/object.h>
-#include <core/reference.h>
-#include <core/resource.h>
+#include <core/object/object.h>
+#include <core/object/reference.h>
+#include <core/io/resource.h>
 #include <scene/2d/node_2d.h>
 
 #include <box2d/b2_chain_shape.h>
@@ -14,7 +14,7 @@
 
 #include "../../util/box2d_types_converter.h"
 #include "../resources/box2d_shapes.h"
-#include "box2d_physics_body.h"
+#include "box2d_collision_object.h"
 #include "box2d_world.h"
 
 /**
@@ -37,7 +37,7 @@ class Box2DFixture : public Node2D {
 	VSet<Box2DFixture *> filtering_me;
 	// TODO might fixtures need to filter other whole bodies?
 
-	Box2DPhysicsBody *body_node = NULL;
+	Box2DCollisionObject *owner_node = NULL;
 
 	Vector<b2Fixture *> fixtures;
 
@@ -59,11 +59,13 @@ protected:
 	static void _bind_methods();
 
 public:
-#ifdef TOOLS_ENABLED
+	inline const Box2DCollisionObject *_get_owner_node() const { return owner_node; }
+
 	virtual bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const override;
-#endif
 
 	virtual String get_configuration_warning() const override;
+
+	Box2DCollisionObject *get_owner() const { return owner_node; }
 
 	//virtual bool test_point(const Point2 &p_point); // TODO figure out how to handle this with edge/chain/(semantic poly made of chain?)
 

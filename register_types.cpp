@@ -1,7 +1,10 @@
 #include "register_types.h"
 
+#include "editor/box2d_joint_editor_plugin.h"
 #include "editor/box2d_polygon_editor_plugin.h"
 #include "editor/box2d_shape_editor_plugin.h"
+#include "scene/2d/box2d_area.h"
+#include "scene/2d/box2d_collision_object.h"
 #include "scene/2d/box2d_fixtures.h"
 #include "scene/2d/box2d_joints.h"
 #include "scene/2d/box2d_physics_body.h"
@@ -14,11 +17,19 @@
 
 void register_godot_box2d_types() {
 	GLOBAL_DEF("physics/2d/box2d_conversion_factor", 50.0f);
-	ProjectSettings::get_singleton()->set_custom_property_info("physics/2d/box2d_conversion_factor", PropertyInfo(Variant::REAL, "physics/2d/box2d_conversion_factor"));
+	ProjectSettings::get_singleton()->set_custom_property_info("physics/2d/box2d_conversion_factor", PropertyInfo(Variant::FLOAT, "physics/2d/box2d_conversion_factor"));
 
+	ClassDB::register_class<Box2DShapeQueryParameters>();
 	ClassDB::register_class<Box2DWorld>();
+
+	ClassDB::register_virtual_class<Box2DCollisionObject>();
+	ClassDB::register_class<Box2DPhysicsTestMotionResult>();
 	ClassDB::register_class<Box2DPhysicsBody>();
+	ClassDB::register_class<Box2DKinematicCollision>();
+	ClassDB::register_class<Box2DArea>();
+
 	ClassDB::register_class<Box2DFixture>();
+
 	ClassDB::register_virtual_class<Box2DShape>();
 	ClassDB::register_class<Box2DCircleShape>();
 	ClassDB::register_class<Box2DRectShape>();
@@ -36,6 +47,7 @@ void register_godot_box2d_types() {
 #ifdef TOOLS_ENABLED
 	EditorPlugins::add_by_type<Box2DPolygonEditorPlugin>();
 	EditorPlugins::add_by_type<Box2DShapeEditorPlugin>();
+	EditorPlugins::add_by_type<Box2DJointEditorPlugin>();
 #endif
 }
 
