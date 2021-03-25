@@ -91,7 +91,7 @@ void Box2DCollisionObject::set_box2dworld_transform(const Transform2D &p_transfo
 	set_transform(target_xform);
 }
 
-Transform2D Box2DCollisionObject::get_box2dworld_transform() {
+Transform2D Box2DCollisionObject::get_box2dworld_transform() const {
 	std::vector<Transform2D> transforms{};
 	transforms.push_back(get_transform());
 	Node *parent = get_parent();

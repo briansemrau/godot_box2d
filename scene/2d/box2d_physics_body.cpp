@@ -149,11 +149,11 @@ void Box2DPhysicsBody::_compute_area_effects(const Box2DArea *p_area, b2Vec2 &r_
 	b2Body *body = _get_b2Body();
 
 	if (p_area->is_gravity_a_point()) {
-		if (p_area->get_gravity_distance_scale() > 0) {
-			Vector2 v = p_area->get_transform().xform(p_area->get_gravity_vector()) - get_transform().get_origin();
-			r_gravity += gd_to_b2(v.normalized() * (p_area->get_gravity() / Math::pow(v.length() * p_area->get_gravity_distance_scale() + 1, 2)));
+		Vector2 r = p_area->get_box2dworld_transform().xform(p_area->get_gravity_vector()) - get_box2dworld_transform().get_origin();
+		if (p_area->get_gravity_distance_scale() > 0.0f) {
+			r_gravity += gd_to_b2(r.normalized() * (p_area->get_gravity() / Math::pow(r.length() * p_area->get_gravity_distance_scale() + 1.0f, 2.0f)));
 		} else {
-			r_gravity += gd_to_b2((p_area->get_transform().xform(p_area->get_gravity_vector()) - get_transform().get_origin()).normalized() * p_area->get_gravity());
+			r_gravity += gd_to_b2(r.normalized() * p_area->get_gravity());
 		}
 	} else {
 		r_gravity += gd_to_b2(p_area->get_gravity_vector() * p_area->get_gravity());
@@ -230,13 +230,16 @@ void Box2DPhysicsBody::_update_area_effects() {
 
 	gravity *= get_gravity_scale() * body->GetMass();
 
-	body->ApplyForceToCenter(gravity, false);
+	const bool wake = gravity != last_area_gravity;
+	body->ApplyForceToCenter(gravity, wake);
 	if (linear_damp >= 0) {
 		body->SetLinearDamping(linear_damp);
 	}
 	if (angular_damp >= 0) {
 		body->SetLinearDamping(angular_damp);
 	}
+
+	last_area_gravity = gravity;
 }
 
 void Box2DPhysicsBody::_on_object_entered(Box2DCollisionObject *p_object) {

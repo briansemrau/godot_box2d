@@ -75,6 +75,26 @@ private:
 	};
 
 	Vector<Box2DAreaItem> colliding_areas;
+	b2Vec2 last_area_gravity;
+
+	Transform2D prev_xform; // For calculating kinematic body movement velocity
+	Transform2D next_xform;
+	bool integrate_position = false; // Default false is Godot behavior, true is Box2D behavior
+	bool sync_to_physics = false;
+
+	Ref<Box2DKinematicCollision> motion_cache;
+
+	Vector2 floor_normal{};
+	Vector2 floor_velocity{};
+	ObjectID on_floor_body{};
+	bool on_floor{ false };
+	bool on_ceiling{ false };
+	bool on_wall{ false };
+
+	// Used for move_and_slide/_with_snap
+	std::vector<KinematicCollision> kinematic_colliders;
+	Vector<Ref<Box2DKinematicCollision>> kinematic_colliders_refcache;
+	Ref<Box2DKinematicCollision> kinematic_motion_cache;
 
 	Transform2D prev_xform; // For calculating kinematic body movement velocity
 	Transform2D next_xform;

@@ -67,8 +67,32 @@ void Box2DArea::_on_fixture_exited(Box2DFixture *p_fixture) {
 	}
 }
 
+void Box2DArea::pre_step(float p_delta) {
+	Transform2D motion = last_step_xform.affine_inverse() * get_box2dworld_transform();
+
+	Vector2 lin_vel = motion.get_origin() / p_delta;
+	float ang_vel = motion.get_rotation() / p_delta;
+
+	b2Body *body = _get_b2Body();
+	if (body) {
+		body->SetLinearVelocity(gd_to_b2(lin_vel));
+		body->SetAngularVelocity(ang_vel);
+	}
+
+	last_step_xform = get_box2dworld_transform();
+}
+
 void Box2DArea::_notification(int p_what) {
 	switch (p_what) {
+		case NOTIFICATION_ENTER_TREE: {
+			last_step_xform = get_box2dworld_transform();
+		}
+
+		case Box2DWorld::NOTIFICATION_WORLD_STEPPED: {
+			// Don't sync physics position
+			// This allows areas to move with the scene transform under other physics objects
+		} break;
+
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
 			// Send new transform to physics
 			Transform2D new_xform = get_box2dworld_transform();
@@ -80,6 +104,8 @@ void Box2DArea::_notification(int p_what) {
 			if (body) {
 				body->SetTransform(gd_to_b2(new_xform.get_origin()), new_xform.get_rotation());
 			}
+
+			last_step_xform = new_xform;
 		} break;
 	}
 }
@@ -135,13 +161,13 @@ void Box2DArea::_bind_methods() {
 
 	ADD_SIGNAL(MethodInfo("body_fixture_entered", PropertyInfo(Variant::OBJECT, "fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture"), PropertyInfo(Variant::OBJECT, "local_fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture")));
 	ADD_SIGNAL(MethodInfo("body_fixture_exited", PropertyInfo(Variant::OBJECT, "fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture"), PropertyInfo(Variant::OBJECT, "local_fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture")));
-	ADD_SIGNAL(MethodInfo("body_entered", PropertyInfo(Variant::OBJECT, "body", PROPERTY_HINT_RESOURCE_TYPE, "Box2DPhysicsBody")));
-	ADD_SIGNAL(MethodInfo("body_exited", PropertyInfo(Variant::OBJECT, "body", PROPERTY_HINT_RESOURCE_TYPE, "Box2DPhysicsBody")));
+	ADD_SIGNAL(MethodInfo(SceneStringNames::get_singleton()->body_entered, PropertyInfo(Variant::OBJECT, "body", PROPERTY_HINT_RESOURCE_TYPE, "Box2DPhysicsBody")));
+	ADD_SIGNAL(MethodInfo(SceneStringNames::get_singleton()->body_exited, PropertyInfo(Variant::OBJECT, "body", PROPERTY_HINT_RESOURCE_TYPE, "Box2DPhysicsBody")));
 
 	ADD_SIGNAL(MethodInfo("area_fixture_entered", PropertyInfo(Variant::OBJECT, "fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture"), PropertyInfo(Variant::OBJECT, "local_fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture")));
 	ADD_SIGNAL(MethodInfo("area_fixture_exited", PropertyInfo(Variant::OBJECT, "fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture"), PropertyInfo(Variant::OBJECT, "local_fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture")));
-	ADD_SIGNAL(MethodInfo("area_entered", PropertyInfo(Variant::OBJECT, "area", PROPERTY_HINT_RESOURCE_TYPE, "Box2DArea")));
-	ADD_SIGNAL(MethodInfo("area_exited", PropertyInfo(Variant::OBJECT, "area", PROPERTY_HINT_RESOURCE_TYPE, "Box2DArea")));
+	ADD_SIGNAL(MethodInfo(SceneStringNames::get_singleton()->area_entered, PropertyInfo(Variant::OBJECT, "area", PROPERTY_HINT_RESOURCE_TYPE, "Box2DArea")));
+	ADD_SIGNAL(MethodInfo(SceneStringNames::get_singleton()->area_exited, PropertyInfo(Variant::OBJECT, "area", PROPERTY_HINT_RESOURCE_TYPE, "Box2DArea")));
 
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "space_override", PROPERTY_HINT_ENUM, "Disabled,Combine,Combine-Replace,Replace,Replace-Combine"), "set_space_override_mode", "get_space_override_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "gravity_point"), "set_gravity_is_point", "is_gravity_a_point");
@@ -251,12 +277,16 @@ int Box2DArea::get_priority() const {
 }
 
 void Box2DArea::set_monitoring(bool p_enable) {
-	if (monitoring != p_enable) {
-		if (space_override != Box2DArea::SpaceOverride::SPACE_OVERRIDE_DISABLED)
-			_set_contact_monitor(true);
-		else if (!p_enable)
-			_set_contact_monitor(false);
+	if (monitoring == p_enable) {
+		return;
 	}
+
+	if (p_enable || space_override != Box2DArea::SpaceOverride::SPACE_OVERRIDE_DISABLED) {
+		_set_contact_monitor(true);
+	} else {
+		_set_contact_monitor(false);
+	}
+
 	monitoring = p_enable;
 }
 
@@ -361,7 +391,8 @@ StringName Box2DArea::get_audio_bus_name() const {
 }
 
 Box2DArea::Box2DArea() {
-	bodyDef.type = b2BodyType::b2_kinematicBody;
+	bodyDef.type = b2BodyType::b2_dynamicBody;
+	bodyDef.gravityScale = 0.0f;
 }
 
 Box2DArea::~Box2DArea() {
