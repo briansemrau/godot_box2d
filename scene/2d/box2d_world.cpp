@@ -1113,7 +1113,7 @@ Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, con
 Dictionary Box2DWorld::intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Vector<int64_t> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_sensors, uint32_t p_collision_layer, int32_t p_group_index) {
 	// This function uses queries in Box2DWorld-local space, not global space
 
-	ERR_FAIL_COND_V_MSG(!(p_to - p_from).length_squared() > 0.0f, Dictionary{}, "Raycast queries must have valid vector inputs.");
+	ERR_FAIL_COND_V_MSG(!((p_to - p_from).length_squared() > 0.0f), Dictionary{}, "Raycast queries must have valid vector inputs.");
 
 	ray_callback.result.fixture = NULL;
 
@@ -1349,7 +1349,7 @@ void Box2DWorld::query_aabb(const Rect2 &p_bounds, const Callable &p_callback) {
 }
 
 void Box2DWorld::raycast(const Vector2 &p_from, const Vector2 &p_to, const Callable &p_callback) {
-	ERR_FAIL_COND_MSG(!(p_to - p_from).length_squared() > 0.0f, "Raycast queries must have valid vector inputs.");
+	ERR_FAIL_COND_MSG(!((p_to - p_from).length_squared() > 0.0f), "Raycast queries must have valid vector inputs.");
 
 	// This function uses queries in Box2DWorld-local space, not global space
 	user_raycast_callback.handled_fixtures.clear();

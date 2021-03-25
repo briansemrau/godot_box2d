@@ -140,7 +140,6 @@ void Box2DRectShape::_bind_methods() {
 void Box2DRectShape::set_size(const Vector2 &p_size) {
 	set_width(p_size.width);
 	set_height(p_size.height);
-	_change_notify();
 }
 
 Vector2 Box2DRectShape::get_size() const {
@@ -151,7 +150,6 @@ void Box2DRectShape::set_width(real_t p_width) {
 	const float factor = GD_TO_B2;
 	width = MAX(p_width * factor, b2_linearSlop) / factor;
 	shape.SetAsBox(width * factor * 0.5, height * factor * 0.5);
-	_change_notify();
 	emit_changed();
 }
 
@@ -163,7 +161,6 @@ void Box2DRectShape::set_height(real_t p_height) {
 	const float factor = GD_TO_B2;
 	height = MAX(p_height * factor, b2_linearSlop) / factor;
 	shape.SetAsBox(width * factor * 0.5, height * factor * 0.5);
-	_change_notify();
 	emit_changed();
 }
 

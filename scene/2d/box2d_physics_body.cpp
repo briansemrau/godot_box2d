@@ -938,8 +938,6 @@ void Box2DPhysicsBody::set_integrate_position(bool p_integrate_pos) {
 		teleport(get_box2dworld_transform());
 	}
 
-	_change_notify("integrate_position");
-
 	if (integrate_position && sync_to_physics) {
 		WARN_PRINT("Enabling both sync_to_physics and integrate_position is not supported. Disabling sync_to_physics.");
 		set_sync_to_physics(false);
@@ -1160,8 +1158,6 @@ void Box2DPhysicsBody::set_sync_to_physics(bool p_enable) {
 	}
 	ERR_FAIL_COND_MSG(get_type() != Mode::MODE_KINEMATIC, "The property sync_to_physics has no effect on non-kinematic bodies.");
 	sync_to_physics = p_enable;
-
-	_change_notify("sync_to_physics");
 
 	if (integrate_position && sync_to_physics) {
 		WARN_PRINT("Enabling both sync_to_physics and integrate_position is not supported. Disabling integrate_position.");
