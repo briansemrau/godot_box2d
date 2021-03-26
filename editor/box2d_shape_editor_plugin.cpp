@@ -348,7 +348,8 @@ void Box2DShapeEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 
 	Transform2D gt = canvas_item_editor->get_canvas_transform() * node->get_global_transform();
 
-	Ref<Texture> h = get_icon("EditorHandle", "EditorIcons");
+	Ref<Theme> theme = EditorNode::get_singleton()->get_editor_theme();
+	Ref<Texture> h = theme->get_icon("EditorHandle", "EditorIcons");
 	Vector2 size = h->get_size() * 0.5;
 
 	handles.clear();

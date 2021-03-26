@@ -1,6 +1,8 @@
 #include "box2d_shapes.h"
 
 #include <core/project_settings.h>
+#include <core/math/geometry.h>
+//#include <servers/rendering_server.h>
 #include <servers/visual_server.h>
 
 #include "../../util/box2d_types_converter.h"
@@ -69,7 +71,14 @@ bool Box2DShape::is_composite_shape() const {
 }
 
 const Vector<const b2Shape *> Box2DShape::get_shapes() const {
-	ERR_FAIL_V(Vector<const b2Shape *>());
+	if (is_composite_shape()) {
+		CRASH_NOW_MSG("Box2DShape::get_shapes must be overridden by all composite shapes.");
+		ERR_FAIL_V(Vector<const b2Shape *>());
+	} else {
+		Vector<const b2Shape *> vec;
+		vec.push_back(get_shape());
+		return vec;
+	}
 }
 
 bool Box2DShape::_edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const {
@@ -710,7 +719,7 @@ void Box2DCapsuleShape::set_height(real_t p_height) {
 	const float hy = p_height * GD_TO_B2 * 0.5f;
 	topCircleShape.m_p.y = -hy;
 	bottomCircleShape.m_p.y = hy;
-	rectShape.SetAsBox(radius, hy);
+	rectShape.SetAsBox(hy, hy);
 
 	emit_changed();
 }
@@ -725,7 +734,7 @@ void Box2DCapsuleShape::set_radius(real_t p_radius) {
 	const float r = MAX(p_radius * GD_TO_B2, b2_linearSlop);
 	topCircleShape.m_radius = r;
 	bottomCircleShape.m_radius = r;
-	rectShape.SetAsBox(radius, height * GD_TO_B2 * 0.5f);
+	rectShape.SetAsBox(r, height * GD_TO_B2 * 0.5f);
 
 	emit_changed();
 }
