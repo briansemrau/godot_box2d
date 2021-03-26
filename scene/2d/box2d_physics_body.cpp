@@ -1,6 +1,7 @@
 #include "box2d_physics_body.h"
 
-#include <core/config/engine.h>
+#include <core/engine.h>
+#include <core/method_bind_ext.gen.inc>
 #include <scene/scene_string_names.h>
 
 #include "box2d_area.h"
@@ -502,7 +503,7 @@ void Box2DPhysicsBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_sync_to_physics", "enable"), &Box2DPhysicsBody::set_sync_to_physics);
 	ClassDB::bind_method(D_METHOD("is_sync_to_physics_enabled"), &Box2DPhysicsBody::is_sync_to_physics_enabled);
 
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_scale", PROPERTY_HINT_RANGE, "-128,128,0.01"), "set_gravity_scale", "get_gravity_scale");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "gravity_scale", PROPERTY_HINT_RANGE, "-128,128,0.01"), "set_gravity_scale", "get_gravity_scale");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM, "Static,Kinematic,Rigid"), "set_type", "get_type");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bullet"), "set_bullet", "is_bullet");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "fixed_rotation"), "set_fixed_rotation", "is_fixed_rotation");
@@ -515,15 +516,15 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sync_to_physics"), "set_sync_to_physics", "is_sync_to_physics_enabled");
 	ADD_GROUP("Linear", "linear_");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "linear_velocity"), "set_linear_velocity", "get_linear_velocity");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "linear_damping", PROPERTY_HINT_RANGE, "-1,1,0.001"), "set_linear_damping", "get_linear_damping");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "linear_damping", PROPERTY_HINT_RANGE, "-1,1,0.001"), "set_linear_damping", "get_linear_damping");
 	ADD_GROUP("Angular", "angular_");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "angular_velocity"), "set_angular_velocity", "get_angular_velocity");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "angular_damping"), "set_angular_damping", "get_angular_damping");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "angular_velocity"), "set_angular_velocity", "get_angular_velocity");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "angular_damping"), "set_angular_damping", "get_angular_damping");
 	ADD_GROUP("", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_custom_massdata"), "set_use_custom_massdata", "get_use_custom_massdata");
 	ADD_GROUP("Custom Mass Data", "custom_");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "custom_mass", PROPERTY_HINT_EXP_RANGE, "0.01,65535,0.01"), "set_custom_mass", "get_custom_mass");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "custom_inertia", PROPERTY_HINT_EXP_RANGE, "0.01,65535,0.01"), "set_custom_inertia", "get_custom_inertia");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "custom_mass", PROPERTY_HINT_EXP_RANGE, "0.01,65535,0.01"), "set_custom_mass", "get_custom_mass");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "custom_inertia", PROPERTY_HINT_EXP_RANGE, "0.01,65535,0.01"), "set_custom_inertia", "get_custom_inertia");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "custom_center_of_mass"), "set_custom_center_of_mass", "get_custom_center_of_mass");
 
 	ADD_SIGNAL(MethodInfo("body_fixture_entered", PropertyInfo(Variant::OBJECT, "fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture"), PropertyInfo(Variant::OBJECT, "local_fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture")));
@@ -535,6 +536,8 @@ void Box2DPhysicsBody::_bind_methods() {
 	BIND_ENUM_CONSTANT(MODE_RIGID);
 	BIND_ENUM_CONSTANT(MODE_STATIC);
 	BIND_ENUM_CONSTANT(MODE_KINEMATIC);
+
+	ClassDB::bind_method(D_METHOD("_remove_area_variant"), &Box2DPhysicsBody::_remove_area_variant);
 }
 
 void Box2DPhysicsBody::_add_area(Box2DArea *p_area) {
@@ -544,7 +547,7 @@ void Box2DPhysicsBody::_add_area(Box2DArea *p_area) {
 		colliding_areas.ordered_insert(item);
 		Vector<Variant> binds;
 		binds.push_back(Variant(p_area));
-		p_area->connect(SceneStringNames::get_singleton()->tree_exited, callable_mp(this, &Box2DPhysicsBody::_remove_area_variant), binds, Object::ConnectFlags::CONNECT_ONESHOT);
+		p_area->connect(SceneStringNames::get_singleton()->tree_exited, this, "_remove_area_variant", binds, Object::ConnectFlags::CONNECT_ONESHOT);
 	}
 }
 
@@ -552,7 +555,7 @@ void Box2DPhysicsBody::_remove_area(Box2DArea *p_area) {
 	const int index = colliding_areas.find(Box2DAreaItem(p_area));
 	if (index > -1) {
 		colliding_areas.remove(index);
-		p_area->disconnect(SceneStringNames::get_singleton()->tree_exited, callable_mp(this, &Box2DPhysicsBody::_remove_area_variant));
+		p_area->disconnect(SceneStringNames::get_singleton()->tree_exited, this, "_remove_area_variant");
 	}
 }
 
@@ -938,6 +941,8 @@ void Box2DPhysicsBody::set_integrate_position(bool p_integrate_pos) {
 		teleport(get_box2dworld_transform());
 	}
 
+	_change_notify("integrate_position");
+
 	if (integrate_position && sync_to_physics) {
 		WARN_PRINT("Enabling both sync_to_physics and integrate_position is not supported. Disabling sync_to_physics.");
 		set_sync_to_physics(false);
@@ -993,7 +998,7 @@ Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const
 	Vector2 up_direction = p_up_direction.normalized();
 
 	Vector2 current_floor_velocity = floor_velocity;
-	if (on_floor && on_floor_body.is_valid()) {
+	if (on_floor && on_floor_body != 0) {
 		const Object *obj = ObjectDB::get_instance(on_floor_body);
 		const Box2DPhysicsBody *body = Object::cast_to<Box2DPhysicsBody>(obj);
 		if (body) {
@@ -1158,6 +1163,8 @@ void Box2DPhysicsBody::set_sync_to_physics(bool p_enable) {
 	}
 	ERR_FAIL_COND_MSG(get_type() != Mode::MODE_KINEMATIC, "The property sync_to_physics has no effect on non-kinematic bodies.");
 	sync_to_physics = p_enable;
+
+	_change_notify("sync_to_physics");
 
 	if (integrate_position && sync_to_physics) {
 		WARN_PRINT("Enabling both sync_to_physics and integrate_position is not supported. Disabling integrate_position.");

@@ -1,6 +1,6 @@
 #include "box2d_collision_object.h"
 
-#include <core/config/engine.h>
+#include <core/engine.h>
 
 #include "box2d_world.h"
 #include "box2d_fixtures.h"

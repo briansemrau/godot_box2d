@@ -2,6 +2,7 @@
 #define BOX2D_AREA_H
 
 #include <scene/2d/node_2d.h>
+#include <core/array.h>
 
 #include <box2d/b2_body.h>
 #include <box2d/b2_fixture.h>
@@ -95,8 +96,8 @@ public:
 	void set_collision_layer_bit(int p_bit, bool p_value);
 	bool get_collision_layer_bit(int p_bit) const;
 
-	TypedArray<Node2D> get_overlapping_bodies() const; // TODO should the return type be Box2DPhysicsObject?
-	TypedArray<Box2DArea> get_overlapping_areas() const;
+	Array get_overlapping_bodies() const;
+	Array get_overlapping_areas() const;
 
 	bool overlaps_area(Node *p_area) const;
 	bool overlaps_body(Node *p_body) const;

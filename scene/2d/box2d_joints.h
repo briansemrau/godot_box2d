@@ -1,9 +1,9 @@
 #ifndef BOX2D_JOINTS_H
 #define BOX2D_JOINTS_H
 
-#include <core/io/resource.h>
-#include <core/object/object.h>
-#include <core/object/reference.h>
+#include <core/resource.h>
+#include <core/object.h>
+#include <core/reference.h>
 #include <scene/2d/node_2d.h>
 
 #include <box2d/b2_distance_joint.h>

@@ -1,6 +1,6 @@
 #include "box2d_fixtures.h"
 
-#include <core/config/engine.h>
+#include <core/engine.h>
 
 #include "box2d_collision_object.h"
 #include "box2d_physics_body.h"
@@ -153,8 +153,8 @@ void Box2DFixture::_notification(int p_what) {
 			if (owner_node != new_owner) {
 				if (owner_node) {
 					if (owner_node->has_signal("sleeping_state_changed"))
-						owner_node->disconnect("sleeping_state_changed", Callable(this, "update"));
-					owner_node->disconnect("enabled_state_changed", Callable(this, "update"));
+						owner_node->disconnect("sleeping_state_changed", this, "update");
+					owner_node->disconnect("enabled_state_changed", this, "update");
 				}
 				destroy_b2();
 
@@ -162,9 +162,9 @@ void Box2DFixture::_notification(int p_what) {
 
 				if (owner_node) {
 					if (owner_node->has_signal("sleeping_state_changed")) {
-						owner_node->connect("sleeping_state_changed", Callable(this, "update"));
+						owner_node->connect("sleeping_state_changed", this, "update");
 					}
-					owner_node->connect("enabled_state_changed", Callable(this, "update"));
+					owner_node->connect("enabled_state_changed", this, "update");
 
 					if (Object::cast_to<Box2DArea>(owner_node)) {
 						set_sensor(true);
@@ -226,7 +226,7 @@ void Box2DFixture::_notification(int p_what) {
 			}
 
 			if (is_sensor()) {
-				draw_col = draw_col.lerp(Color(0.4f, 0.7f, 1.0f, 0.5f), 0.7f);
+				draw_col = draw_col.linear_interpolate(Color(0.4f, 0.7f, 1.0f, 0.5f), 0.7f);
 			}
 
 			if (shape.is_valid()) {
@@ -271,9 +271,9 @@ void Box2DFixture::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shape", PROPERTY_HINT_RESOURCE_TYPE, "Box2DShape"), "set_shape", "get_shape");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sensor"), "set_sensor", "is_sensor");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "density"), "set_density", "get_density");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "friction"), "set_friction", "get_friction");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "restitution"), "set_restitution", "get_restitution");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "density"), "set_density", "get_density");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "friction"), "set_friction", "get_friction");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "restitution"), "set_restitution", "get_restitution");
 	ADD_GROUP("Collision", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "override_body_collision"), "set_override_body_collision", "get_override_body_collision");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_layer", "get_collision_layer");
@@ -344,12 +344,12 @@ String Box2DFixture::get_configuration_warning() const {
 
 void Box2DFixture::set_shape(const Ref<Box2DShape> &p_shape) {
 	if (shape.is_valid()) {
-		shape->disconnect("changed", Callable(this, "_shape_changed"));
+		shape->disconnect("changed", this, "_shape_changed");
 	}
 	shape = p_shape;
 
 	if (shape.is_valid()) {
-		shape->connect("changed", Callable(this, "_shape_changed"));
+		shape->connect("changed", this, "_shape_changed");
 	}
 
 	emit_signal("_shape_type_changed");

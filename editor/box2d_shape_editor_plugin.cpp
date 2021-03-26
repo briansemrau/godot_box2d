@@ -148,6 +148,8 @@ void Box2DShapeEditor::set_handle(int idx, Point2 &p_point) {
 			ERR_PRINT("Invalid shape type");
 		} break;
 	}
+
+	node->get_shape()->_change_notify();
 }
 
 void Box2DShapeEditor::commit_handle(int idx, Variant &p_org) {
@@ -247,7 +249,7 @@ bool Box2DShapeEditor::forward_canvas_gui_input(const Ref<InputEvent> &p_event) 
 
 		Vector2 gpoint = mb->get_position();
 
-		if (mb->get_button_index() == MouseButton::MOUSE_BUTTON_LEFT) {
+		if (mb->get_button_index() == BUTTON_LEFT) {
 			if (mb->is_pressed()) {
 				for (int i = 0; i < handles.size(); i++) {
 					if (xform.xform(handles[i]).distance_to(gpoint) < 8) {
@@ -347,7 +349,7 @@ void Box2DShapeEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 	Transform2D gt = canvas_item_editor->get_canvas_transform() * node->get_global_transform();
 
 	Ref<Theme> theme = EditorNode::get_singleton()->get_editor_theme();
-	Ref<Texture2D> h = theme->get_icon("EditorHandle", "EditorIcons");
+	Ref<Texture> h = theme->get_icon("EditorHandle", "EditorIcons");
 	Vector2 size = h->get_size() * 0.5;
 
 	handles.clear();
@@ -430,11 +432,11 @@ void Box2DShapeEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 void Box2DShapeEditor::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE: {
-			get_tree()->connect("node_removed", Callable(this, "_node_removed"));
+			get_tree()->connect("node_removed", this, "_node_removed");
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
-			get_tree()->disconnect("node_removed", Callable(this, "_node_removed"));
+			get_tree()->disconnect("node_removed", this, "_node_removed");
 		} break;
 	}
 }

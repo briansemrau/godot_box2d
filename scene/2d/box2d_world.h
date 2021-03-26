@@ -1,11 +1,11 @@
 #ifndef BOX2D_WORLD_H
 #define BOX2D_WORLD_H
 
-#include <core/io/resource.h>
-#include <core/object/object.h>
-#include <core/object/reference.h>
-#include <core/templates/set.h>
-#include <core/templates/vset.h>
+#include <core/resource.h>
+#include <core/object.h>
+#include <core/reference.h>
+#include <core/set.h>
+#include <core/vset.h>
 #include <scene/2d/node_2d.h>
 
 #include <box2d/b2_contact.h>
@@ -166,9 +166,9 @@ public:
 	void set_ignore_rigid(bool p_enable);
 	bool is_ignoring_rigid() const;
 
-	// Using ObjectIDs as int64_t so that we can bind these methods
-	void set_exclude(const Vector<int64_t> &p_exclude);
-	Vector<int64_t> get_exclude() const;
+	// Using ObjectIDs (int64_t) in an Array so that we can bind these methods
+	void set_exclude(const Array &p_exclude);
+	Array get_exclude() const;
 };
 
 class Box2DPhysicsTestMotionResult;
@@ -240,7 +240,8 @@ private:
 	class UserAABBQueryCallback : public b2QueryCallback {
 	public:
 		std::unordered_set<const Box2DFixture *> handled_fixtures;
-		const Callable *callback = NULL;
+		Object *callback_owner = NULL;
+		String callback_func;
 
 		virtual bool ReportFixture(b2Fixture *fixture) override;
 	};
@@ -248,7 +249,8 @@ private:
 	class UserRaycastQueryCallback : public b2RayCastCallback {
 	public:
 		std::unordered_set<const Box2DFixture *> handled_fixtures;
-		const Callable *callback = NULL;
+		Object *callback_owner = NULL;
+		String callback_func;
 
 		virtual float ReportFixture(b2Fixture *fixture, const b2Vec2 &point, const b2Vec2 &normal, float fraction) override;
 	};
@@ -385,18 +387,18 @@ public:
 
 	// Godot space query API
 	// TODO What is collide_shape? Does this return manifold points? //Array collide_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
-	Array intersect_point(const Vector2 &p_point, int p_max_results = 32, const Vector<int64_t> &p_exclude = Vector<int64_t>(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false, uint32_t p_collision_layer = 0x0, int32_t p_group_index = 0);
-	Dictionary intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Vector<int64_t> &p_exclude = Vector<int64_t>(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false, uint32_t p_collision_layer = 0x0, int32_t p_group_index = 0);
+	Array intersect_point(const Vector2 &p_point, int p_max_results = 32, const Array &p_exclude = Array(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false, uint32_t p_collision_layer = 0x0, int32_t p_group_index = 0);
+	Dictionary intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Array &p_exclude = Array(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_sensors = false, uint32_t p_collision_layer = 0x0, int32_t p_group_index = 0);
 	Array intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query, int p_max_results = 32);
 	Array cast_motion(const Ref<Box2DShapeQueryParameters> &p_query);
 
 	// This is by-default continuous collision. Is this slow? TODO test or remove commented code
 	bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, MotionResult *r_result = nullptr);
-	bool _body_test_motion_binding(const Object *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<PhysicsTestMotionResult2D>());
+	bool _body_test_motion_binding(const Object *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<Box2DPhysicsTestMotionResult>());
 
 	// Box2D space query API
-	void query_aabb(const Rect2 &p_aabb, const Callable &p_callback);
-	void raycast(const Vector2 &p_from, const Vector2 &p_to, const Callable &p_callback);
+	void query_aabb(const Rect2 &p_aabb, Object *p_callback_owner, const String &p_callback_func);
+	void raycast(const Vector2 &p_from, const Vector2 &p_to, Object *p_callback_owner, const String &p_callback_func);
 
 	Box2DWorld();
 	~Box2DWorld();

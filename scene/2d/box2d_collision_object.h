@@ -1,10 +1,10 @@
 #ifndef BOX2D_COLLISION_OBJECT_H
 #define BOX2D_COLLISION_OBJECT_H
 
-#include <core/io/resource.h>
-#include <core/object/object.h>
-#include <core/object/reference.h>
-#include <core/templates/vset.h>
+#include <core/resource.h>
+#include <core/object.h>
+#include <core/reference.h>
+#include <core/vset.h>
 #include <scene/2d/node_2d.h>
 
 #include <box2d/b2_body.h>

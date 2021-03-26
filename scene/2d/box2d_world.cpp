@@ -1,6 +1,7 @@
 #include "box2d_world.h"
 
-#include <core/config/engine.h>
+#include <core/engine.h>
+#include <core/method_bind_ext.gen.inc>
 #include <core/os/os.h>
 
 #include <box2d/b2_collision.h>
@@ -62,7 +63,7 @@ void Box2DShapeQueryParameters::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "group_index"), "set_group_index", "get_group_index");
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "exclude", PROPERTY_HINT_NONE, itos(Variant::INT) + ":"), "set_exclude", "get_exclude");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "motion"), "set_motion", "get_motion");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "motion_rotation"), "set_motion_rotation", "get_motion_rotation");
+	ADD_PROPERTY(PropertyInfo(Variant::REAL, "motion_rotation"), "set_motion_rotation", "get_motion_rotation");
 	ADD_PROPERTY(PropertyInfo(Variant::TRANSFORM2D, "motion_transform"), "set_motion_transform", "get_motion_transform");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "local_center"), "set_motion_local_center", "get_motion_local_center");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shape", PROPERTY_HINT_RESOURCE_TYPE, "Box2DShape"), "set_shape", "get_shape");
@@ -156,7 +157,7 @@ int Box2DShapeQueryParameters::get_group_index() const {
 	return parameters.filter.groupIndex;
 }
 
-void Box2DShapeQueryParameters::set_exclude(const Vector<int64_t> &p_exclude) {
+void Box2DShapeQueryParameters::set_exclude(const Array &p_exclude) {
 	parameters.exclude.clear();
 	for (int i = 0; i < p_exclude.size(); i++) {
 		Object *obj = ObjectDB::get_instance(ObjectID(p_exclude[i]));
@@ -166,12 +167,12 @@ void Box2DShapeQueryParameters::set_exclude(const Vector<int64_t> &p_exclude) {
 	}
 }
 
-Vector<int64_t> Box2DShapeQueryParameters::get_exclude() const {
-	Vector<int64_t> ret;
+Array Box2DShapeQueryParameters::get_exclude() const {
+	Array ret;
 	ret.resize(parameters.exclude.size());
 	int idx = 0;
 	for (Set<const Box2DPhysicsBody *>::Element *E = parameters.exclude.front(); E; E = E->next()) {
-		ret.write[idx] = int64_t(E->get()->get_instance_id());
+		ret[idx] = int64_t(E->get()->get_instance_id());
 	}
 	return ret;
 }
@@ -1064,7 +1065,7 @@ bool Box2DWorld::get_auto_step() const {
 	return auto_step;
 }
 
-Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, const Vector<int64_t> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_sensors, uint32_t p_collision_layer, int32_t p_group_index) {
+Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, const Array &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_sensors, uint32_t p_collision_layer, int32_t p_group_index) {
 	// This function uses queries in Box2DWorld-local space, not global space
 
 	point_callback.results.clear();
@@ -1110,7 +1111,7 @@ Array Box2DWorld::intersect_point(const Vector2 &p_point, int p_max_results, con
 	return arr;
 }
 
-Dictionary Box2DWorld::intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Vector<int64_t> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_sensors, uint32_t p_collision_layer, int32_t p_group_index) {
+Dictionary Box2DWorld::intersect_ray(const Vector2 &p_from, const Vector2 &p_to, const Array &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_sensors, uint32_t p_collision_layer, int32_t p_group_index) {
 	// This function uses queries in Box2DWorld-local space, not global space
 
 	ERR_FAIL_COND_V_MSG(!((p_to - p_from).length_squared() > 0.0f), Dictionary{}, "Raycast queries must have valid vector inputs.");
@@ -1341,19 +1342,21 @@ bool Box2DWorld::_body_test_motion_binding(const Object *p_body, const Transform
 	return body_test_motion(body, p_from, p_motion, p_infinite_inertia, r);
 }
 
-void Box2DWorld::query_aabb(const Rect2 &p_bounds, const Callable &p_callback) {
+void Box2DWorld::query_aabb(const Rect2 &p_bounds, Object *p_callback_owner, const String &p_callback_func) {
 	// This function uses queries in Box2DWorld-local space, not global space
 	user_query_callback.handled_fixtures.clear();
-	user_query_callback.callback = &p_callback;
+	user_query_callback.callback_owner = p_callback_owner;
+	user_query_callback.callback_func = p_callback_func;
 	world->QueryAABB(&user_query_callback, gd_to_b2(p_bounds));
 }
 
-void Box2DWorld::raycast(const Vector2 &p_from, const Vector2 &p_to, const Callable &p_callback) {
+void Box2DWorld::raycast(const Vector2 &p_from, const Vector2 &p_to, Object *p_callback_owner, const String &p_callback_func) {
 	ERR_FAIL_COND_MSG(!((p_to - p_from).length_squared() > 0.0f), "Raycast queries must have valid vector inputs.");
 
 	// This function uses queries in Box2DWorld-local space, not global space
 	user_raycast_callback.handled_fixtures.clear();
-	user_raycast_callback.callback = &p_callback;
+	user_query_callback.callback_owner = p_callback_owner;
+	user_query_callback.callback_func = p_callback_func;
 	world->RayCast(&user_raycast_callback, gd_to_b2(p_from), gd_to_b2(p_to));
 }
 
@@ -1446,11 +1449,11 @@ bool Box2DWorld::UserAABBQueryCallback::ReportFixture(b2Fixture *fixture) {
 		&arg0
 	};
 	Variant ret;
-	Callable::CallError ce;
-	callback->call((const Variant **)&args, argcount, ret, ce);
+	Variant::CallError ce;
+	ret = callback_owner->call(callback_func, (const Variant **)&args, argcount, ce);
 
-	if (ce.error != Callable::CallError::CALL_OK) {
-		String err = Variant::get_callable_error_text(*callback, (const Variant **)&args, argcount, ce);
+	if (ce.error != Variant::CallError::CALL_OK) {
+		String err = Variant::get_call_error_text(callback_owner, callback_func, (const Variant **)&args, argcount, ce);
 		ERR_PRINT("Error calling function from query_aabb: " + err);
 		return false;
 	}
@@ -1485,16 +1488,16 @@ float Box2DWorld::UserRaycastQueryCallback::ReportFixture(b2Fixture *fixture, co
 		&arg3
 	};
 	Variant ret;
-	Callable::CallError ce;
-	callback->call((const Variant **)&args, argcount, ret, ce);
+	Variant::CallError ce;
+	ret = callback_owner->call(callback_func, (const Variant **)&args, argcount, ce);
 
-	if (ce.error != Callable::CallError::CALL_OK) {
-		String err = Variant::get_callable_error_text(*callback, (const Variant **)&args, argcount, ce);
+	if (ce.error != Variant::CallError::CALL_OK) {
+		String err = Variant::get_call_error_text(callback_owner, callback_func, (const Variant **)&args, argcount, ce);
 		ERR_PRINT("Error calling function from raycast: " + err);
 		return false;
 	}
 
-	if (ret.get_type() == Variant::Type::FLOAT) {
+	if (ret.get_type() == Variant::Type::REAL) {
 		return float(ret);
 	} else {
 		ERR_PRINT("Error returning from raycast callback: Wrong return type. Was expecting float but instead got " + ret.get_type_name(ret.get_type()) + ".");
@@ -1519,7 +1522,7 @@ bool Box2DWorld::CastQueryWrapper::QueryCallback(int32 proxyId) {
 	// Then measure the closest point of each callback AABB to the motion vector line (tangential projection).
 	// If the measured distance is outside of our query shape bounds in tangent space, we can discard it.
 
-	results.append(proxy);
+	results.push_back(proxy);
 
 	return max_results == -1 || results.size() < max_results;
 }

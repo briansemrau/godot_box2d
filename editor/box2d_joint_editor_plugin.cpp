@@ -521,7 +521,7 @@ bool Box2DJointEditor::forward_canvas_gui_input(const Ref<InputEvent> &p_event) 
 	if (mb.is_valid()) {
 		Vector2 gpoint = mb->get_position();
 
-		if (mb->get_button_index() == MouseButton::MOUSE_BUTTON_LEFT) {
+		if (mb->get_button_index() == BUTTON_LEFT) {
 			if (mb->is_pressed()) {
 				for (int i = 0; i < handles.size(); i++) {
 					if (xform.xform(handles[i]).distance_to(gpoint - handle_offsets[i]) < 8) {
@@ -618,9 +618,9 @@ void Box2DJointEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 	Transform2D gt = canvas_item_editor->get_canvas_transform() * node->get_global_transform();
 
 	Ref<Theme> theme = EditorNode::get_singleton()->get_editor_theme();
-	Ref<Texture2D> handle_icon = theme->get_icon("EditorHandle", "EditorIcons");
-	Ref<Texture2D> handle_limit_icon = theme->get_icon("EditorHandleLinearLimit", "EditorIcons");
-	Ref<Texture2D> anchor_icon = theme->get_icon("EditorControlAnchor", "EditorIcons");
+	Ref<Texture> handle_icon = theme->get_icon("EditorHandle", "EditorIcons");
+	Ref<Texture> handle_limit_icon = theme->get_icon("EditorHandleLinearLimit", "EditorIcons");
+	Ref<Texture> anchor_icon = theme->get_icon("EditorControlAnchor", "EditorIcons");
 	Vector2 handle_hsize = handle_icon->get_size() * 0.5;
 	Vector2 handle_limit_hsize = handle_limit_icon->get_size() * 0.5;
 	Vector2 anchor_size = anchor_icon->get_size();
@@ -891,17 +891,17 @@ void Box2DJointEditor::_notification(int p_what) {
 		case NOTIFICATION_READY: {
 			disable_anchor_modes(false, String());
 
-			button_anchor_local->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("AnchorModeLocal", "EditorIcons"));
-			button_anchor_global->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("AnchorModeSticky", "EditorIcons"));
+			button_anchor_local->set_icon(EditorNode::get_singleton()->get_gui_base()->get_icon("AnchorModeLocal", "EditorIcons"));
+			button_anchor_global->set_icon(EditorNode::get_singleton()->get_gui_base()->get_icon("AnchorModeSticky", "EditorIcons"));
 			button_anchor_local->set_pressed(true);
 		} break;
 
 		case NOTIFICATION_ENTER_TREE: {
-			get_tree()->connect("node_removed", callable_mp(this, &Box2DJointEditor::_node_removed));
+			get_tree()->connect("node_removed", this, "_node_removed");
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
-			get_tree()->disconnect("node_removed", callable_mp(this, &Box2DJointEditor::_node_removed));
+			get_tree()->disconnect("node_removed", this, "_node_removed");
 		} break;
 	}
 }
@@ -950,6 +950,8 @@ void Box2DJointEditor::edit(Node *p_node) {
 }
 
 void Box2DJointEditor::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("_node_removed"), &Box2DJointEditor::_node_removed);
+	ClassDB::bind_method(D_METHOD("_menu_option"), &Box2DJointEditor::_menu_option);
 }
 
 Box2DJointEditor::Box2DJointEditor(EditorNode *p_editor) :
@@ -961,13 +963,13 @@ Box2DJointEditor::Box2DJointEditor(EditorNode *p_editor) :
 	button_anchor_local = memnew(Button);
 	button_anchor_local->set_flat(true);
 	add_child(button_anchor_local);
-	button_anchor_local->connect("pressed", callable_mp(this, &Box2DJointEditor::_menu_option), varray(static_cast<int>(AnchorMode::MODE_ANCHORS_LOCAL)));
+	button_anchor_local->connect("pressed", this, "_menu_option", varray(static_cast<int>(AnchorMode::MODE_ANCHORS_LOCAL)));
 	button_anchor_local->set_toggle_mode(true);
 
 	button_anchor_global = memnew(Button);
 	button_anchor_global->set_flat(true);
 	add_child(button_anchor_global);
-	button_anchor_global->connect("pressed", callable_mp(this, &Box2DJointEditor::_menu_option), varray(static_cast<int>(AnchorMode::MODE_ANCHORS_STICKY)));
+	button_anchor_global->connect("pressed", this, "_menu_option", varray(static_cast<int>(AnchorMode::MODE_ANCHORS_STICKY)));
 	button_anchor_global->set_toggle_mode(true);
 
 	//add_child(memnew(VSeparator));
