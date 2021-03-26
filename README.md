@@ -13,8 +13,7 @@ Using [Box2D v2.4.1](https://github.com/erincatto/box2d)
 
 This module should work on all platforms.
 
-This module supports Godot 4.0.
-There is an occasionally updated 3.2 branch.
+This module supports Godot 4.0 and 3.x.
 
 ## Purpose
 
@@ -79,15 +78,13 @@ To use this module, it helps to already be familiar with compiling the engine on
 
 ```
 cd /your/documents/folder/wherever/
-git clone https://github.com/godotengine/godot.git godot
+git clone -b 3.x https://github.com/godotengine/godot.git godot
 ```
-
-For Godot 3.2 use: `git clone -b 3.2 https://github.com/godotengine/godot.git godot`
 
 2. Clone this module and init submodules (box2d) inside the modules folder:
 ```
 cd ./godot/modules
-git clone https://github.com/briansemrau/godot_box2d.git
+git clone -b 3.x https://github.com/briansemrau/godot_box2d.git
 cd godot_box2d
 git submodule update --init --recursive
 ```
