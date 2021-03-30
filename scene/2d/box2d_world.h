@@ -278,6 +278,10 @@ private:
 			queue.push_back({ p_caller, p_transient });
 		}
 
+		inline void call_immediate(Box2DCollisionObject* p_caller, P* p_transient) {
+			(p_caller->*on_thing_inout)(p_transient);
+		}
+
 		inline void call_and_clear() {
 			while (!queue.empty()) {
 				CollisionUpdatePair *pair = &queue.front();

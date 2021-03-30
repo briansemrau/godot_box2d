@@ -38,7 +38,7 @@ private:
 	real_t linear_damp = 0.1;
 	real_t angular_damp = 1;
 	int priority = 0;
-	bool monitoring = true;
+	bool monitoring = false;
 	bool monitorable = true;
 
 	bool audio_bus_override = false;

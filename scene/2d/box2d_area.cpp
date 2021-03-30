@@ -393,6 +393,8 @@ StringName Box2DArea::get_audio_bus_name() const {
 Box2DArea::Box2DArea() {
 	bodyDef.type = b2BodyType::b2_dynamicBody;
 	bodyDef.gravityScale = 0.0f;
+
+	set_monitoring(true);
 }
 
 Box2DArea::~Box2DArea() {
