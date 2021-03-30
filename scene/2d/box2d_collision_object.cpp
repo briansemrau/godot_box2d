@@ -43,6 +43,7 @@ bool Box2DCollisionObject::destroy_b2Body() {
 		ERR_FAIL_COND_V(!world_node->world, false);
 
 		// Destroy body
+		body->GetUserData().owner = NULL;
 		world_node->world->DestroyBody(body);
 		body = NULL;
 
@@ -141,7 +142,12 @@ void Box2DCollisionObject::_notification(int p_what) {
 	// TODO finalize implementation to imitate behavior from RigidBody2D and Kinematic (static too?)
 	switch (p_what) {
 		case NOTIFICATION_PREDELETE: {
-			destroy_b2Body();
+			if (world_node) {
+				if (world_node->world) {
+					destroy_b2Body();
+				}
+				world_node->body_owners.erase(this);
+			}
 		} break;
 
 		case NOTIFICATION_ENTER_TREE: {
@@ -157,10 +163,10 @@ void Box2DCollisionObject::_notification(int p_what) {
 			if (new_world != world_node) {
 				// Destroy b2Body
 				if (world_node) {
-					destroy_b2Body();
-					if (world_node) {
-						world_node->body_owners.erase(this);
+					if (world_node->world) {
+						destroy_b2Body();
 					}
+					world_node->body_owners.erase(this);
 				}
 				world_node = new_world;
 				// Create b2Body

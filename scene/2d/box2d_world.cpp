@@ -363,6 +363,9 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 	const bool monitoringA = fnode_a->owner_node->_is_contact_monitor_enabled();
 	const bool monitoringB = fnode_b->owner_node->_is_contact_monitor_enabled();
 
+	// EndContact may occur outside of timestep. No need to defer signal calls when world is unlocked.
+	bool queue_inout = world->IsLocked();
+
 	// Deliver signals to bodies with contact monitoring enabled
 	if (monitoringA) {
 		int *body_count_ptr = body_a->contact_monitor->entered_objects.getptr(body_b->get_instance_id());
@@ -370,7 +373,10 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 
 		if ((*body_count_ptr) == 0) {
 			body_a->contact_monitor->entered_objects.erase(body_b->get_instance_id());
-			object_exited_queue.enqueue(body_a, body_b);
+			if (queue_inout)
+				object_exited_queue.enqueue(body_a, body_b);
+			else
+				object_exited_queue.call_immediate(body_a, body_b);
 		}
 
 		int *fix_count_ptr = body_a->contact_monitor->entered_objects.getptr(fnode_b->get_instance_id());
@@ -378,7 +384,10 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 
 		if ((*fix_count_ptr) == 0) {
 			body_a->contact_monitor->entered_objects.erase(fnode_b->get_instance_id());
-			fixture_exited_queue.enqueue(body_a, fnode_b);
+			if (queue_inout)
+				fixture_exited_queue.enqueue(body_a, fnode_b);
+			else
+				fixture_exited_queue.call_immediate(body_a, fnode_b);
 		}
 	}
 	if (monitoringB) {
@@ -387,7 +396,10 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 
 		if ((*body_count_ptr) == 0) {
 			body_b->contact_monitor->entered_objects.erase(body_a->get_instance_id());
-			object_exited_queue.enqueue(body_b, body_a);
+			if (queue_inout)
+				object_exited_queue.enqueue(body_b, body_a);
+			else
+				object_exited_queue.call_immediate(body_b, body_a);
 		}
 
 		int *fix_count_ptr = body_b->contact_monitor->entered_objects.getptr(fnode_a->get_instance_id());
@@ -395,7 +407,10 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 
 		if ((*fix_count_ptr) == 0) {
 			body_b->contact_monitor->entered_objects.erase(fnode_a->get_instance_id());
-			fixture_exited_queue.enqueue(body_b, fnode_a);
+			if (queue_inout)
+				fixture_exited_queue.enqueue(body_b, fnode_a);
+			else
+				fixture_exited_queue.call_immediate(body_b, fnode_a);
 		}
 	}
 
