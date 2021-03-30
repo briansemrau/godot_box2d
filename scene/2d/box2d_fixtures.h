@@ -62,7 +62,9 @@ protected:
 public:
 	inline const Box2DCollisionObject *_get_owner_node() const { return owner_node; }
 
+#ifdef TOOLS_ENABLED
 	virtual bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const override;
+#endif
 
 	virtual String get_configuration_warning() const override;
 
