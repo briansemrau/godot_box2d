@@ -237,7 +237,7 @@ void Box2DPhysicsBody::_update_area_effects() {
 		body->SetLinearDamping(linear_damp);
 	}
 	if (angular_damp >= 0) {
-		body->SetLinearDamping(angular_damp);
+		body->SetAngularDamping(angular_damp);
 	}
 
 	last_area_gravity = gravity;
