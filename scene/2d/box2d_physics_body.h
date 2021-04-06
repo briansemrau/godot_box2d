@@ -111,8 +111,8 @@ private:
 
 	virtual void _on_object_entered(Box2DCollisionObject *p_object) override;
 	virtual void _on_object_exited(Box2DCollisionObject *p_object) override;
-	virtual void _on_fixture_entered(Box2DFixture *p_fixture) override;
-	virtual void _on_fixture_exited(Box2DFixture *p_fixture) override;
+	virtual void _on_fixture_entered(Box2DFixture *p_fixture, Box2DFixture *p_self_fixture) override;
+	virtual void _on_fixture_exited(Box2DFixture *p_fixture, Box2DFixture *p_self_fixture) override;
 
 private:
 	Ref<Box2DKinematicCollision> _move_and_collide_binding(const Vector2 &p_motion, const float p_rotation, const bool p_infinite_inertia = true, const bool p_exclude_raycast_shapes = true, const bool p_test_only = false);

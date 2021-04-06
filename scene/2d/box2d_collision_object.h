@@ -67,8 +67,8 @@ protected:
 
 	virtual void _on_object_entered(Box2DCollisionObject *p_object) = 0;
 	virtual void _on_object_exited(Box2DCollisionObject *p_object) = 0;
-	virtual void _on_fixture_entered(Box2DFixture *p_fixture) = 0;
-	virtual void _on_fixture_exited(Box2DFixture *p_fixture) = 0;
+	virtual void _on_fixture_entered(Box2DFixture *p_fixture, Box2DFixture *p_self_fixture) = 0;
+	virtual void _on_fixture_exited(Box2DFixture *p_fixture, Box2DFixture *p_self_fixture) = 0;
 
 	virtual void pre_step(float p_delta){};
 
