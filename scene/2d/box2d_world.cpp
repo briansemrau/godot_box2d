@@ -328,7 +328,7 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 		++(*fix_count_ptr);
 
 		if (*fix_count_ptr == 1) {
-			fixture_entered_queue.enqueue(body_a, fnode_b);
+			fixture_entered_queue.enqueue(body_a, fnode_b, fnode_a);
 		}
 	}
 	if (monitoringB) {
@@ -349,7 +349,7 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 		++(*fix_count_ptr);
 
 		if (*fix_count_ptr == 1) {
-			fixture_entered_queue.enqueue(body_b, fnode_a);
+			fixture_entered_queue.enqueue(body_b, fnode_a, fnode_b);
 		}
 	}
 }
@@ -385,9 +385,9 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 		if ((*fix_count_ptr) == 0) {
 			body_a->contact_monitor->entered_objects.erase(fnode_b->get_instance_id());
 			if (queue_inout)
-				fixture_exited_queue.enqueue(body_a, fnode_b);
+				fixture_exited_queue.enqueue(body_a, fnode_b, fnode_a);
 			else
-				fixture_exited_queue.call_immediate(body_a, fnode_b);
+				fixture_exited_queue.call_immediate(body_a, fnode_b, fnode_a);
 		}
 	}
 	if (monitoringB) {
@@ -408,9 +408,9 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 		if ((*fix_count_ptr) == 0) {
 			body_b->contact_monitor->entered_objects.erase(fnode_a->get_instance_id());
 			if (queue_inout)
-				fixture_exited_queue.enqueue(body_b, fnode_a);
+				fixture_exited_queue.enqueue(body_b, fnode_a, fnode_b);
 			else
-				fixture_exited_queue.call_immediate(body_b, fnode_a);
+				fixture_exited_queue.call_immediate(body_b, fnode_a, fnode_b);
 		}
 	}
 

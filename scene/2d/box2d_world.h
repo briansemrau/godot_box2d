@@ -266,28 +266,56 @@ private:
 		bool QueryCallback(int32 proxyId);
 	};
 	
-	template <class P, void (Box2DCollisionObject::*on_thing_inout)(P *)>
-	class CollisionUpdateQueue {
+	template <void (Box2DCollisionObject::*on_object_inout)(Box2DCollisionObject *)>
+	class ObjectCollisionUpdateQueue {
 	private:
 		struct CollisionUpdatePair {
 			Box2DCollisionObject *function_owner;
-			P *transient;
+			Box2DCollisionObject *transient;
 		};
 		std::deque<CollisionUpdatePair> queue{};
 
 	public:
-		inline void enqueue(Box2DCollisionObject *p_caller, P *p_transient) {
+		inline void enqueue(Box2DCollisionObject *p_caller, Box2DCollisionObject *p_transient) {
 			queue.push_back({ p_caller, p_transient });
 		}
 
-		inline void call_immediate(Box2DCollisionObject* p_caller, P* p_transient) {
-			(p_caller->*on_thing_inout)(p_transient);
+		inline void call_immediate(Box2DCollisionObject *p_caller, Box2DCollisionObject *p_transient) {
+			(p_caller->*on_object_inout)(p_transient);
 		}
 
 		inline void call_and_clear() {
 			while (!queue.empty()) {
 				CollisionUpdatePair *pair = &queue.front();
-				(pair->function_owner->*on_thing_inout)(pair->transient);
+				(pair->function_owner->*on_object_inout)(pair->transient);
+				queue.pop_front();
+			}
+		}
+	};
+
+	template <void (Box2DCollisionObject::*on_fixture_inout)(Box2DFixture *, Box2DFixture *)>
+	class FixtureCollisionUpdateQueue {
+	private:
+		struct CollisionUpdatePair {
+			Box2DCollisionObject *function_owner;
+			Box2DFixture *transient;
+			Box2DFixture *self;
+		};
+		std::deque<CollisionUpdatePair> queue{};
+
+	public:
+		inline void enqueue(Box2DCollisionObject *p_caller, Box2DFixture *p_transient, Box2DFixture *p_self) {
+			queue.push_back({ p_caller, p_transient, p_self });
+		}
+
+		inline void call_immediate(Box2DCollisionObject *p_caller, Box2DFixture *p_transient, Box2DFixture *p_self) {
+			(p_caller->*on_fixture_inout)(p_transient, p_self);
+		}
+
+		inline void call_and_clear() {
+			while (!queue.empty()) {
+				CollisionUpdatePair *pair = &queue.front();
+				(pair->function_owner->*on_fixture_inout)(pair->transient, pair->self);
 				queue.pop_front();
 			}
 		}
@@ -301,10 +329,10 @@ private:
 
 	float last_step_delta = 0.0f;
 
-	CollisionUpdateQueue<Box2DCollisionObject, &Box2DCollisionObject::_on_object_entered> object_entered_queue;
-	CollisionUpdateQueue<Box2DCollisionObject, &Box2DCollisionObject::_on_object_exited> object_exited_queue;
-	CollisionUpdateQueue<Box2DFixture, &Box2DCollisionObject::_on_fixture_entered> fixture_entered_queue;
-	CollisionUpdateQueue<Box2DFixture, &Box2DCollisionObject::_on_fixture_exited> fixture_exited_queue;
+	ObjectCollisionUpdateQueue<&Box2DCollisionObject::_on_object_entered> object_entered_queue;
+	ObjectCollisionUpdateQueue<&Box2DCollisionObject::_on_object_exited> object_exited_queue;
+	FixtureCollisionUpdateQueue<&Box2DCollisionObject::_on_fixture_entered> fixture_entered_queue;
+	FixtureCollisionUpdateQueue<&Box2DCollisionObject::_on_fixture_exited> fixture_exited_queue;
 
 	// TODO make sure these are using the best data structure
 	Set<Box2DCollisionObject *> body_owners;
