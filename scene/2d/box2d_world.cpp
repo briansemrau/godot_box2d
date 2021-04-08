@@ -656,8 +656,8 @@ void Box2DWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("cast_motion", "query"), &Box2DWorld::cast_motion);
 	//ClassDB::bind_method(D_METHOD("collide_shape", "shape", "max_results"), &PhysicsDirectSpaceState2D::_collide_shape, DEFVAL(32));
 
-	ClassDB::bind_method(D_METHOD("query_aabb", "aabb", "callback"), &Box2DWorld::query_aabb);
-	ClassDB::bind_method(D_METHOD("raycast", "from", "to", "callback"), &Box2DWorld::raycast);
+	ClassDB::bind_method(D_METHOD("query_aabb", "aabb", "target", "method"), &Box2DWorld::query_aabb);
+	ClassDB::bind_method(D_METHOD("raycast", "from", "to", "target", "method"), &Box2DWorld::raycast);
 
 	ClassDB::bind_method(D_METHOD("body_test_motion", "body", "from", "motion", "infinite_inertia", "result"), &Box2DWorld::_body_test_motion_binding, DEFVAL(Variant()));
 

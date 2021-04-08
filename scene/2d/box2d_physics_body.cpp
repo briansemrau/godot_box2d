@@ -477,12 +477,12 @@ void Box2DPhysicsBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_contact_normal_impulse", "idx"), &Box2DPhysicsBody::get_contact_normal_impulse);
 	ClassDB::bind_method(D_METHOD("get_contact_tangent_impulse", "idx"), &Box2DPhysicsBody::get_contact_tangent_impulse);
 
-	ClassDB::bind_method(D_METHOD("apply_force", "force", "point"), &Box2DPhysicsBody::apply_force, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("apply_central_force", "force"), &Box2DPhysicsBody::apply_central_force, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("apply_torque", "torque"), &Box2DPhysicsBody::apply_torque, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("apply_linear_impulse", "impulse", "point"), &Box2DPhysicsBody::apply_linear_impulse, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("apply_central_linear_impulse", "impulse"), &Box2DPhysicsBody::apply_central_linear_impulse, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("apply_torque_impulse", "impulse"), &Box2DPhysicsBody::apply_torque_impulse, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("apply_force", "force", "point", "wake"), &Box2DPhysicsBody::apply_force, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("apply_central_force", "force", "wake"), &Box2DPhysicsBody::apply_central_force, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("apply_torque", "torque", "wake"), &Box2DPhysicsBody::apply_torque, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("apply_linear_impulse", "impulse", "point", "wake"), &Box2DPhysicsBody::apply_linear_impulse, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("apply_central_linear_impulse", "impulse", "wake"), &Box2DPhysicsBody::apply_central_linear_impulse, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("apply_torque_impulse", "impulse", "wake"), &Box2DPhysicsBody::apply_torque_impulse, DEFVAL(true));
 
 	ClassDB::bind_method(D_METHOD("set_integrate_position", "enabled"), &Box2DPhysicsBody::set_integrate_position);
 	ClassDB::bind_method(D_METHOD("is_integrate_position_enabled"), &Box2DPhysicsBody::is_integrate_position_enabled);
