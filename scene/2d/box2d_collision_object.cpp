@@ -138,6 +138,11 @@ bool Box2DCollisionObject::_is_contact_monitor_enabled() const {
 	return contact_monitor != NULL;
 }
 
+void Box2DCollisionObject::step(float p_delta) {
+	if (get_script_instance())
+		get_script_instance()->call("_world_step", p_delta);
+}
+
 void Box2DCollisionObject::_notification(int p_what) {
 	// TODO finalize implementation to imitate behavior from RigidBody2D and Kinematic (static too?)
 	switch (p_what) {
@@ -214,7 +219,9 @@ void Box2DCollisionObject::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_group_index"), &Box2DCollisionObject::get_group_index);
 
 	ClassDB::bind_method(D_METHOD("set_filter_data", "collision_layer", "collision_mask", "group_index"), &Box2DCollisionObject::set_filter_data);
-	
+
+	BIND_VMETHOD(MethodInfo("_world_step", PropertyInfo(Variant::REAL, "delta")));
+
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "enabled"), "set_enabled", "is_enabled");
 	ADD_GROUP("Collision", "");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_layer", "get_collision_layer");

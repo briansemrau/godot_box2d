@@ -121,6 +121,22 @@ void Box2DPhysicsBody::pre_step(float p_delta) {
 	_update_area_effects();
 }
 
+void Box2DPhysicsBody::step(float p_delta) {
+	Box2DCollisionObject::step(p_delta);
+
+	if (_get_b2Body()) {
+		const bool awake = _get_b2Body()->IsAwake();
+		if (awake != prev_sleeping_state) {
+			emit_signal("sleeping_state_changed");
+			prev_sleeping_state = awake;
+		}
+
+		if (get_type() == Mode::MODE_RIGID || (get_type() == Mode::MODE_KINEMATIC && (sync_to_physics || integrate_position))) {
+			sync_state();
+		}
+	}
+}
+
 void Box2DPhysicsBody::sync_state() {
 	const Transform2D physics_xform = b2_to_gd(_get_b2Body()->GetTransform());
 	set_block_transform_notify(true);
@@ -372,20 +388,6 @@ void Box2DPhysicsBody::_notification(int p_what) {
 				while (joint) {
 					joint->get()->on_editor_transforms_changed();
 					joint = joint->next();
-				}
-			}
-		} break;
-
-		case Box2DWorld::NOTIFICATION_WORLD_STEPPED: {
-			if (_get_b2Body()) {
-				const bool awake = _get_b2Body()->IsAwake();
-				if (awake != prev_sleeping_state) {
-					emit_signal("sleeping_state_changed");
-					prev_sleeping_state = awake;
-				}
-
-				if (get_type() == Mode::MODE_RIGID || (get_type() == Mode::MODE_KINEMATIC && (sync_to_physics || integrate_position))) {
-					sync_state();
 				}
 			}
 		} break;

@@ -88,11 +88,6 @@ void Box2DArea::_notification(int p_what) {
 			last_step_xform = get_box2dworld_transform();
 		}
 
-		case Box2DWorld::NOTIFICATION_WORLD_STEPPED: {
-			// Don't sync physics position
-			// This allows areas to move with the scene transform under other physics objects
-		} break;
-
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
 			// Send new transform to physics
 			Transform2D new_xform = get_box2dworld_transform();

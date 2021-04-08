@@ -285,21 +285,6 @@ void Box2DJoint::_notification(int p_what) {
 			}
 		} break;
 
-		case Box2DWorld::NOTIFICATION_WORLD_STEPPED: {
-			if (breaking_enabled && joint) {
-				Vector2 force = get_reaction_force();
-				real_t torque = abs(get_reaction_torque());
-
-				const bool exceeded_force = max_force > 0 && force.length() > max_force;
-				const bool exceeded_torque = max_torque > 0 && torque > max_torque;
-
-				if (exceeded_force || exceeded_torque) {
-					emit_signal("joint_broken", force, torque);
-					set_broken(true);
-				}
-			}
-		} break;
-
 		case NOTIFICATION_INTERNAL_PROCESS: {
 			// Leaving on for now, but ideally we only want to update() when the actual display of something will change
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
@@ -491,6 +476,24 @@ void Box2DJoint::reset_joint_anchors() {
 
 	_change_notify("anchor_a");
 	_change_notify("anchor_b");
+}
+
+void Box2DJoint::step(float p_delta) {
+	if (breaking_enabled && joint) {
+		Vector2 force = get_reaction_force();
+		real_t torque = abs(get_reaction_torque());
+
+		const bool exceeded_force = max_force > 0 && force.length() > max_force;
+		const bool exceeded_torque = max_torque > 0 && torque > max_torque;
+
+		if (exceeded_force || exceeded_torque) {
+			emit_signal("joint_broken", force, torque);
+			set_broken(true);
+		}
+	}
+
+	if (get_script_instance())
+		get_script_instance()->call("_world_step", p_delta);
 }
 
 void Box2DJoint::set_collide_connected(bool p_collide) {
