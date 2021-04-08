@@ -1374,8 +1374,8 @@ void Box2DWorld::raycast(const Vector2 &p_from, const Vector2 &p_to, Object *p_c
 
 	// This function uses queries in Box2DWorld-local space, not global space
 	user_raycast_callback.handled_fixtures.clear();
-	user_query_callback.callback_owner = p_callback_owner;
-	user_query_callback.callback_func = p_callback_func;
+	user_raycast_callback.callback_owner = p_callback_owner;
+	user_raycast_callback.callback_func = p_callback_func;
 	world->RayCast(&user_raycast_callback, gd_to_b2(p_from), gd_to_b2(p_to));
 }
 
