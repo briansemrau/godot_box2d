@@ -59,39 +59,24 @@ struct Box2DContactPoint {
 
 struct ContactBufferManifold {
 	Box2DContactPoint points[b2_maxManifoldPoints];
-	int count = 0;
 
-	// TODO Optimize? These functions may be overkill, but everything currently works this way
-
-	inline void insert(Box2DContactPoint &p_point, int p_idx) {
-		ERR_FAIL_COND(count + 1 > b2_maxManifoldPoints);
+	inline void set(Box2DContactPoint &p_point, int p_idx) {
 		ERR_FAIL_COND(p_idx < 0 || p_idx >= b2_maxManifoldPoints);
-		ERR_FAIL_COND(p_idx > count); // Can't insert a point leaving a null at the index below
-
-		// Shift points up
-		if (p_idx < count) {
-			for (int i = count; i > p_idx; --i) {
-				points[i] = points[i - 1];
-			}
-		}
 		points[p_idx] = p_point;
-
-		++count;
 	}
 
-	inline void remove(int p_idx) {
-		ERR_FAIL_COND(p_idx < 0 || p_idx >= count || p_idx >= b2_maxManifoldPoints);
+	inline void erase(int p_idx) {
+		ERR_FAIL_COND(p_idx < 0 || p_idx >= b2_maxManifoldPoints);
+		points[p_idx].id = -1;
+	}
 
-		// Shift points down
-		if (p_idx < count - 1) {
-			for (int i = p_idx; i < count - 1; ++i) {
-				// There's a buffer overflow warning for this line but I don't believe it
-				points[i] = points[i + 1];
+	inline bool is_empty() {
+		for (int i = 0; i < b2_maxManifoldPoints; ++i) {
+			if (points[i].id != -1) {
+				return false;
 			}
-			points[count - 1].id = -1;
 		}
-
-		--count;
+		return true;
 	}
 };
 
