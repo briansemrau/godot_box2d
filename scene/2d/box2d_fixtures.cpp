@@ -115,7 +115,7 @@ bool Box2DFixture::destroy_b2() {
 		ERR_FAIL_COND_V(!owner_node, false);
 		if (owner_node->body) {
 			for (int i = 0; i < fixtures.size(); i++) {
-				fixtures[i]->GetUserData().owner = NULL;
+				//fixtures[i]->GetUserData().owner = NULL;
 				owner_node->body->DestroyFixture(fixtures[i]);
 			}
 			fixtures.clear();
