@@ -72,7 +72,7 @@ void Box2DFixture::create_b2Fixture(b2Fixture *&p_fixture_out, const b2FixtureDe
 	}
 
 	p_fixture_out->GetUserData().owner = this;
-	Box2DPhysicsBody *body_node = dynamic_cast<Box2DPhysicsBody *>(owner_node);
+	Box2DPhysicsBody *body_node = Object::cast_to<Box2DPhysicsBody>(owner_node);
 	if (body_node)
 		body_node->update_mass();
 }
@@ -203,8 +203,8 @@ void Box2DFixture::_notification(int p_what) {
 			}
 
 			Color draw_col;
-			Box2DPhysicsBody *body_node = dynamic_cast<Box2DPhysicsBody *>(owner_node);
-			//Box2DArea *area_node = dynamic_cast<Box2DArea *>(owner_node);
+			Box2DPhysicsBody *body_node = Object::cast_to<Box2DPhysicsBody>(owner_node);
+			//Box2DArea *area_node = Object::cast_to<Box2DArea>(owner_node);
 
 			if (!owner_node) {
 				draw_col = Color(1.0f, 0.0f, 0.0f);
