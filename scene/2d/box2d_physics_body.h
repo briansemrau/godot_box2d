@@ -122,6 +122,7 @@ protected:
 	virtual void on_b2Body_created() override;
 
 	virtual void pre_step(float p_delta) override;
+	virtual void step(float p_delta) override;
 
 protected:
 	void _notification(int p_what);

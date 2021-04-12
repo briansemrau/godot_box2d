@@ -94,6 +94,8 @@ protected:
 	void _notification(int p_what);
 	static void _bind_methods();
 
+	GDVIRTUAL1(_world_step, float);
+
 	// Joint node local-space anchor points. These sync with jointDef's body-local anchor points.
 	// Allows configuring anchor points to be in different world positions when added to the scene.
 	// Modifying these is generally not recommended unless required for initializing a broken joint that starts separated.
@@ -119,6 +121,8 @@ protected:
 	Vector2 get_anchor_b() const;
 
 	void reset_joint_anchors();
+
+	void step(float p_delta);
 
 public:
 	virtual PackedStringArray get_configuration_warnings() const override;

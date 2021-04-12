@@ -397,10 +397,6 @@ protected:
 	static void _bind_methods();
 
 public:
-	enum {
-		NOTIFICATION_WORLD_STEPPED = 42300, // special int that shouldn't clobber other notifications.  See node.h
-	};
-
 	void step(float p_step);
 
 	float get_last_step_delta() const;

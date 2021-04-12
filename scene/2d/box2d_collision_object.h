@@ -4,6 +4,7 @@
 #include <core/io/resource.h>
 #include <core/object/object.h>
 #include <core/object/ref_counted.h>
+#include <core/object/gdvirtual.gen.inc>
 #include <core/templates/vset.h>
 #include <scene/2d/node_2d.h>
 
@@ -71,10 +72,13 @@ protected:
 	virtual void _on_fixture_exited(Box2DFixture *p_fixture, Box2DFixture *p_self_fixture) = 0;
 
 	virtual void pre_step(float p_delta){};
+	virtual void step(float p_delta);
 
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
+
+	GDVIRTUAL1(_world_step, float);
 
 public:
 	virtual PackedStringArray get_configuration_warnings() const override;
