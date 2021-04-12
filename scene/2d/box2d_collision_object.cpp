@@ -43,7 +43,7 @@ bool Box2DCollisionObject::destroy_b2Body() {
 		ERR_FAIL_COND_V(!world_node->world, false);
 
 		// Destroy body
-		body->GetUserData().owner = NULL;
+		//body->GetUserData().owner = NULL;
 		world_node->world->DestroyBody(body);
 		body = NULL;
 

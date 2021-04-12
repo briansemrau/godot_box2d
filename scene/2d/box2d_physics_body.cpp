@@ -478,12 +478,12 @@ void Box2DPhysicsBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_contact_normal_impulse", "idx"), &Box2DPhysicsBody::get_contact_normal_impulse);
 	ClassDB::bind_method(D_METHOD("get_contact_tangent_impulse", "idx"), &Box2DPhysicsBody::get_contact_tangent_impulse);
 
-	ClassDB::bind_method(D_METHOD("apply_force", "force", "point"), &Box2DPhysicsBody::apply_force, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("apply_central_force", "force"), &Box2DPhysicsBody::apply_central_force, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("apply_torque", "torque"), &Box2DPhysicsBody::apply_torque, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("apply_linear_impulse", "impulse", "point"), &Box2DPhysicsBody::apply_linear_impulse, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("apply_central_linear_impulse", "impulse"), &Box2DPhysicsBody::apply_central_linear_impulse, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("apply_torque_impulse", "impulse"), &Box2DPhysicsBody::apply_torque_impulse, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("apply_force", "force", "point", "wake"), &Box2DPhysicsBody::apply_force, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("apply_central_force", "force", "wake"), &Box2DPhysicsBody::apply_central_force, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("apply_torque", "torque", "wake"), &Box2DPhysicsBody::apply_torque, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("apply_linear_impulse", "impulse", "point", "wake"), &Box2DPhysicsBody::apply_linear_impulse, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("apply_central_linear_impulse", "impulse", "wake"), &Box2DPhysicsBody::apply_central_linear_impulse, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("apply_torque_impulse", "impulse", "wake"), &Box2DPhysicsBody::apply_torque_impulse, DEFVAL(true));
 
 	ClassDB::bind_method(D_METHOD("set_integrate_position", "enabled"), &Box2DPhysicsBody::set_integrate_position);
 	ClassDB::bind_method(D_METHOD("is_integrate_position_enabled"), &Box2DPhysicsBody::is_integrate_position_enabled);
@@ -519,7 +519,7 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "sync_to_physics"), "set_sync_to_physics", "is_sync_to_physics_enabled");
 	ADD_GROUP("Linear", "linear_");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "linear_velocity"), "set_linear_velocity", "get_linear_velocity");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "linear_damping", PROPERTY_HINT_RANGE, "-1,1,0.001"), "set_linear_damping", "get_linear_damping");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "linear_damping"), "set_linear_damping", "get_linear_damping");
 	ADD_GROUP("Angular", "angular_");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "angular_velocity"), "set_angular_velocity", "get_angular_velocity");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "angular_damping"), "set_angular_damping", "get_angular_damping");

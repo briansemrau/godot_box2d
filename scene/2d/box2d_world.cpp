@@ -283,7 +283,7 @@ inline void Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
 		c.fixture_a = fnode_a;
 		c.fixture_b = fnode_b;
 
-		buffer_manifold->insert(c, i);
+		buffer_manifold->set(c, i);
 
 		// Buffer again into monitoring node
 		if (hasCapacityA) {
@@ -417,8 +417,11 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 	ContactBufferManifold *buffer_manifold = contact_buffer.getptr(reinterpret_cast<uint64_t>(contact));
 
 	if (buffer_manifold) {
-		for (int i = 0; i < buffer_manifold->count; ++i) {
+		for (int i = 0; i < b2_maxManifoldPoints; ++i) {
 			Box2DContactPoint *c_ptr = &buffer_manifold->points[i];
+
+			if (c_ptr->id == -1)
+				continue;
 
 			if (c_ptr->fixture_a->owner_node->_is_contact_monitor_enabled()) {
 				// TODO lock/unlock
@@ -457,8 +460,11 @@ void Box2DWorld::PreSolve(b2Contact *contact, const b2Manifold *oldManifold) {
 	for (int i = b2_maxManifoldPoints - 1; i >= 0; --i) {
 		if (state1[i] == b2PointState::b2_removeState) {
 			// Remove this contact
-			if (buffer_manifold && i < buffer_manifold->count) {
+			if (buffer_manifold) {
 				Box2DContactPoint *c_ptr = &buffer_manifold->points[i];
+
+				if (c_ptr->id == -1)
+					continue;
 
 				if (c_ptr->fixture_a->owner_node->_is_contact_monitor_enabled()) {
 					// TODO lock/unlock
@@ -469,8 +475,8 @@ void Box2DWorld::PreSolve(b2Contact *contact, const b2Manifold *oldManifold) {
 					c_ptr->fixture_b->owner_node->contact_monitor->contacts.erase(*c_ptr);
 				}
 
-				buffer_manifold->remove(i);
-				if (buffer_manifold->count == 0) {
+				buffer_manifold->erase(i);
+				if (buffer_manifold->is_empty()) {
 					ERR_FAIL_COND(!contact_buffer.erase(reinterpret_cast<uint64_t>(contact)));
 				}
 			}
@@ -484,8 +490,11 @@ void Box2DWorld::PreSolve(b2Contact *contact, const b2Manifold *oldManifold) {
 
 	if (buffer_manifold) {
 		// Only handle the first PreSolve for this contact this step (don't overwrite initial impact_velocity, world_pos)
-		for (int i = 0; i < buffer_manifold->count; ++i) {
+		for (int i = 0; i < b2_maxManifoldPoints; ++i) {
 			Box2DContactPoint *c_ptr = &buffer_manifold->points[i];
+
+			if (c_ptr->id == -1)
+				continue;
 
 			if (c_ptr->solves == 0) {
 				c_ptr->solves += 1;
@@ -525,8 +534,11 @@ void Box2DWorld::PostSolve(b2Contact *contact, const b2ContactImpulse *impulse) 
 		ContactBufferManifold *buffer_manifold = contact_buffer.getptr(reinterpret_cast<uint64_t>(contact));
 
 		if (buffer_manifold) {
-			for (int i = 0; i < buffer_manifold->count; ++i) {
+			for (int i = 0; i < b2_maxManifoldPoints; ++i) {
 				Box2DContactPoint *c_ptr = &buffer_manifold->points[i];
+
+				if (c_ptr->id == -1)
+					continue;
 
 				Vector2 manifold_tan = c_ptr->normal.rotated(Math_PI * 0.5);
 				// TODO test: should impulse be accumulated (relevant to TOI solve), or does Box2D accumulate them itself?
@@ -660,7 +672,7 @@ void Box2DWorld::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("body_test_motion", "body", "from", "motion", "infinite_inertia", "result"), &Box2DWorld::_body_test_motion_binding, DEFVAL(Variant()));
 
-	ClassDB::bind_method(D_METHOD("step", "delta"), &Box2DWorld::step);
+	ClassDB::bind_method(D_METHOD("step", "delta", "velocity_iterations", "position_iterations"), &Box2DWorld::step, DEFVAL(8), DEFVAL(8));
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "auto_step"), "set_auto_step", "get_auto_step");
@@ -1024,11 +1036,13 @@ b2Vec2 Box2DWorld::_solve_position(const Vector<const b2Shape *> &p_body_shapes,
 	return correction;
 }
 
-void Box2DWorld::step(float p_step) {
+void Box2DWorld::step(float p_step, int32 velocity_iterations, int32 position_iterations) {
 	// Reset contact "solves" counter to 0
 	for (KeyValue<uint64_t, ContactBufferManifold> &E : contact_buffer) {
 		ContactBufferManifold *buffer_manifold = &E.value;
-		for (int i = 0; i < buffer_manifold->count; ++i) {
+		for (int i = 0; i < b2_maxManifoldPoints; ++i) {
+			if (buffer_manifold->points[i].id == -1)
+				continue;
 			buffer_manifold->points[i].reset_accum();
 		}
 	}
@@ -1039,7 +1053,7 @@ void Box2DWorld::step(float p_step) {
 	}
 
 	// Step world
-	world->Step(p_step, 8, 8);
+	world->Step(p_step, velocity_iterations, position_iterations);
 	flag_rescan_contacts_monitored = false;
 
 	last_step_delta = p_step;

@@ -34,7 +34,7 @@ void Box2DPolygonEditor::_set_node(Node *p_polygon) {
 
 bool Box2DPolygonEditor::_is_line() const {
 	if (node->get_shape().is_valid()) {
-		Box2DPolygonShape *poly = dynamic_cast<Box2DPolygonShape *>(*node->get_shape());
+		Box2DPolygonShape *poly = Object::cast_to<Box2DPolygonShape>(*node->get_shape());
 		if (poly) {
 			return poly->get_build_mode() == Box2DPolygonShape::BUILD_OPEN_SEGMENTS;
 		}
@@ -44,7 +44,7 @@ bool Box2DPolygonEditor::_is_line() const {
 
 Variant Box2DPolygonEditor::_get_polygon(int p_idx) const {
 	if (node->get_shape().is_valid()) {
-		Box2DPolygonShape *poly = dynamic_cast<Box2DPolygonShape *>(*node->get_shape());
+		Box2DPolygonShape *poly = Object::cast_to<Box2DPolygonShape>(*node->get_shape());
 		if (poly) {
 			return poly->get_points();
 		}
@@ -54,7 +54,7 @@ Variant Box2DPolygonEditor::_get_polygon(int p_idx) const {
 
 void Box2DPolygonEditor::_set_polygon(int p_idx, const Variant &p_polygon) const {
 	if (node->get_shape().is_valid()) {
-		Box2DPolygonShape *poly = dynamic_cast<Box2DPolygonShape *>(*node->get_shape());
+		Box2DPolygonShape *poly = Object::cast_to<Box2DPolygonShape>(*node->get_shape());
 		if (poly) {
 			poly->set_points(p_polygon);
 		}
