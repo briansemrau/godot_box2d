@@ -665,8 +665,6 @@ void Box2DWorld::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "auto_step"), "set_auto_step", "get_auto_step");
-
-	BIND_CONSTANT(NOTIFICATION_WORLD_STEPPED);
 }
 
 inline void _get_aabb_from_shapes(const Vector<const b2Shape *> &p_b2shapes, const b2Transform &p_xform, b2AABB &r_aabb) {
@@ -1042,20 +1040,26 @@ void Box2DWorld::step(float p_step) {
 		obj->get()->pre_step(p_step);
 	}
 
-	// Step
+	// Step world
 	world->Step(p_step, 8, 8);
 	flag_rescan_contacts_monitored = false;
 
 	last_step_delta = p_step;
 
-	// Body/shape inout callbacks
+	// Step bodies/joints
+	for (Set<Box2DCollisionObject *>::Element *obj = body_owners.front(); obj; obj = obj->next()) {
+		obj->get()->step(p_step);
+	}
+	
+	for (Set<Box2DJoint *>::Element *joint = joint_owners.front(); joint; joint = joint->next()) {
+		joint->get()->step(p_step);
+	}
+
+	// Body/fixture inout callbacks
 	object_entered_queue.call_and_clear();
 	object_exited_queue.call_and_clear();
 	fixture_entered_queue.call_and_clear();
 	fixture_exited_queue.call_and_clear();
-
-	// Notify our bodies in this world
-	propagate_notification(NOTIFICATION_WORLD_STEPPED);
 }
 
 float Box2DWorld::get_last_step_delta() const {
