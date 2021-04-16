@@ -62,11 +62,20 @@ struct ContactBufferManifold {
 
 	inline void set(Box2DContactPoint &p_point, int p_idx) {
 		ERR_FAIL_COND(p_idx < 0 || p_idx >= b2_maxManifoldPoints);
+		ERR_FAIL_COND(points[p_idx].id != -1);
 		points[p_idx] = p_point;
+	}
+
+	inline void swap() {
+		ERR_FAIL_COND(b2_maxManifoldPoints != 2); // affirm in case this ever changes(?) - swap algo would need to become smart
+		const Box2DContactPoint temp = points[0];
+		points[0] = points[1];
+		points[1] = temp;
 	}
 
 	inline void erase(int p_idx) {
 		ERR_FAIL_COND(p_idx < 0 || p_idx >= b2_maxManifoldPoints);
+		ERR_FAIL_COND(points[p_idx].id == -1);
 		points[p_idx].id = -1;
 	}
 

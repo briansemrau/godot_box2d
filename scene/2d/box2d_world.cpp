@@ -287,12 +287,10 @@ inline void Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
 
 		// Buffer again into monitoring node
 		if (hasCapacityA) {
-			auto contacts = &fnode_a->owner_node->contact_monitor->contacts;
-			contacts->insert(c);
+			fnode_a->owner_node->contact_monitor->contacts.insert(c);
 		}
 		if (hasCapacityB) {
-			auto contacts = &fnode_b->owner_node->contact_monitor->contacts;
-			contacts->insert(c);
+			fnode_b->owner_node->contact_monitor->contacts.insert(c);
 		}
 	}
 }
@@ -484,6 +482,10 @@ void Box2DWorld::PreSolve(b2Contact *contact, const b2Manifold *oldManifold) {
 	}
 	for (int i = 0; i < b2_maxManifoldPoints; ++i) {
 		if (state2[i] == b2PointState::b2_addState) {
+			if (state1[i] != b2PointState::b2_removeState) {
+				if (buffer_manifold)
+					buffer_manifold->swap();
+			}
 			try_buffer_contact(contact, i);
 		}
 	}
@@ -548,19 +550,19 @@ void Box2DWorld::PostSolve(b2Contact *contact, const b2ContactImpulse *impulse) 
 				// Update contacts buffered in listening nodes
 				if (monitoringA) {
 					//fnode_a->body_node->contact_monitor.locked = true; TODO
-					auto contacts = &fnode_a->owner_node->contact_monitor->contacts;
-					int idx = contacts->find(*c_ptr);
+					VSet<Box2DContactPoint> * const contacts = &fnode_a->owner_node->contact_monitor->contacts;
+					const int idx = contacts->find(*c_ptr);
 					if (idx >= 0)
 						(*contacts)[idx] = (*c_ptr);
 					//fnode_a->body_node->contact_monitor.locked = false;
 				}
 				if (monitoringB) {
 					// Invert contact so A is always owned by the monitor
-					Box2DContactPoint cB = c_ptr->flipped_a_b();
+					const Box2DContactPoint cB = c_ptr->flipped_a_b();
 
 					//fnode_b->body_node->contact_monitor.locked = true; TODO
-					auto contacts = &fnode_b->owner_node->contact_monitor->contacts;
-					int idx = contacts->find(cB);
+					VSet<Box2DContactPoint> * const contacts = &fnode_b->owner_node->contact_monitor->contacts;
+					const int idx = contacts->find(cB);
 					if (idx >= 0)
 						(*contacts)[idx] = (cB);
 					//fnode_b->body_node->contact_monitor.locked = false;
