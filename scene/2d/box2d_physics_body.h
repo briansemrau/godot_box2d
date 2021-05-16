@@ -132,7 +132,7 @@ public:
 	void _remove_area(Box2DArea *p_area);
 	void _remove_area_variant(const Variant &p_area);
 
-	virtual String get_configuration_warning() const override;
+	virtual TypedArray<String> get_configuration_warnings() const override;
 
 	void _set_linear_velocity_no_check(const Vector2 &p_vel);
 	void set_linear_velocity(const Vector2 &p_vel);

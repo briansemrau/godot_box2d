@@ -380,8 +380,8 @@ void Box2DJoint::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("joint_broken", PropertyInfo(Variant::VECTOR2, "break_force"), PropertyInfo(Variant::FLOAT, "break_torque")));
 }
 
-String Box2DJoint::get_configuration_warning() const {
-	String warning = Node2D::get_configuration_warning();
+TypedArray<String> Box2DJoint::get_configuration_warnings() const {
+	TypedArray<String> warnings = Node2D::get_configuration_warnings();
 
 	Node *_ancestor = get_parent();
 	Box2DWorld *new_world = NULL;
@@ -391,20 +391,14 @@ String Box2DJoint::get_configuration_warning() const {
 	}
 
 	if (!new_world) {
-		if (warning != String()) {
-			warning += "\n\n";
-		}
-		warning += TTR("Box2DJoint only serves to create joints under the hierarchy of a Box2DWorld node. Please only use it as a descendant of Box2DWorld.");
+		warnings.push_back(TTR("Box2DJoint only serves to create joints under the hierarchy of a Box2DWorld node. Please only use it as a descendant of Box2DWorld."));
 	}
 
 	if (a.is_empty() || b.is_empty()) {
-		if (warning != String()) {
-			warning += "\n\n";
-		}
-		warning += TTR("This node does not have NodePaths defined for two Box2DPhysicsBody nodes, so it can't act on any bodies.");
+		warnings.push_back(TTR("This node does not have NodePaths defined for two Box2DPhysicsBody nodes, so it can't act on any bodies."));
 	}
 
-	return warning;
+	return warnings;
 }
 
 void Box2DJoint::set_nodepath_a(const NodePath &p_node_a) {
@@ -412,7 +406,7 @@ void Box2DJoint::set_nodepath_a(const NodePath &p_node_a) {
 		return;
 	a = p_node_a;
 	if (Engine::get_singleton()->is_editor_hint()) {
-		update_configuration_warning();
+		update_configuration_warnings();
 	}
 	if (is_inside_tree()) {
 		update_joint_bodies();
@@ -428,7 +422,7 @@ void Box2DJoint::set_nodepath_b(const NodePath &p_node_b) {
 		return;
 	b = p_node_b;
 	if (Engine::get_singleton()->is_editor_hint()) {
-		update_configuration_warning();
+		update_configuration_warnings();
 	}
 	if (is_inside_tree()) {
 		update_joint_bodies();

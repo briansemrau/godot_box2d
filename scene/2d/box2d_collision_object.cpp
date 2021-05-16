@@ -218,8 +218,8 @@ void Box2DCollisionObject::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("enabled_state_changed"));
 }
 
-String Box2DCollisionObject::get_configuration_warning() const {
-	String warning = Node2D::get_configuration_warning();
+TypedArray<String> Box2DCollisionObject::get_configuration_warnings() const {
+	TypedArray<String> warnings = Node2D::get_configuration_warnings();
 
 	Node *_ancestor = get_parent();
 	Box2DWorld *new_world = NULL;
@@ -229,10 +229,7 @@ String Box2DCollisionObject::get_configuration_warning() const {
 	}
 
 	if (!new_world) {
-		if (warning != String()) {
-			warning += "\n\n";
-		}
-		warning += TTR("Box2DCollisionObject only serves to provide bodies to a Box2DWorld node. Please only use it under the hierarchy of Box2DWorld.");
+		warnings.push_back(TTR("Box2DCollisionObject only serves to provide bodies to a Box2DWorld node. Please only use it under the hierarchy of Box2DWorld."));
 	}
 
 	bool has_fixture_child = false;
@@ -243,13 +240,10 @@ String Box2DCollisionObject::get_configuration_warning() const {
 		}
 	}
 	if (!has_fixture_child) {
-		if (warning != String()) {
-			warning += "\n\n";
-		}
-		warning += TTR("This node has no fixture, so it can't collide or interact with other objects.\nConsider adding a Box2DFixture subtype as a child to define its shape.");
+		warnings.push_back(TTR("This node has no fixture, so it can't collide or interact with other objects.\nConsider adding a Box2DFixture subtype as a child to define its shape."));
 	}
 
-	return warning;
+	return warnings;
 }
 
 void Box2DCollisionObject::set_enabled(bool p_enabled) {

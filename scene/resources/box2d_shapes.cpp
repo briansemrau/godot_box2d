@@ -411,7 +411,7 @@ void Box2DPolygonShape::build_polygon() {
 			// Ensure all points are counterclockwise
 			Vector<Vector2> ccw_points = points;
 			if (Geometry2D::is_polygon_clockwise(ccw_points)) {
-				ccw_points.invert();
+				ccw_points.reverse();
 			}
 
 			// Decompose concave into multiple convex
@@ -468,7 +468,7 @@ void Box2DPolygonShape::build_polygon() {
 
 			Vector<Vector2> ordered_points = points;
 			if (invert_order) {
-				ordered_points.invert();
+				ordered_points.reverse();
 			}
 
 			// Convert vertices
@@ -489,7 +489,7 @@ void Box2DPolygonShape::build_polygon() {
 
 			Vector<Vector2> ordered_points = points;
 			if (invert_order) {
-				ordered_points.invert();
+				ordered_points.reverse();
 			}
 
 			// Convert vertices

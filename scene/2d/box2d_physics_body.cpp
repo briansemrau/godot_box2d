@@ -236,7 +236,7 @@ void Box2DPhysicsBody::_update_area_effects() {
 		body->SetLinearDamping(linear_damp);
 	}
 	if (angular_damp >= 0) {
-		body->SetLinearDamping(angular_damp);
+		body->SetAngularDamping(angular_damp);
 	}
 
 	last_area_gravity = gravity;
@@ -560,8 +560,8 @@ void Box2DPhysicsBody::_remove_area_variant(const Variant &p_area) {
 	_remove_area(Object::cast_to<Box2DArea>(static_cast<Object *>(p_area)));
 }
 
-String Box2DPhysicsBody::get_configuration_warning() const {
-	String warning = Node2D::get_configuration_warning();
+TypedArray<String> Box2DPhysicsBody::get_configuration_warnings() const {
+	TypedArray<String> warnings = Node2D::get_configuration_warnings();
 
 	Node *_ancestor = get_parent();
 	Box2DWorld *new_world = NULL;
@@ -571,10 +571,7 @@ String Box2DPhysicsBody::get_configuration_warning() const {
 	}
 
 	if (!new_world) {
-		if (warning != String()) {
-			warning += "\n\n";
-		}
-		warning += TTR("Box2DPhysicsBody only serves to provide bodies to a Box2DWorld node. Please only use it under the hierarchy of Box2DWorld.");
+		warnings.push_back(TTR("Box2DPhysicsBody only serves to provide bodies to a Box2DWorld node. Please only use it under the hierarchy of Box2DWorld."));
 	}
 
 	bool has_fixture_child = false;
@@ -585,13 +582,10 @@ String Box2DPhysicsBody::get_configuration_warning() const {
 		}
 	}
 	if (!has_fixture_child) {
-		if (warning != String()) {
-			warning += "\n\n";
-		}
-		warning += TTR("This node has no fixture, so it can't collide or interact with other objects.\nConsider adding a Box2DFixture subtype as a child to define its shape.");
+		warnings.push_back(TTR("This node has no fixture, so it can't collide or interact with other objects.\nConsider adding a Box2DFixture subtype as a child to define its shape."));
 	}
 
-	return warning;
+	return warnings;
 }
 
 void Box2DPhysicsBody::_set_linear_velocity_no_check(const Vector2 &p_vel) {

@@ -77,7 +77,7 @@ protected:
 	static void _bind_methods();
 
 public:
-	virtual String get_configuration_warning() const override;
+	virtual TypedArray<String> get_configuration_warnings() const override;
 
 	// Moving to and from world transform
 	void set_box2dworld_transform(const Transform2D &p_transform);

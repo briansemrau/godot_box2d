@@ -294,7 +294,7 @@ void Box2DFixture::update_shape() {
 	update();
 
 	if (Engine::get_singleton()->is_editor_hint()) {
-		update_configuration_warning();
+		update_configuration_warnings();
 	}
 }
 
@@ -313,8 +313,8 @@ bool Box2DFixture::_edit_is_selected_on_click(const Point2 &p_point, double p_to
 }
 #endif
 
-String Box2DFixture::get_configuration_warning() const {
-	String warning = Node2D::get_configuration_warning();
+TypedArray<String> Box2DFixture::get_configuration_warnings() const {
+	TypedArray<String> warnings = Node2D::get_configuration_warnings();
 
 	// Find the parent body
 	Node *_ancestor = get_parent();
@@ -325,13 +325,10 @@ String Box2DFixture::get_configuration_warning() const {
 	}
 
 	if (!parent_body) {
-		if (warning != String()) {
-			warning += "\n\n";
-		}
-		warning += TTR("Box2DFixture only serves to provide collision fixtures to a Box2DCollisionObject node. Please use it within the child hierarchy of Box2DPhysicsBody or Box2DArea to give it collision.");
+		warnings.push_back(TTR("Box2DFixture only serves to provide collision fixtures to a Box2DCollisionObject node. Please use it within the child hierarchy of Box2DPhysicsBody or Box2DArea to give it collision."));
 	}
 
-	return warning;
+	return warnings;
 }
 
 //Box2DFixture::FixtureType Box2DFixture::get_type() const {

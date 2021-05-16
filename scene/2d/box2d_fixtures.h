@@ -63,7 +63,7 @@ public:
 
 	virtual bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const override;
 
-	virtual String get_configuration_warning() const override;
+	virtual TypedArray<String> get_configuration_warnings() const override;
 
 	Box2DCollisionObject *get_owner() const { return owner_node; }
 

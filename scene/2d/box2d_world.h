@@ -392,7 +392,7 @@ public:
 
 	// This is by-default continuous collision. Is this slow? TODO test or remove commented code
 	bool body_test_motion(const Box2DPhysicsBody *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, MotionResult *r_result = nullptr);
-	bool _body_test_motion_binding(const Object *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<PhysicsTestMotionResult2D>());
+	bool _body_test_motion_binding(const Object *p_body, const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia, const Ref<Box2DPhysicsTestMotionResult> &r_result = Ref<Box2DPhysicsTestMotionResult>());
 
 	// Box2D space query API
 	void query_aabb(const Rect2 &p_aabb, const Callable &p_callback);

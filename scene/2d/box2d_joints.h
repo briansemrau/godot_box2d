@@ -112,7 +112,7 @@ protected:
 	void reset_joint_anchors();
 
 public:
-	virtual String get_configuration_warning() const override;
+	virtual TypedArray<String> get_configuration_warnings() const override;
 
 	void set_nodepath_a(const NodePath &p_node_a);
 	NodePath get_nodepath_a() const;
