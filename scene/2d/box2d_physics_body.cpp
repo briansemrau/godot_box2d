@@ -141,10 +141,6 @@ void Box2DPhysicsBody::sync_state() {
 	set_block_transform_notify(true);
 	set_box2dworld_transform(physics_xform);
 	set_block_transform_notify(false);
-
-	// At the moment, code meant for "_integrate_forces" goes in _physics_process
-	//if (get_script_instance())
-	//	get_script_instance()->call("_integrate_forces");
 }
 
 void Box2DPhysicsBody::teleport(const Transform2D &p_transform) {

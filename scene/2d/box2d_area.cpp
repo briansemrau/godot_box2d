@@ -68,10 +68,10 @@ void Box2DArea::_on_fixture_exited(Box2DFixture *p_fixture, Box2DFixture *p_self
 }
 
 void Box2DArea::pre_step(float p_delta) {
-	Transform2D motion = last_step_xform.affine_inverse() * get_box2dworld_transform();
+	Transform2D current_xform = get_box2dworld_transform();
 
-	Vector2 lin_vel = motion.get_origin() / p_delta;
-	float ang_vel = motion.get_rotation() / p_delta;
+	Vector2 lin_vel = (current_xform.get_origin() - last_step_xform.get_origin()) / p_delta;
+	float ang_vel = (current_xform.get_rotation() - last_step_xform.get_rotation()) / p_delta;
 
 	b2Body *body = _get_b2Body();
 	if (body) {
