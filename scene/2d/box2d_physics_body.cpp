@@ -862,37 +862,44 @@ int Box2DPhysicsBody::get_contact_count() const {
 }
 
 Box2DFixture *Box2DPhysicsBody::get_contact_fixture_a(int p_idx) const {
-	ERR_FAIL_COND_V_MSG(!contact_monitor, NULL, "Contact monitoring is disabled.");
+	ERR_FAIL_COND_V_MSG(!contact_monitor, nullptr, "Contact monitoring is disabled.");
+	ERR_FAIL_INDEX_V(p_idx, contact_monitor->contacts.size(), nullptr);
 	return contact_monitor->contacts[p_idx].fixture_a;
 }
 
 Box2DFixture *Box2DPhysicsBody::get_contact_fixture_b(int p_idx) const {
-	ERR_FAIL_COND_V_MSG(!contact_monitor, NULL, "Contact monitoring is disabled.");
+	ERR_FAIL_COND_V_MSG(!contact_monitor, nullptr, "Contact monitoring is disabled.");
+	ERR_FAIL_INDEX_V(p_idx, contact_monitor->contacts.size(), nullptr);
 	return contact_monitor->contacts[p_idx].fixture_b;
 }
 
 Vector2 Box2DPhysicsBody::get_contact_world_pos(int p_idx) const {
 	ERR_FAIL_COND_V_MSG(!contact_monitor, Vector2(), "Contact monitoring is disabled.");
+	ERR_FAIL_INDEX_V(p_idx, contact_monitor->contacts.size(), Vector2());
 	return contact_monitor->contacts[p_idx].world_pos;
 }
 
 Vector2 Box2DPhysicsBody::get_contact_impact_velocity(int p_idx) const {
 	ERR_FAIL_COND_V_MSG(!contact_monitor, Vector2(), "Contact monitoring is disabled.");
+	ERR_FAIL_INDEX_V(p_idx, contact_monitor->contacts.size(), Vector2());
 	return contact_monitor->contacts[p_idx].impact_velocity;
 }
 
 Vector2 Box2DPhysicsBody::get_contact_normal(int p_idx) const {
 	ERR_FAIL_COND_V_MSG(!contact_monitor, Vector2(), "Contact monitoring is disabled.");
+	ERR_FAIL_INDEX_V(p_idx, contact_monitor->contacts.size(), Vector2());
 	return contact_monitor->contacts[p_idx].normal;
 }
 
 float Box2DPhysicsBody::get_contact_normal_impulse(int p_idx) const {
 	ERR_FAIL_COND_V_MSG(!contact_monitor, float(), "Contact monitoring is disabled.");
+	ERR_FAIL_INDEX_V(p_idx, contact_monitor->contacts.size(), float());
 	return contact_monitor->contacts[p_idx].normal_impulse;
 }
 
 Vector2 Box2DPhysicsBody::get_contact_tangent_impulse(int p_idx) const {
 	ERR_FAIL_COND_V_MSG(!contact_monitor, Vector2(), "Contact monitoring is disabled.");
+	ERR_FAIL_INDEX_V(p_idx, contact_monitor->contacts.size(), Vector2());
 	return contact_monitor->contacts[p_idx].tangent_impulse;
 }
 
