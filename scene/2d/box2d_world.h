@@ -58,7 +58,7 @@ struct Box2DContactPoint {
 };
 
 struct ContactBufferManifold {
-	Box2DContactPoint points[b2_maxManifoldPoints];
+	Box2DContactPoint points[b2_maxManifoldPoints]{};
 
 	inline void set(Box2DContactPoint &p_point, int p_idx) {
 		ERR_FAIL_COND(p_idx < 0 || p_idx >= b2_maxManifoldPoints);
@@ -343,7 +343,7 @@ private:
 	bool flag_rescan_contacts_monitored = false;
 	HashMap<uint64_t, ContactBufferManifold> contact_buffer;
 
-	inline void try_buffer_contact(b2Contact *contact, int i);
+	inline ContactBufferManifold *try_buffer_contact(b2Contact *contact, int i);
 
 	virtual void BeginContact(b2Contact *contact) override;
 	virtual void EndContact(b2Contact *contact) override;

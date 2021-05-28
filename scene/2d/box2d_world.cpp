@@ -248,9 +248,9 @@ bool Box2DWorld::ShouldCollide(b2Fixture *fixtureA, b2Fixture *fixtureB) {
 	return true;
 }
 
-inline void Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
+inline ContactBufferManifold *Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
 	if (contact->GetFixtureA()->IsSensor() || contact->GetFixtureB()->IsSensor()) {
-		return;
+		return nullptr;
 	}
 
 	Box2DFixture *fnode_a = contact->GetFixtureA()->GetUserData().owner;
@@ -293,6 +293,8 @@ inline void Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
 			fnode_b->owner_node->contact_monitor->contacts.insert(c);
 		}
 	}
+
+	return buffer_manifold;
 }
 
 void Box2DWorld::BeginContact(b2Contact *contact) {
@@ -437,28 +439,36 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 
 void Box2DWorld::PreSolve(b2Contact *contact, const b2Manifold *oldManifold) {
 	b2PointState state1[2], state2[2];
-	b2GetPointStates(state1, state2, oldManifold, contact->GetManifold());
+	const b2Manifold *newManifold = contact->GetManifold();
+	b2GetPointStates(state1, state2, oldManifold, newManifold);
 
 	Box2DFixture *fnode_a = contact->GetFixtureA()->GetUserData().owner;
 	Box2DFixture *fnode_b = contact->GetFixtureB()->GetUserData().owner;
 
 	ContactBufferManifold *buffer_manifold = contact_buffer.getptr(reinterpret_cast<uint64_t>(contact));
 
+	// Check if points have swapped order
+	if (buffer_manifold) {
+		if ((oldManifold->pointCount > 0 && newManifold->pointCount > 1 && oldManifold->points[0].id.key == newManifold->points[1].id.key) || (oldManifold->pointCount > 1 && newManifold->pointCount > 0 && oldManifold->points[1].id.key == newManifold->points[0].id.key)) {
+			buffer_manifold->swap();
+		}
+	}
+
 	if (unlikely(flag_rescan_contacts_monitored) && !buffer_manifold) {
 		// Buffer a contact that only started being monitored after it transitioned from b2_addState
 		for (int i = 0; i < b2_maxManifoldPoints; ++i) {
 			if (state1[i] == b2PointState::b2_persistState) {
-				try_buffer_contact(contact, i);
+				buffer_manifold = try_buffer_contact(contact, i);
 			}
 		}
-		buffer_manifold = contact_buffer.getptr(reinterpret_cast<uint64_t>(contact)); // possible optimization: try_buffer_contact could return buffer_manifold ptr
 	}
 
 	// Handle removed/added points within the manifold
-	for (int i = b2_maxManifoldPoints - 1; i >= 0; --i) {
-		if (state1[i] == b2PointState::b2_removeState) {
-			// Remove this contact
-			if (buffer_manifold) {
+	if (buffer_manifold) {
+		for (int i = b2_maxManifoldPoints - 1; i >= 0; --i) {
+			if (state1[i] == b2PointState::b2_removeState) {
+				// Remove this contact
+
 				Box2DContactPoint *c_ptr = &buffer_manifold->points[i];
 
 				if (c_ptr->id == -1)
@@ -474,20 +484,16 @@ void Box2DWorld::PreSolve(b2Contact *contact, const b2Manifold *oldManifold) {
 				}
 
 				buffer_manifold->erase(i);
-				if (buffer_manifold->is_empty()) {
-					ERR_FAIL_COND(!contact_buffer.erase(reinterpret_cast<uint64_t>(contact)));
-				}
 			}
 		}
 	}
 	for (int i = 0; i < b2_maxManifoldPoints; ++i) {
 		if (state2[i] == b2PointState::b2_addState) {
-			if (state1[i] != b2PointState::b2_removeState) {
-				if (buffer_manifold)
-					buffer_manifold->swap();
-			}
-			try_buffer_contact(contact, i);
+			buffer_manifold = try_buffer_contact(contact, i);
 		}
+	}
+	if (buffer_manifold && buffer_manifold->is_empty()) {
+		ERR_FAIL_COND(!contact_buffer.erase(reinterpret_cast<uint64_t>(contact)));
 	}
 
 	if (buffer_manifold) {
@@ -544,8 +550,8 @@ void Box2DWorld::PostSolve(b2Contact *contact, const b2ContactImpulse *impulse) 
 
 				Vector2 manifold_tan = c_ptr->normal.rotated(Math_PI * 0.5);
 				// TODO test: should impulse be accumulated (relevant to TOI solve), or does Box2D accumulate them itself?
-				c_ptr->normal_impulse += impulse->normalImpulses[i];
-				c_ptr->tangent_impulse += manifold_tan * impulse->tangentImpulses[i];
+				c_ptr->normal_impulse += impulse->normalImpulses[i] * B2_TO_GD;
+				c_ptr->tangent_impulse += manifold_tan * impulse->tangentImpulses[i] * B2_TO_GD;
 
 				// Update contacts buffered in listening nodes
 				if (monitoringA) {
