@@ -21,12 +21,12 @@
 
 #include "../../editor/box2d_joint_editor_plugin.h"
 #include "../../util/box2d_types_converter.h"
-#include "box2d_physics_body.h"
 
 /**
 * @author Brian Semrau
 */
 
+class Box2DPhysicsBody;
 class Box2DWorld;
 
 class Box2DJoint : public Node2D {

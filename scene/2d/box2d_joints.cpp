@@ -1,4 +1,5 @@
 #include "box2d_joints.h"
+#include "box2d_physics_body.h"
 #include "box2d_world.h"
 
 #include <core/engine.h>
