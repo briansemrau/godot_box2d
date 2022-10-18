@@ -344,7 +344,7 @@ void Box2DPhysicsBody::_notification(int p_what) {
 			set_process_internal(false);
 		} break;
 
-		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
+		case NOTIFICATION_TRANSFORM_CHANGED: {
 			Mode type = get_type();
 			Transform2D new_xform = get_box2dworld_transform();
 
@@ -1165,7 +1165,6 @@ bool Box2DPhysicsBody::is_sync_to_physics_enabled() const {
 
 Box2DPhysicsBody::Box2DPhysicsBody() {
 	set_physics_process_internal(true);
-	set_notify_local_transform(true);
 }
 
 Box2DPhysicsBody::~Box2DPhysicsBody() {
