@@ -337,7 +337,7 @@ Box2DCollisionObject::Box2DCollisionObject() {
 	filterDef.maskBits = 0x0001;
 
 	set_physics_process_internal(true);
-	set_notify_local_transform(true);
+	set_notify_transform(true);
 }
 
 Box2DCollisionObject::~Box2DCollisionObject() {
