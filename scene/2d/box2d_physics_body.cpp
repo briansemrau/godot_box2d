@@ -146,7 +146,7 @@ void Box2DPhysicsBody::teleport(const Transform2D &p_transform) {
 }
 
 void Box2DPhysicsBody::_compute_area_effects(const Box2DArea *p_area, b2Vec2 &r_gravity, float &r_lin_damp, float &r_ang_damp) {
-	b2Body *body = _get_b2Body();
+	//b2Body *body = _get_b2Body();
 
 	if (p_area->is_gravity_a_point()) {
 		Vector2 r = p_area->get_box2dworld_transform().xform(p_area->get_gravity_vector()) - get_box2dworld_transform().get_origin();
@@ -279,7 +279,7 @@ Ref<Box2DKinematicCollision> Box2DPhysicsBody::_move_and_collide_binding(const V
 
 	if (move_and_collide(p_motion, p_rotation, p_infinite_inertia, col, p_exclude_raycast_shapes, p_test_only)) {
 		if (motion_cache.is_null()) {
-			motion_cache.instance();
+			motion_cache.instantiate();
 			motion_cache->owner = this;
 		}
 
@@ -298,7 +298,7 @@ Ref<Box2DKinematicCollision> Box2DPhysicsBody::_get_slide_collision_binding(int 
 	}
 
 	if (kinematic_colliders_refcache[p_bounce].is_null()) {
-		kinematic_colliders_refcache.write[p_bounce].instance();
+		kinematic_colliders_refcache.write[p_bounce].instantiate();
 		kinematic_colliders_refcache.write[p_bounce]->owner = this;
 	}
 
@@ -485,8 +485,8 @@ void Box2DPhysicsBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_integrate_position_enabled"), &Box2DPhysicsBody::is_integrate_position_enabled);
 
 	ClassDB::bind_method(D_METHOD("move_and_collide", "velocity", "rotation", "infinite_inertia", "exclude_raycast_shapes", "test_only"), &Box2DPhysicsBody::_move_and_collide_binding, DEFVAL(true), DEFVAL(true), DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("move_and_slide", "linear_velocity", "up_direction", "stop_on_slope", "max_slides", "floor_max_angle", "infinite_inertia"), &Box2DPhysicsBody::move_and_slide, DEFVAL(Vector2(0, 0)), DEFVAL(false), DEFVAL(4), DEFVAL(Math::deg2rad(45.0f)), DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("move_and_slide_with_snap", "linear_velocity", "snap", "up_direction", "stop_on_slope", "max_slides", "floor_max_angle", "infinite_inertia"), &Box2DPhysicsBody::move_and_slide_with_snap, DEFVAL(Vector2(0, 0)), DEFVAL(false), DEFVAL(4), DEFVAL(Math::deg2rad(45.0f)), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("move_and_slide", "linear_velocity", "up_direction", "stop_on_slope", "max_slides", "floor_max_angle", "infinite_inertia"), &Box2DPhysicsBody::move_and_slide, DEFVAL(Vector2(0, 0)), DEFVAL(false), DEFVAL(4), DEFVAL(Math::deg_to_rad(45.0f)), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("move_and_slide_with_snap", "linear_velocity", "snap", "up_direction", "stop_on_slope", "max_slides", "floor_max_angle", "infinite_inertia"), &Box2DPhysicsBody::move_and_slide_with_snap, DEFVAL(Vector2(0, 0)), DEFVAL(false), DEFVAL(4), DEFVAL(Math::deg_to_rad(45.0f)), DEFVAL(true));
 
 	ClassDB::bind_method(D_METHOD("test_move", "from", "rel_vec", "infinite_inertia"), &Box2DPhysicsBody::test_move, DEFVAL(true));
 
@@ -522,8 +522,8 @@ void Box2DPhysicsBody::_bind_methods() {
 	ADD_GROUP("", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_custom_massdata"), "set_use_custom_massdata", "get_use_custom_massdata");
 	ADD_GROUP("Custom Mass Data", "custom_");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "custom_mass", PROPERTY_HINT_EXP_RANGE, "0.01,65535,0.01"), "set_custom_mass", "get_custom_mass");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "custom_inertia", PROPERTY_HINT_EXP_RANGE, "0.01,65535,0.01"), "set_custom_inertia", "get_custom_inertia");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "custom_mass", PROPERTY_HINT_RANGE, "0.01,65535,0.01,exp"), "set_custom_mass", "get_custom_mass");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "custom_inertia", PROPERTY_HINT_RANGE, "0.01,65535,0.01,exp"), "set_custom_inertia", "get_custom_inertia");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "custom_center_of_mass"), "set_custom_center_of_mass", "get_custom_center_of_mass");
 
 	ADD_SIGNAL(MethodInfo("body_fixture_entered", PropertyInfo(Variant::OBJECT, "fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture"), PropertyInfo(Variant::OBJECT, "local_fixture", PROPERTY_HINT_RESOURCE_TYPE, "Box2DFixture")));
@@ -544,14 +544,14 @@ void Box2DPhysicsBody::_add_area(Box2DArea *p_area) {
 		colliding_areas.ordered_insert(item);
 		Vector<Variant> binds;
 		binds.push_back(Variant(p_area));
-		p_area->connect(SceneStringNames::get_singleton()->tree_exited, callable_mp(this, &Box2DPhysicsBody::_remove_area_variant), binds, Object::ConnectFlags::CONNECT_ONESHOT);
+		p_area->connect(SceneStringNames::get_singleton()->tree_exited, callable_mp(this, &Box2DPhysicsBody::_remove_area_variant).bind(binds), Object::ConnectFlags::CONNECT_ONE_SHOT);
 	}
 }
 
 void Box2DPhysicsBody::_remove_area(Box2DArea *p_area) {
 	const int index = colliding_areas.find(Box2DAreaItem(p_area));
 	if (index > -1) {
-		colliding_areas.remove(index);
+		colliding_areas.remove_at(index);
 		p_area->disconnect(SceneStringNames::get_singleton()->tree_exited, callable_mp(this, &Box2DPhysicsBody::_remove_area_variant));
 	}
 }
@@ -560,8 +560,8 @@ void Box2DPhysicsBody::_remove_area_variant(const Variant &p_area) {
 	_remove_area(Object::cast_to<Box2DArea>(static_cast<Object *>(p_area)));
 }
 
-TypedArray<String> Box2DPhysicsBody::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node2D::get_configuration_warnings();
+PackedStringArray Box2DPhysicsBody::get_configuration_warnings() const {
+	PackedStringArray warnings = Node2D::get_configuration_warnings();
 
 	Node *_ancestor = get_parent();
 	Box2DWorld *new_world = NULL;
@@ -571,7 +571,7 @@ TypedArray<String> Box2DPhysicsBody::get_configuration_warnings() const {
 	}
 
 	if (!new_world) {
-		warnings.push_back(TTR("Box2DPhysicsBody only serves to provide bodies to a Box2DWorld node. Please only use it under the hierarchy of Box2DWorld."));
+		warnings.push_back(RTR("Box2DPhysicsBody only serves to provide bodies to a Box2DWorld node. Please only use it under the hierarchy of Box2DWorld."));
 	}
 
 	bool has_fixture_child = false;
@@ -582,7 +582,7 @@ TypedArray<String> Box2DPhysicsBody::get_configuration_warnings() const {
 		}
 	}
 	if (!has_fixture_child) {
-		warnings.push_back(TTR("This node has no fixture, so it can't collide or interact with other objects.\nConsider adding a Box2DFixture subtype as a child to define its shape."));
+		warnings.push_back(RTR("This node has no fixture, so it can't collide or interact with other objects.\nConsider adding a Box2DFixture subtype as a child to define its shape."));
 	}
 
 	return warnings;
@@ -836,10 +836,8 @@ Array Box2DPhysicsBody::get_colliding_bodies() const {
 	ERR_FAIL_COND_V(!contact_monitor, Array());
 	Array ret;
 
-	List<ObjectID> keys;
-	contact_monitor->entered_objects.get_key_list(&keys);
-	for (int i = 0; i < keys.size(); i++) {
-		Object *node = ObjectDB::get_instance(keys[i]);
+	for (const KeyValue<ObjectID, int> &E : contact_monitor->entered_objects) {
+		Object *node = ObjectDB::get_instance(E.key);
 		if (node && Object::cast_to<Box2DPhysicsBody>(node)) {
 			ret.append(node);
 		}
@@ -968,7 +966,7 @@ bool Box2DPhysicsBody::move_and_collide(const Vector2 &p_motion, const float p_r
 	}
 
 	if (!p_test_only) {
-		gt.elements[2] += result.motion;
+		gt.columns[2] += result.motion;
 		set_box2dworld_transform(gt);
 	}
 
@@ -1035,7 +1033,7 @@ Vector2 Box2DPhysicsBody::move_and_slide(const Vector2 &p_linear_velocity, const
 					if (p_stop_on_slope) {
 						if ((body_velocity_normal + up_direction).length() < 0.01 && collision.travel.length() < 1) {
 							Transform2D gt = get_box2dworld_transform();
-							gt.elements[2] -= collision.travel.slide(up_direction);
+							gt.columns[2] -= collision.travel.slide(up_direction);
 							set_box2dworld_transform(gt);
 							return Vector2();
 						}
@@ -1094,7 +1092,7 @@ Vector2 Box2DPhysicsBody::move_and_slide_with_snap(const Vector2 &p_linear_veloc
 		}
 
 		if (apply) {
-			gt.elements[2] += col.travel;
+			gt.columns[2] += col.travel;
 			set_global_transform(gt);
 		}
 	}

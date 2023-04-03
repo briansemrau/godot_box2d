@@ -1,6 +1,7 @@
 #ifndef BOX2D_POLYGON_EDITOR_PLUGIN_H
 #define BOX2D_POLYGON_EDITOR_PLUGIN_H
 
+#include <editor/editor_undo_redo_manager.h>
 #include <editor/plugins/abstract_polygon_2d_editor.h>
 
 #include "../scene/resources/box2d_shapes.h"
@@ -12,7 +13,7 @@
 class Box2DPolygonEditor : public AbstractPolygon2DEditor {
 	GDCLASS(Box2DPolygonEditor, AbstractPolygon2DEditor);
 
-	EditorNode *editor;
+	EditorUndoRedoManager *undo_redo;
 
 	Box2DFixture *node = NULL;
 	Box2DPolygonShape *shape = NULL;
@@ -32,7 +33,7 @@ protected:
 	virtual void _action_set_polygon(int p_idx, const Variant &p_previous, const Variant &p_polygon) override;
 
 public:
-	Box2DPolygonEditor(EditorNode *p_editor);
+	Box2DPolygonEditor();
 };
 
 class Box2DPolygonEditorPlugin : public AbstractPolygon2DEditorPlugin {
@@ -41,7 +42,7 @@ class Box2DPolygonEditorPlugin : public AbstractPolygon2DEditorPlugin {
 public:
 	virtual bool handles(Object *p_object) const override;
 
-	Box2DPolygonEditorPlugin(EditorNode *p_node);
+	Box2DPolygonEditorPlugin();
 };
 
 #endif // BOX2D_POLYGON_EDITOR_PLUGIN_H

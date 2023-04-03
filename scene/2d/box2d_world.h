@@ -3,8 +3,8 @@
 
 #include <core/io/resource.h>
 #include <core/object/object.h>
-#include <core/object/reference.h>
-#include <core/templates/set.h>
+#include <core/object/ref_counted.h>
+#include <core/templates/rb_set.h>
 #include <core/templates/vset.h>
 #include <scene/2d/node_2d.h>
 
@@ -101,7 +101,7 @@ class Box2DPhysicsBody;
 struct MotionQueryParameters {
 	Transform2D transform = Transform2D();
 
-	Set<const Box2DPhysicsBody *> exclude;
+	RBSet<const Box2DPhysicsBody *> exclude;
 	// potential addition: exclude fixtures
 	b2Filter filter; // TODO If/when we fork Box2D, filters get 32bit data
 	bool collide_with_bodies = true; // TODO might be better named as "collide_with_solids"
@@ -115,8 +115,8 @@ struct MotionQueryParameters {
 	//float motion_timedelta_for_prediction = 1/60;
 };
 
-class Box2DShapeQueryParameters : public Reference {
-	GDCLASS(Box2DShapeQueryParameters, Reference);
+class Box2DShapeQueryParameters : public RefCounted {
+	GDCLASS(Box2DShapeQueryParameters, RefCounted);
 
 	friend class Box2DWorld;
 
@@ -128,10 +128,10 @@ protected:
 
 public:
 	const b2Filter &_get_filter() const;
-	Set<const Box2DPhysicsBody *> _get_exclude() const;
+	RBSet<const Box2DPhysicsBody *> _get_exclude() const;
 
-	void set_shape(const RES &p_shape_ref);
-	RES get_shape() const;
+	void set_shape(const Ref<Resource> &p_shape_ref);
+	Ref<Resource> get_shape() const;
 
 	void set_transform(const Transform2D &p_transform);
 	Transform2D get_transform() const;
@@ -196,11 +196,11 @@ public:
 private:
 	class PointQueryCallback : public b2QueryCallback {
 	public:
-		Set<Box2DFixture *> results; // Use a set so composite fixtures don't double-count towards max_results
+		RBSet<Box2DFixture *> results; // Use a set so composite fixtures don't double-count towards max_results
 
 		b2Vec2 point;
 		int max_results;
-		Set<const Box2DPhysicsBody *> exclude;
+		RBSet<const Box2DPhysicsBody *> exclude;
 		b2Filter filter;
 		bool collide_with_bodies;
 		bool collide_with_sensors;
@@ -210,7 +210,7 @@ private:
 
 	class ShapeQueryCallback : public b2QueryCallback {
 	public:
-		Set<Box2DFixture *> results;
+		RBSet<Box2DFixture *> results;
 
 		Ref<Box2DShapeQueryParameters> params;
 		int max_results;
@@ -229,7 +229,7 @@ private:
 
 		Result result;
 
-		Set<const Box2DPhysicsBody *> exclude;
+		RBSet<const Box2DPhysicsBody *> exclude;
 		b2Filter filter;
 		bool collide_with_bodies;
 		bool collide_with_sensors;
@@ -301,8 +301,8 @@ private:
 	CollisionUpdateQueue<Box2DFixture, &Box2DCollisionObject::_on_fixture_exited> fixture_exited_queue;
 
 	// TODO make sure these are using the best data structure
-	Set<Box2DCollisionObject *> body_owners;
-	Set<Box2DJoint *> joint_owners;
+	RBSet<Box2DCollisionObject *> body_owners;
+	RBSet<Box2DJoint *> joint_owners;
 
 	// b2World Callbacks
 	// TODO extract into classes
@@ -402,8 +402,8 @@ public:
 	~Box2DWorld();
 };
 
-class Box2DPhysicsTestMotionResult : public Reference {
-	GDCLASS(Box2DPhysicsTestMotionResult, Reference);
+class Box2DPhysicsTestMotionResult : public RefCounted {
+	GDCLASS(Box2DPhysicsTestMotionResult, RefCounted);
 
 	friend class Box2DWorld;
 

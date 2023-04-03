@@ -5,6 +5,7 @@
 #include <core/math/vector2.h>
 #include <core/math/vector3.h>
 #include <core/typedefs.h>
+#include <core/config/project_settings.h>
 
 #include <box2d/b2_collision.h>
 #include <box2d/b2_math.h>

@@ -56,7 +56,7 @@ private:
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
-	void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &property) const;
 
 public:
 	void set_space_override_mode(SpaceOverride p_mode);

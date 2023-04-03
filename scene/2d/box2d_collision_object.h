@@ -3,7 +3,7 @@
 
 #include <core/io/resource.h>
 #include <core/object/object.h>
-#include <core/object/reference.h>
+#include <core/object/ref_counted.h>
 #include <core/templates/vset.h>
 #include <scene/2d/node_2d.h>
 
@@ -77,7 +77,7 @@ protected:
 	static void _bind_methods();
 
 public:
-	virtual TypedArray<String> get_configuration_warnings() const override;
+	virtual PackedStringArray get_configuration_warnings() const override;
 
 	// Moving to and from world transform
 	void set_box2dworld_transform(const Transform2D &p_transform);

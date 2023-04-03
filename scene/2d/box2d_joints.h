@@ -3,7 +3,7 @@
 
 #include <core/io/resource.h>
 #include <core/object/object.h>
-#include <core/object/reference.h>
+#include <core/object/ref_counted.h>
 #include <scene/2d/node_2d.h>
 
 #include <box2d/b2_distance_joint.h>
@@ -28,6 +28,7 @@
 */
 
 class Box2DWorld;
+class Box2DPhysicsBody;
 
 class Box2DJoint : public Node2D {
 	GDCLASS(Box2DJoint, Node2D);
@@ -112,7 +113,7 @@ protected:
 	void reset_joint_anchors();
 
 public:
-	virtual TypedArray<String> get_configuration_warnings() const override;
+	virtual PackedStringArray get_configuration_warnings() const override;
 
 	void set_nodepath_a(const NodePath &p_node_a);
 	NodePath get_nodepath_a() const;

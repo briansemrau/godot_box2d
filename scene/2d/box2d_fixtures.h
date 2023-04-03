@@ -2,7 +2,7 @@
 #define BOX2D_FIXTURES_H
 
 #include <core/object/object.h>
-#include <core/object/reference.h>
+#include <core/object/ref_counted.h>
 #include <core/io/resource.h>
 #include <scene/2d/node_2d.h>
 
@@ -61,9 +61,11 @@ protected:
 public:
 	inline const Box2DCollisionObject *_get_owner_node() const { return owner_node; }
 
+#ifdef TOOLS_ENABLED
 	virtual bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const override;
+#endif
 
-	virtual TypedArray<String> get_configuration_warnings() const override;
+	virtual PackedStringArray get_configuration_warnings() const override;
 
 	Box2DCollisionObject *get_owner() const { return owner_node; }
 

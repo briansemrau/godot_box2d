@@ -171,7 +171,7 @@ void Box2DArea::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "space_override", PROPERTY_HINT_ENUM, "Disabled,Combine,Combine-Replace,Replace,Replace-Combine"), "set_space_override_mode", "get_space_override_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "gravity_point"), "set_gravity_is_point", "is_gravity_a_point");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_distance_scale", PROPERTY_HINT_EXP_RANGE, "0,1024,0.001,or_greater"), "set_gravity_distance_scale", "get_gravity_distance_scale");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_distance_scale", PROPERTY_HINT_RANGE, "0,1024,0.001,or_greater,exp"), "set_gravity_distance_scale", "get_gravity_distance_scale");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity_vec"), "set_gravity_vector", "get_gravity_vector");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity", PROPERTY_HINT_RANGE, "-1024,1024,0.001"), "set_gravity", "get_gravity");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "linear_damp", PROPERTY_HINT_RANGE, "0,100,0.001,or_greater"), "set_linear_damp", "get_linear_damp");
@@ -337,8 +337,8 @@ TypedArray<Node2D> Box2DArea::get_overlapping_bodies() const {
 	ret.resize(contact_monitor->entered_objects.size());
 
 	int idx = 0;
-	for (const ObjectID *key = contact_monitor->entered_objects.next(NULL); key; key = contact_monitor->entered_objects.next(key)) {
-		const Object *obj = ObjectDB::get_instance(*key);
+	for (const KeyValue<ObjectID, int> &E : contact_monitor->entered_objects) {
+		const Object *obj = ObjectDB::get_instance(E.key);
 		const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(obj);
 		if (body)
 			ret[idx++] = body;
@@ -355,8 +355,8 @@ TypedArray<Box2DArea> Box2DArea::get_overlapping_areas() const {
 	ret.resize(contact_monitor->entered_objects.size());
 
 	int idx = 0;
-	for (const ObjectID *key = contact_monitor->entered_objects.next(NULL); key; key = contact_monitor->entered_objects.next(key)) {
-		const Object *obj = ObjectDB::get_instance(*key);
+	for (const KeyValue<ObjectID, int> &E : contact_monitor->entered_objects) {
+		const Object *obj = ObjectDB::get_instance(E.key);
 		const Box2DArea *area = Object::cast_to<const Box2DArea>(obj);
 		if (area)
 			ret[idx++] = area;

@@ -5,7 +5,9 @@
 * @author Brian Semrau
 */
 
-void register_godot_box2d_types();
-void unregister_godot_box2d_types();
+#include "modules/register_module_types.h"
+
+void initialize_godot_box2d_module(ModuleInitializationLevel p_level);
+void uninitialize_godot_box2d_module(ModuleInitializationLevel p_level);
 
 #endif // REGISTER_BOX2D_TYPES_H

@@ -26,7 +26,7 @@ void Box2DJoint::on_b2Joint_destroyed() {
 		update_joint_bodies();
 	}
 
-	update();
+	queue_redraw();
 }
 
 bool Box2DJoint::create_b2Joint() {
@@ -103,11 +103,11 @@ void Box2DJoint::on_editor_transforms_changed() {
 		//   TODO don't bother using b2bodies, just use the node
 		anchor_a = to_local(b2_to_gd(jointDef->bodyA->GetWorldPoint(gd_to_b2(get_body_local_anchor_a())))); // TODO should to_local be replaced with usage of box2dworld_global_transform?
 		anchor_b = to_local(b2_to_gd(jointDef->bodyB->GetWorldPoint(gd_to_b2(get_body_local_anchor_b()))));
-		update();
+		queue_redraw();
 	} else {
 		// Keep our local anchors in-place
 		recreate_joint(true);
-		//update();
+		//queue_redraw();
 	}
 }
 
@@ -299,9 +299,9 @@ void Box2DJoint::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_INTERNAL_PROCESS: {
-			// Leaving on for now, but ideally we only want to update() when the actual display of something will change
+			// Leaving on for now, but ideally we only want to queue_redraw() when the actual display of something will change
 			if (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint()) {
-				update();
+				queue_redraw();
 			}
 		} break;
 
@@ -374,14 +374,14 @@ void Box2DJoint::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "broken"), "set_broken", "is_broken");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "breaking_enabled"), "set_breaking_enabled", "is_breaking_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "free_on_break"), "set_free_on_break", "get_free_on_break");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_force", PROPERTY_HINT_EXP_RANGE, "0,65535,0.01"), "set_max_force", "get_max_force");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_torque", PROPERTY_HINT_EXP_RANGE, "0,65535,0.01"), "set_max_torque", "get_max_torque");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_force", PROPERTY_HINT_RANGE, "0,65535,0.01,exp"), "set_max_force", "get_max_force");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_torque", PROPERTY_HINT_RANGE, "0,65535,0.01,exp"), "set_max_torque", "get_max_torque");
 
 	ADD_SIGNAL(MethodInfo("joint_broken", PropertyInfo(Variant::VECTOR2, "break_force"), PropertyInfo(Variant::FLOAT, "break_torque")));
 }
 
-TypedArray<String> Box2DJoint::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node2D::get_configuration_warnings();
+PackedStringArray Box2DJoint::get_configuration_warnings() const {
+	PackedStringArray warnings = Node2D::get_configuration_warnings();
 
 	Node *_ancestor = get_parent();
 	Box2DWorld *new_world = NULL;
@@ -391,11 +391,11 @@ TypedArray<String> Box2DJoint::get_configuration_warnings() const {
 	}
 
 	if (!new_world) {
-		warnings.push_back(TTR("Box2DJoint only serves to create joints under the hierarchy of a Box2DWorld node. Please only use it as a descendant of Box2DWorld."));
+		warnings.push_back(RTR("Box2DJoint only serves to create joints under the hierarchy of a Box2DWorld node. Please only use it as a descendant of Box2DWorld."));
 	}
 
 	if (a.is_empty() || b.is_empty()) {
-		warnings.push_back(TTR("This node does not have NodePaths defined for two Box2DPhysicsBody nodes, so it can't act on any bodies."));
+		warnings.push_back(RTR("This node does not have NodePaths defined for two Box2DPhysicsBody nodes, so it can't act on any bodies."));
 	}
 
 	return warnings;
@@ -498,7 +498,7 @@ void Box2DJoint::set_broken(bool p_broken) {
 		// This may be a Box2D issue. Needs testing.
 		destroy_b2Joint();
 		if (free_on_break) {
-			queue_delete();
+			queue_free();
 		}
 	} else if (!p_broken && broken) {
 		if (is_valid()) {

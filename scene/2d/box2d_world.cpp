@@ -76,16 +76,16 @@ const b2Filter &Box2DShapeQueryParameters::_get_filter() const {
 	return parameters.filter;
 }
 
-Set<const Box2DPhysicsBody *> Box2DShapeQueryParameters::_get_exclude() const {
+RBSet<const Box2DPhysicsBody *> Box2DShapeQueryParameters::_get_exclude() const {
 	return parameters.exclude;
 }
 
-void Box2DShapeQueryParameters::set_shape(const RES &p_shape_ref) {
+void Box2DShapeQueryParameters::set_shape(const Ref<Resource> &p_shape_ref) {
 	ERR_FAIL_COND(p_shape_ref.is_null());
 	shape_ref = p_shape_ref;
 }
 
-RES Box2DShapeQueryParameters::get_shape() const {
+Ref<Resource> Box2DShapeQueryParameters::get_shape() const {
 	return shape_ref;
 }
 
@@ -170,7 +170,7 @@ Vector<int64_t> Box2DShapeQueryParameters::get_exclude() const {
 	Vector<int64_t> ret;
 	ret.resize(parameters.exclude.size());
 	int idx = 0;
-	for (Set<const Box2DPhysicsBody *>::Element *E = parameters.exclude.front(); E; E = E->next()) {
+	for (RBSet<const Box2DPhysicsBody *>::Element *E = parameters.exclude.front(); E; E = E->next()) {
 		ret.write[idx] = int64_t(E->get()->get_instance_id());
 	}
 	return ret;
@@ -274,7 +274,7 @@ inline void Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
 
 	if (hasCapacityA || hasCapacityB || buffer_manifold) {
 		if (!buffer_manifold) {
-			buffer_manifold = &contact_buffer.set(reinterpret_cast<uint64_t>(contact), ContactBufferManifold())->value();
+			buffer_manifold = &contact_buffer.insert(reinterpret_cast<uint64_t>(contact), ContactBufferManifold())->value;
 		}
 
 		// Init contact
@@ -312,7 +312,7 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 	if (monitoringA) {
 		int *body_count_ptr = body_a->contact_monitor->entered_objects.getptr(body_b->get_instance_id());
 		if (!body_count_ptr) {
-			body_count_ptr = &(body_a->contact_monitor->entered_objects.set(body_b->get_instance_id(), 0)->value());
+			body_count_ptr = &(body_a->contact_monitor->entered_objects.insert(body_b->get_instance_id(), 0)->value);
 		}
 		++(*body_count_ptr);
 
@@ -322,7 +322,7 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 
 		int *fix_count_ptr = body_a->contact_monitor->entered_objects.getptr(fnode_b->get_instance_id());
 		if (!fix_count_ptr) {
-			fix_count_ptr = &(body_a->contact_monitor->entered_objects.set(fnode_b->get_instance_id(), 0)->value());
+			fix_count_ptr = &(body_a->contact_monitor->entered_objects.insert(fnode_b->get_instance_id(), 0)->value);
 		}
 		++(*fix_count_ptr);
 
@@ -333,7 +333,7 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 	if (monitoringB) {
 		int *body_count_ptr = body_b->contact_monitor->entered_objects.getptr(body_a->get_instance_id());
 		if (!body_count_ptr) {
-			body_count_ptr = &(body_b->contact_monitor->entered_objects.set(body_a->get_instance_id(), 0)->value());
+			body_count_ptr = &(body_b->contact_monitor->entered_objects.insert(body_a->get_instance_id(), 0)->value);
 		}
 		++(*body_count_ptr);
 
@@ -343,7 +343,7 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 
 		int *fix_count_ptr = body_b->contact_monitor->entered_objects.getptr(fnode_a->get_instance_id());
 		if (!fix_count_ptr) {
-			fix_count_ptr = &(body_b->contact_monitor->entered_objects.set(fnode_a->get_instance_id(), 0)->value());
+			fix_count_ptr = &(body_b->contact_monitor->entered_objects.insert(fnode_a->get_instance_id(), 0)->value);
 		}
 		++(*fix_count_ptr);
 
@@ -551,12 +551,12 @@ void Box2DWorld::create_b2World() {
 		world->SetContactFilter(this);
 		world->SetContactListener(this);
 
-		Set<Box2DCollisionObject *>::Element *body = body_owners.front();
+		RBSet<Box2DCollisionObject *>::Element *body = body_owners.front();
 		while (body) {
 			body->get()->on_parent_created(this);
 			body = body->next();
 		}
-		Set<Box2DJoint *>::Element *joint = joint_owners.front();
+		RBSet<Box2DJoint *>::Element *joint = joint_owners.front();
 		while (joint) {
 			joint->get()->on_parent_created(this);
 			joint = joint->next();
@@ -634,8 +634,8 @@ void Box2DWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_auto_step"), &Box2DWorld::get_auto_step);
 
 	// TODO should default collision_mask really be 0x7FFFFFFF? This is copied from Godot physics API
-	ClassDB::bind_method(D_METHOD("intersect_point", "point", "max_results", "exclude", "collision_mask", "collide_with_bodies", "collide_with_sensors", "collision_layer", "group"), &Box2DWorld::intersect_point, DEFVAL(32), DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false), DEFVAL(0x0), DEFVAL(0));
-	ClassDB::bind_method(D_METHOD("intersect_ray", "from", "to", "exclude", "collision_mask", "collide_with_bodies", "collide_with_sensors", "collision_layer", "group"), &Box2DWorld::intersect_ray, DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false), DEFVAL(0x0), DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("intersect_point", "point", "max_results", "exclude", "collision_mask", "collide_with_bodies", "collide_with_sensors", "collision_layer", "group"), &Box2DWorld::intersect_point, DEFVAL(32), DEFVAL(Vector<int64_t>()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false), DEFVAL(0x0), DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("intersect_ray", "from", "to", "exclude", "collision_mask", "collide_with_bodies", "collide_with_sensors", "collision_layer", "group"), &Box2DWorld::intersect_ray, DEFVAL(Vector<int64_t>()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false), DEFVAL(0x0), DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("intersect_shape", "query", "max_results"), &Box2DWorld::intersect_shape, DEFVAL(32));
 	ClassDB::bind_method(D_METHOD("cast_motion", "query"), &Box2DWorld::cast_motion);
 	//ClassDB::bind_method(D_METHOD("collide_shape", "shape", "max_results"), &PhysicsDirectSpaceState2D::_collide_shape, DEFVAL(32));
@@ -1013,16 +1013,15 @@ b2Vec2 Box2DWorld::_solve_position(const Vector<const b2Shape *> &p_body_shapes,
 
 void Box2DWorld::step(float p_step) {
 	// Reset contact "solves" counter to 0
-	const uint64_t *k = NULL;
-	while ((k = contact_buffer.next(k))) {
-		ContactBufferManifold *buffer_manifold = contact_buffer.getptr(*k);
+	for (KeyValue<uint64_t, ContactBufferManifold> &E : contact_buffer) {
+		ContactBufferManifold *buffer_manifold = &E.value;
 		for (int i = 0; i < buffer_manifold->count; ++i) {
 			buffer_manifold->points[i].reset_accum();
 		}
 	}
 
 	// Handle pre-step logic
-	for (Set<Box2DCollisionObject *>::Element *obj = body_owners.front(); obj; obj = obj->next()) {
+	for (RBSet<Box2DCollisionObject *>::Element *obj = body_owners.front(); obj; obj = obj->next()) {
 		obj->get()->pre_step(p_step);
 	}
 
@@ -1199,7 +1198,7 @@ Array Box2DWorld::intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query,
 
 // Are file-scoped inline functions (for duplicate code) good practice for code cleanliness?
 // no, for purpose of extensibility they should be members
-inline bool _query_should_ignore_fixture(b2Fixture *p_fixture, const bool p_collide_with_sensors, const bool p_collide_with_bodies, const bool p_ignore_dynamic, const b2Filter &p_filter, const Set<const Box2DPhysicsBody *> &p_exclude) {
+inline bool _query_should_ignore_fixture(b2Fixture *p_fixture, const bool p_collide_with_sensors, const bool p_collide_with_bodies, const bool p_ignore_dynamic, const b2Filter &p_filter, const RBSet<const Box2DPhysicsBody *> &p_exclude) {
 	// Check sensor flags
 	if (!(p_collide_with_sensors && p_fixture->IsSensor()) && !(p_collide_with_bodies && !p_fixture->IsSensor())) {
 		return true;
@@ -1272,7 +1271,7 @@ bool Box2DWorld::body_test_motion(const Box2DPhysicsBody *p_body, const Transfor
 	// Unstuck body
 
 	const Vector2 correction = b2_to_gd(_solve_position(query_b2shapes, params, 4));
-	params.transform.translate(correction);
+	params.transform.translate_local(correction);
 
 	// Test motion
 
@@ -1447,7 +1446,7 @@ bool Box2DWorld::UserAABBQueryCallback::ReportFixture(b2Fixture *fixture) {
 	};
 	Variant ret;
 	Callable::CallError ce;
-	callback->call((const Variant **)&args, argcount, ret, ce);
+	callback->callp((const Variant **)&args, argcount, ret, ce);
 
 	if (ce.error != Callable::CallError::CALL_OK) {
 		String err = Variant::get_callable_error_text(*callback, (const Variant **)&args, argcount, ce);
@@ -1486,7 +1485,7 @@ float Box2DWorld::UserRaycastQueryCallback::ReportFixture(b2Fixture *fixture, co
 	};
 	Variant ret;
 	Callable::CallError ce;
-	callback->call((const Variant **)&args, argcount, ret, ce);
+	callback->callp((const Variant **)&args, argcount, ret, ce);
 
 	if (ce.error != Callable::CallError::CALL_OK) {
 		String err = Variant::get_callable_error_text(*callback, (const Variant **)&args, argcount, ce);

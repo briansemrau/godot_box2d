@@ -3,7 +3,7 @@
 
 #include <core/io/resource.h>
 #include <core/object/object.h>
-#include <core/object/reference.h>
+#include <core/object/ref_counted.h>
 #include <core/templates/vset.h>
 #include <scene/2d/node_2d.h>
 
@@ -59,7 +59,7 @@ private:
 	VSet<Box2DPhysicsBody *> filtering_me;
 	// TODO i don't care enough right now to let bodies exclude specific fixtures
 
-	Set<Box2DJoint *> joints;
+	RBSet<Box2DJoint *> joints;
 
 	Transform2D last_valid_xform;
 
@@ -132,7 +132,7 @@ public:
 	void _remove_area(Box2DArea *p_area);
 	void _remove_area_variant(const Variant &p_area);
 
-	virtual TypedArray<String> get_configuration_warnings() const override;
+	virtual PackedStringArray get_configuration_warnings() const override;
 
 	void _set_linear_velocity_no_check(const Vector2 &p_vel);
 	void set_linear_velocity(const Vector2 &p_vel);
@@ -225,8 +225,8 @@ public:
 	bool test_move(const Transform2D &p_from, const Vector2 &p_motion, bool p_infinite_inertia = true);
 
 	// TODO missing rotation param, maybe pass a Transform2D
-	Vector2 move_and_slide(const Vector2 &p_linear_velocity, const Vector2 &p_up_direction = Vector2(0, 0), bool p_stop_on_slope = false, int p_max_slides = 4, float p_floor_max_angle = Math::deg2rad(45.0f), bool p_infinite_inertia = true);
-	Vector2 move_and_slide_with_snap(const Vector2 &p_linear_velocity, const Vector2 &p_snap, const Vector2 &p_up_direction = Vector2(0, 0), bool p_stop_on_slope = false, int p_max_slides = 4, float p_floor_max_angle = Math::deg2rad(45.0f), bool p_infinite_inertia = true);
+	Vector2 move_and_slide(const Vector2 &p_linear_velocity, const Vector2 &p_up_direction = Vector2(0, 0), bool p_stop_on_slope = false, int p_max_slides = 4, float p_floor_max_angle = Math::deg_to_rad(45.0f), bool p_infinite_inertia = true);
+	Vector2 move_and_slide_with_snap(const Vector2 &p_linear_velocity, const Vector2 &p_snap, const Vector2 &p_up_direction = Vector2(0, 0), bool p_stop_on_slope = false, int p_max_slides = 4, float p_floor_max_angle = Math::deg_to_rad(45.0f), bool p_infinite_inertia = true);
 	bool is_on_floor() const;
 	bool is_on_wall() const;
 	bool is_on_ceiling() const;
@@ -245,8 +245,8 @@ public:
 
 VARIANT_ENUM_CAST(Box2DPhysicsBody::Mode);
 
-class Box2DKinematicCollision : public Reference {
-	GDCLASS(Box2DKinematicCollision, Reference);
+class Box2DKinematicCollision : public RefCounted {
+	GDCLASS(Box2DKinematicCollision, RefCounted);
 
 	friend class Box2DPhysicsBody;
 

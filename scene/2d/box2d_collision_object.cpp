@@ -218,8 +218,8 @@ void Box2DCollisionObject::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("enabled_state_changed"));
 }
 
-TypedArray<String> Box2DCollisionObject::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node2D::get_configuration_warnings();
+PackedStringArray Box2DCollisionObject::get_configuration_warnings() const {
+	PackedStringArray warnings = Node2D::get_configuration_warnings();
 
 	Node *_ancestor = get_parent();
 	Box2DWorld *new_world = NULL;
@@ -229,7 +229,7 @@ TypedArray<String> Box2DCollisionObject::get_configuration_warnings() const {
 	}
 
 	if (!new_world) {
-		warnings.push_back(TTR("Box2DCollisionObject only serves to provide bodies to a Box2DWorld node. Please only use it under the hierarchy of Box2DWorld."));
+		warnings.push_back(RTR("Box2DCollisionObject only serves to provide bodies to a Box2DWorld node. Please only use it under the hierarchy of Box2DWorld."));
 	}
 
 	bool has_fixture_child = false;
@@ -240,7 +240,7 @@ TypedArray<String> Box2DCollisionObject::get_configuration_warnings() const {
 		}
 	}
 	if (!has_fixture_child) {
-		warnings.push_back(TTR("This node has no fixture, so it can't collide or interact with other objects.\nConsider adding a Box2DFixture subtype as a child to define its shape."));
+		warnings.push_back(RTR("This node has no fixture, so it can't collide or interact with other objects.\nConsider adding a Box2DFixture subtype as a child to define its shape."));
 	}
 
 	return warnings;
@@ -302,10 +302,8 @@ Array Box2DCollisionObject::get_colliding_bodies() const {
 	ERR_FAIL_COND_V(!contact_monitor, Array());
 	Array ret;
 
-	List<ObjectID> keys;
-	contact_monitor->entered_objects.get_key_list(&keys);
-	for (int i = 0; i < keys.size(); i++) {
-		Object *node = ObjectDB::get_instance(keys[i]);
+	for (const KeyValue<ObjectID, int> &E : contact_monitor->entered_objects) {
+		Object *node = ObjectDB::get_instance(E.key);
 		if (node && Object::cast_to<Box2DCollisionObject>(node)) {
 			ret.append(node);
 		}

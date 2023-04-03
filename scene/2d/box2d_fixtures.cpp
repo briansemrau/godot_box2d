@@ -153,8 +153,8 @@ void Box2DFixture::_notification(int p_what) {
 			if (owner_node != new_owner) {
 				if (owner_node) {
 					if (owner_node->has_signal("sleeping_state_changed"))
-						owner_node->disconnect("sleeping_state_changed", Callable(this, "update"));
-					owner_node->disconnect("enabled_state_changed", Callable(this, "update"));
+						owner_node->disconnect("sleeping_state_changed", Callable(this, "queue_redraw"));
+					owner_node->disconnect("enabled_state_changed", Callable(this, "queue_redraw"));
 				}
 				destroy_b2();
 
@@ -162,9 +162,9 @@ void Box2DFixture::_notification(int p_what) {
 
 				if (owner_node) {
 					if (owner_node->has_signal("sleeping_state_changed")) {
-						owner_node->connect("sleeping_state_changed", Callable(this, "update"));
+						owner_node->connect("sleeping_state_changed", Callable(this, "queue_redraw"));
 					}
-					owner_node->connect("enabled_state_changed", Callable(this, "update"));
+					owner_node->connect("enabled_state_changed", Callable(this, "queue_redraw"));
 
 					if (Object::cast_to<Box2DArea>(owner_node)) {
 						set_sensor(true);
@@ -291,7 +291,7 @@ void Box2DFixture::update_shape() {
 		create_b2();
 	}
 
-	update();
+	queue_redraw();
 
 	if (Engine::get_singleton()->is_editor_hint()) {
 		update_configuration_warnings();
@@ -313,8 +313,8 @@ bool Box2DFixture::_edit_is_selected_on_click(const Point2 &p_point, double p_to
 }
 #endif
 
-TypedArray<String> Box2DFixture::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node2D::get_configuration_warnings();
+PackedStringArray Box2DFixture::get_configuration_warnings() const {
+	PackedStringArray warnings = Node2D::get_configuration_warnings();
 
 	// Find the parent body
 	Node *_ancestor = get_parent();
@@ -325,7 +325,7 @@ TypedArray<String> Box2DFixture::get_configuration_warnings() const {
 	}
 
 	if (!parent_body) {
-		warnings.push_back(TTR("Box2DFixture only serves to provide collision fixtures to a Box2DCollisionObject node. Please use it within the child hierarchy of Box2DPhysicsBody or Box2DArea to give it collision."));
+		warnings.push_back(RTR("Box2DFixture only serves to provide collision fixtures to a Box2DCollisionObject node. Please use it within the child hierarchy of Box2DPhysicsBody or Box2DArea to give it collision."));
 	}
 
 	return warnings;
@@ -341,12 +341,12 @@ TypedArray<String> Box2DFixture::get_configuration_warnings() const {
 
 void Box2DFixture::set_shape(const Ref<Box2DShape> &p_shape) {
 	if (shape.is_valid()) {
-		shape->disconnect("changed", Callable(this, "_shape_changed"));
+		shape->disconnect("changed", callable_mp(this, &Box2DFixture::_shape_changed));
 	}
 	shape = p_shape;
 
 	if (shape.is_valid()) {
-		shape->connect("changed", Callable(this, "_shape_changed"));
+		shape->connect("changed", callable_mp(this, &Box2DFixture::_shape_changed));
 	}
 
 	emit_signal("_shape_type_changed");
