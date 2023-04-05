@@ -365,6 +365,7 @@ void Box2DPhysicsBody::_notification(int p_what) {
 				}
 			}
 
+#ifdef TOOLS_ENABLED
 			// Inform joints in editor that we moved
 			if (Engine::get_singleton()->is_editor_hint()) {
 				auto joint = joints.front();
@@ -373,6 +374,7 @@ void Box2DPhysicsBody::_notification(int p_what) {
 					joint = joint->next();
 				}
 			}
+#endif
 		} break;
 
 		case Box2DWorld::NOTIFICATION_WORLD_STEPPED: {

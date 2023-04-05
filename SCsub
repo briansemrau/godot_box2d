@@ -90,7 +90,6 @@ env_thirdparty.add_source_files(env.modules_sources, thirdparty_sources)
 module_subdirs = [
     "",
     "util/",
-    "editor/",
     "scene/2d/",
     "scene/resources/",
 ]
@@ -98,4 +97,5 @@ module_subdirs = [
 for f in module_subdirs:
     env_godot_box2d.add_source_files(env.modules_sources, f + "*.cpp")
 
-
+if env.editor_build:
+    env_godot_box2d.add_source_files(env.modules_sources, "editor/*.cpp")

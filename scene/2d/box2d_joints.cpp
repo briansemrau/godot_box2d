@@ -93,6 +93,7 @@ void Box2DJoint::on_node_predelete(Box2DPhysicsBody *node) {
 	set_process_internal(false);
 }
 
+#ifdef TOOLS_ENABLED
 void Box2DJoint::on_editor_transforms_changed() {
 	// TODO this is probably where to fix ticket #1
 
@@ -110,6 +111,7 @@ void Box2DJoint::on_editor_transforms_changed() {
 		//queue_redraw();
 	}
 }
+#endif
 
 void Box2DJoint::update_joint_bodies() {
 	// This is called whenever the joint's body nodes are reassigned via set_node_a/b.
@@ -274,6 +276,7 @@ void Box2DJoint::_notification(int p_what) {
 			update_joint_bodies();
 		} break;
 
+#ifdef TOOLS_ENABLED
 		case NOTIFICATION_TRANSFORM_CHANGED: {
 			// Changing transform only does anything if reinitialize_joint() is called
 
@@ -282,6 +285,7 @@ void Box2DJoint::_notification(int p_what) {
 				on_editor_transforms_changed();
 			}
 		} break;
+#endif
 
 		case Box2DWorld::NOTIFICATION_WORLD_STEPPED: {
 			if (breaking_enabled && joint) {
@@ -1133,6 +1137,7 @@ real_t Box2DPrismaticJoint::get_motor_force() const {
 Box2DPrismaticJoint::Box2DPrismaticJoint() :
 		Box2DJoint(&jointDef) {}
 
+//#ifdef TOOLS_ENABLED
 //void Box2DDistanceJoint::on_editor_transforms_changed() {
 	// TODO
 	//if (editor_translate_anchors) {
@@ -1150,6 +1155,7 @@ Box2DPrismaticJoint::Box2DPrismaticJoint() :
 	//	}
 	//}
 //}
+//#endif
 
 void Box2DDistanceJoint::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_anchor_a", "anchor_a"), &Box2DDistanceJoint::set_anchor_a);
