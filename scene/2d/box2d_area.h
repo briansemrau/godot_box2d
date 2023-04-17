@@ -38,7 +38,7 @@ private:
 	real_t linear_damp = 0.1;
 	real_t angular_damp = 1;
 	int priority = 0;
-	bool monitoring = true;
+	bool monitoring = false;
 	bool monitorable = true;
 
 	bool audio_bus_override = false;
@@ -48,15 +48,15 @@ private:
 
 	virtual void _on_object_entered(Box2DCollisionObject *p_object) override;
 	virtual void _on_object_exited(Box2DCollisionObject *p_object) override;
-	virtual void _on_fixture_entered(Box2DFixture *p_fixture) override;
-	virtual void _on_fixture_exited(Box2DFixture *p_fixture) override;
+	virtual void _on_fixture_entered(Box2DFixture *p_fixture, Box2DFixture *p_self_fixture) override;
+	virtual void _on_fixture_exited(Box2DFixture *p_fixture, Box2DFixture *p_self_fixture) override;
 
 	virtual void pre_step(float p_delta) override;
 
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
-	void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &property) const;
 
 public:
 	void set_space_override_mode(SpaceOverride p_mode);

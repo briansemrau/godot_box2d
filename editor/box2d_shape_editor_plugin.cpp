@@ -1,6 +1,8 @@
 #include "box2d_shape_editor_plugin.h"
 
 #include <editor/plugins/canvas_item_editor_plugin.h>
+#include <editor/editor_node.h>
+#include <editor/editor_undo_redo_manager.h>
 
 #include "../scene/2d/box2d_fixtures.h"
 #include "../scene/resources/box2d_shapes.h"
@@ -19,7 +21,7 @@ void Box2DShapeEditor::_node_removed(Node *p_node) {
 
 void Box2DShapeEditor::_shape_type_changed() {
 	// We might want to swap to the Box2DPolygonEditorPlugin
-	editor->edit_current();
+	EditorNode::get_singleton()->edit_current();
 }
 
 Variant Box2DShapeEditor::get_handle_value(int idx) const {
@@ -247,7 +249,7 @@ bool Box2DShapeEditor::forward_canvas_gui_input(const Ref<InputEvent> &p_event) 
 
 		Vector2 gpoint = mb->get_position();
 
-		if (mb->get_button_index() == MouseButton::MOUSE_BUTTON_LEFT) {
+		if (mb->get_button_index() == MouseButton::LEFT) {
 			if (mb->is_pressed()) {
 				for (int i = 0; i < handles.size(); i++) {
 					if (xform.xform(handles[i]).distance_to(gpoint) < 8) {
@@ -430,11 +432,11 @@ void Box2DShapeEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 void Box2DShapeEditor::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE: {
-			get_tree()->connect("node_removed", Callable(this, "_node_removed"));
+			get_tree()->connect("node_removed", callable_mp(this, &Box2DShapeEditor::_node_removed));
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
-			get_tree()->disconnect("node_removed", Callable(this, "_node_removed"));
+			get_tree()->disconnect("node_removed", callable_mp(this, &Box2DShapeEditor::_node_removed));
 		} break;
 	}
 }
@@ -445,14 +447,14 @@ void Box2DShapeEditor::edit(Node *p_node) {
 	}
 
 	if (node) {
-		node->disconnect("_shape_type_changed", Callable(this, "_shape_type_changed"));
+		node->disconnect("_shape_type_changed", callable_mp(this, &Box2DShapeEditor::_shape_type_changed));
 	}
 
 	if (p_node) {
 		node = Object::cast_to<Box2DFixture>(p_node);
 
 		if (node) {
-			node->connect("_shape_type_changed", Callable(this, "_shape_type_changed"), Vector<Variant>(), CONNECT_DEFERRED);
+			node->connect("_shape_type_changed", callable_mp(this, &Box2DShapeEditor::_shape_type_changed), CONNECT_DEFERRED);
 		}
 
 		_get_current_shape_type();
@@ -473,9 +475,8 @@ void Box2DShapeEditor::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_shape_type_changed"), &Box2DShapeEditor::_shape_type_changed);
 }
 
-Box2DShapeEditor::Box2DShapeEditor(EditorNode *p_editor) :
-		editor(p_editor),
-		undo_redo(p_editor->get_undo_redo()) {}
+Box2DShapeEditor::Box2DShapeEditor() :
+		undo_redo(EditorUndoRedoManager::get_singleton()) {}
 
 void Box2DShapeEditorPlugin::edit(Object *p_obj) {
 	box2d_shape_editor->edit(Object::cast_to<Node>(p_obj));
@@ -493,10 +494,9 @@ void Box2DShapeEditorPlugin::make_visible(bool visible) {
 	}
 }
 
-Box2DShapeEditorPlugin::Box2DShapeEditorPlugin(EditorNode *p_editor) {
-	editor = p_editor;
-	box2d_shape_editor = memnew(Box2DShapeEditor(p_editor));
-	p_editor->get_gui_base()->add_child(box2d_shape_editor);
+Box2DShapeEditorPlugin::Box2DShapeEditorPlugin() {
+	box2d_shape_editor = memnew(Box2DShapeEditor);
+	EditorNode::get_singleton()->get_gui_base()->add_child(box2d_shape_editor);
 }
 
 Box2DShapeEditorPlugin::~Box2DShapeEditorPlugin() {}

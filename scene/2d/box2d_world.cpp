@@ -76,16 +76,16 @@ const b2Filter &Box2DShapeQueryParameters::_get_filter() const {
 	return parameters.filter;
 }
 
-Set<const Box2DPhysicsBody *> Box2DShapeQueryParameters::_get_exclude() const {
+RBSet<const Box2DPhysicsBody *> Box2DShapeQueryParameters::_get_exclude() const {
 	return parameters.exclude;
 }
 
-void Box2DShapeQueryParameters::set_shape(const RES &p_shape_ref) {
+void Box2DShapeQueryParameters::set_shape(const Ref<Resource> &p_shape_ref) {
 	ERR_FAIL_COND(p_shape_ref.is_null());
 	shape_ref = p_shape_ref;
 }
 
-RES Box2DShapeQueryParameters::get_shape() const {
+Ref<Resource> Box2DShapeQueryParameters::get_shape() const {
 	return shape_ref;
 }
 
@@ -170,7 +170,7 @@ Vector<int64_t> Box2DShapeQueryParameters::get_exclude() const {
 	Vector<int64_t> ret;
 	ret.resize(parameters.exclude.size());
 	int idx = 0;
-	for (Set<const Box2DPhysicsBody *>::Element *E = parameters.exclude.front(); E; E = E->next()) {
+	for (RBSet<const Box2DPhysicsBody *>::Element *E = parameters.exclude.front(); E; E = E->next()) {
 		ret.write[idx] = int64_t(E->get()->get_instance_id());
 	}
 	return ret;
@@ -248,9 +248,9 @@ bool Box2DWorld::ShouldCollide(b2Fixture *fixtureA, b2Fixture *fixtureB) {
 	return true;
 }
 
-inline void Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
+inline ContactBufferManifold *Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
 	if (contact->GetFixtureA()->IsSensor() || contact->GetFixtureB()->IsSensor()) {
-		return;
+		return nullptr;
 	}
 
 	Box2DFixture *fnode_a = contact->GetFixtureA()->GetUserData().owner;
@@ -274,7 +274,7 @@ inline void Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
 
 	if (hasCapacityA || hasCapacityB || buffer_manifold) {
 		if (!buffer_manifold) {
-			buffer_manifold = &contact_buffer.set(reinterpret_cast<uint64_t>(contact), ContactBufferManifold())->value();
+			buffer_manifold = &contact_buffer.insert(reinterpret_cast<uint64_t>(contact), ContactBufferManifold())->value;
 		}
 
 		// Init contact
@@ -283,18 +283,18 @@ inline void Box2DWorld::try_buffer_contact(b2Contact *contact, int i) {
 		c.fixture_a = fnode_a;
 		c.fixture_b = fnode_b;
 
-		buffer_manifold->insert(c, i);
+		buffer_manifold->set(c, i);
 
 		// Buffer again into monitoring node
 		if (hasCapacityA) {
-			auto contacts = &fnode_a->owner_node->contact_monitor->contacts;
-			contacts->insert(c);
+			fnode_a->owner_node->contact_monitor->contacts.insert(c);
 		}
 		if (hasCapacityB) {
-			auto contacts = &fnode_b->owner_node->contact_monitor->contacts;
-			contacts->insert(c);
+			fnode_b->owner_node->contact_monitor->contacts.insert(c);
 		}
 	}
+
+	return buffer_manifold;
 }
 
 void Box2DWorld::BeginContact(b2Contact *contact) {
@@ -312,7 +312,7 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 	if (monitoringA) {
 		int *body_count_ptr = body_a->contact_monitor->entered_objects.getptr(body_b->get_instance_id());
 		if (!body_count_ptr) {
-			body_count_ptr = &(body_a->contact_monitor->entered_objects.set(body_b->get_instance_id(), 0)->value());
+			body_count_ptr = &(body_a->contact_monitor->entered_objects.insert(body_b->get_instance_id(), 0)->value);
 		}
 		++(*body_count_ptr);
 
@@ -322,18 +322,18 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 
 		int *fix_count_ptr = body_a->contact_monitor->entered_objects.getptr(fnode_b->get_instance_id());
 		if (!fix_count_ptr) {
-			fix_count_ptr = &(body_a->contact_monitor->entered_objects.set(fnode_b->get_instance_id(), 0)->value());
+			fix_count_ptr = &(body_a->contact_monitor->entered_objects.insert(fnode_b->get_instance_id(), 0)->value);
 		}
 		++(*fix_count_ptr);
 
 		if (*fix_count_ptr == 1) {
-			fixture_entered_queue.enqueue(body_a, fnode_b);
+			fixture_entered_queue.enqueue(body_a, fnode_b, fnode_a);
 		}
 	}
 	if (monitoringB) {
 		int *body_count_ptr = body_b->contact_monitor->entered_objects.getptr(body_a->get_instance_id());
 		if (!body_count_ptr) {
-			body_count_ptr = &(body_b->contact_monitor->entered_objects.set(body_a->get_instance_id(), 0)->value());
+			body_count_ptr = &(body_b->contact_monitor->entered_objects.insert(body_a->get_instance_id(), 0)->value);
 		}
 		++(*body_count_ptr);
 
@@ -343,12 +343,12 @@ void Box2DWorld::BeginContact(b2Contact *contact) {
 
 		int *fix_count_ptr = body_b->contact_monitor->entered_objects.getptr(fnode_a->get_instance_id());
 		if (!fix_count_ptr) {
-			fix_count_ptr = &(body_b->contact_monitor->entered_objects.set(fnode_a->get_instance_id(), 0)->value());
+			fix_count_ptr = &(body_b->contact_monitor->entered_objects.insert(fnode_a->get_instance_id(), 0)->value);
 		}
 		++(*fix_count_ptr);
 
 		if (*fix_count_ptr == 1) {
-			fixture_entered_queue.enqueue(body_b, fnode_a);
+			fixture_entered_queue.enqueue(body_b, fnode_a, fnode_b);
 		}
 	}
 }
@@ -362,6 +362,9 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 	const bool monitoringA = fnode_a->owner_node->_is_contact_monitor_enabled();
 	const bool monitoringB = fnode_b->owner_node->_is_contact_monitor_enabled();
 
+	// EndContact may occur outside of timestep. No need to defer signal calls when world is unlocked.
+	bool queue_inout = world->IsLocked();
+
 	// Deliver signals to bodies with contact monitoring enabled
 	if (monitoringA) {
 		int *body_count_ptr = body_a->contact_monitor->entered_objects.getptr(body_b->get_instance_id());
@@ -369,7 +372,10 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 
 		if ((*body_count_ptr) == 0) {
 			body_a->contact_monitor->entered_objects.erase(body_b->get_instance_id());
-			object_exited_queue.enqueue(body_a, body_b);
+			if (queue_inout)
+				object_exited_queue.enqueue(body_a, body_b);
+			else
+				object_exited_queue.call_immediate(body_a, body_b);
 		}
 
 		int *fix_count_ptr = body_a->contact_monitor->entered_objects.getptr(fnode_b->get_instance_id());
@@ -377,7 +383,10 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 
 		if ((*fix_count_ptr) == 0) {
 			body_a->contact_monitor->entered_objects.erase(fnode_b->get_instance_id());
-			fixture_exited_queue.enqueue(body_a, fnode_b);
+			if (queue_inout)
+				fixture_exited_queue.enqueue(body_a, fnode_b, fnode_a);
+			else
+				fixture_exited_queue.call_immediate(body_a, fnode_b, fnode_a);
 		}
 	}
 	if (monitoringB) {
@@ -386,7 +395,10 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 
 		if ((*body_count_ptr) == 0) {
 			body_b->contact_monitor->entered_objects.erase(body_a->get_instance_id());
-			object_exited_queue.enqueue(body_b, body_a);
+			if (queue_inout)
+				object_exited_queue.enqueue(body_b, body_a);
+			else
+				object_exited_queue.call_immediate(body_b, body_a);
 		}
 
 		int *fix_count_ptr = body_b->contact_monitor->entered_objects.getptr(fnode_a->get_instance_id());
@@ -394,7 +406,10 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 
 		if ((*fix_count_ptr) == 0) {
 			body_b->contact_monitor->entered_objects.erase(fnode_a->get_instance_id());
-			fixture_exited_queue.enqueue(body_b, fnode_a);
+			if (queue_inout)
+				fixture_exited_queue.enqueue(body_b, fnode_a, fnode_b);
+			else
+				fixture_exited_queue.call_immediate(body_b, fnode_a, fnode_b);
 		}
 	}
 
@@ -402,8 +417,11 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 	ContactBufferManifold *buffer_manifold = contact_buffer.getptr(reinterpret_cast<uint64_t>(contact));
 
 	if (buffer_manifold) {
-		for (int i = 0; i < buffer_manifold->count; ++i) {
+		for (int i = 0; i < b2_maxManifoldPoints; ++i) {
 			Box2DContactPoint *c_ptr = &buffer_manifold->points[i];
+
+			if (c_ptr->id == -1)
+				continue;
 
 			if (c_ptr->fixture_a->owner_node->_is_contact_monitor_enabled()) {
 				// TODO lock/unlock
@@ -421,29 +439,40 @@ void Box2DWorld::EndContact(b2Contact *contact) {
 
 void Box2DWorld::PreSolve(b2Contact *contact, const b2Manifold *oldManifold) {
 	b2PointState state1[2], state2[2];
-	b2GetPointStates(state1, state2, oldManifold, contact->GetManifold());
+	const b2Manifold *newManifold = contact->GetManifold();
+	b2GetPointStates(state1, state2, oldManifold, newManifold);
 
 	Box2DFixture *fnode_a = contact->GetFixtureA()->GetUserData().owner;
 	Box2DFixture *fnode_b = contact->GetFixtureB()->GetUserData().owner;
 
 	ContactBufferManifold *buffer_manifold = contact_buffer.getptr(reinterpret_cast<uint64_t>(contact));
 
+	// Check if points have swapped order
+	if (buffer_manifold) {
+		if ((oldManifold->pointCount > 0 && newManifold->pointCount > 1 && oldManifold->points[0].id.key == newManifold->points[1].id.key) || (oldManifold->pointCount > 1 && newManifold->pointCount > 0 && oldManifold->points[1].id.key == newManifold->points[0].id.key)) {
+			buffer_manifold->swap();
+		}
+	}
+
 	if (unlikely(flag_rescan_contacts_monitored) && !buffer_manifold) {
 		// Buffer a contact that only started being monitored after it transitioned from b2_addState
 		for (int i = 0; i < b2_maxManifoldPoints; ++i) {
 			if (state1[i] == b2PointState::b2_persistState) {
-				try_buffer_contact(contact, i);
+				buffer_manifold = try_buffer_contact(contact, i);
 			}
 		}
-		buffer_manifold = contact_buffer.getptr(reinterpret_cast<uint64_t>(contact)); // possible optimization: try_buffer_contact could return buffer_manifold ptr
 	}
 
 	// Handle removed/added points within the manifold
-	for (int i = b2_maxManifoldPoints - 1; i >= 0; --i) {
-		if (state1[i] == b2PointState::b2_removeState) {
-			// Remove this contact
-			if (buffer_manifold && i < buffer_manifold->count) {
+	if (buffer_manifold) {
+		for (int i = b2_maxManifoldPoints - 1; i >= 0; --i) {
+			if (state1[i] == b2PointState::b2_removeState) {
+				// Remove this contact
+
 				Box2DContactPoint *c_ptr = &buffer_manifold->points[i];
+
+				if (c_ptr->id == -1)
+					continue;
 
 				if (c_ptr->fixture_a->owner_node->_is_contact_monitor_enabled()) {
 					// TODO lock/unlock
@@ -454,23 +483,26 @@ void Box2DWorld::PreSolve(b2Contact *contact, const b2Manifold *oldManifold) {
 					c_ptr->fixture_b->owner_node->contact_monitor->contacts.erase(*c_ptr);
 				}
 
-				buffer_manifold->remove(i);
-				if (buffer_manifold->count == 0) {
-					ERR_FAIL_COND(!contact_buffer.erase(reinterpret_cast<uint64_t>(contact)));
-				}
+				buffer_manifold->erase(i);
 			}
 		}
 	}
 	for (int i = 0; i < b2_maxManifoldPoints; ++i) {
 		if (state2[i] == b2PointState::b2_addState) {
-			try_buffer_contact(contact, i);
+			buffer_manifold = try_buffer_contact(contact, i);
 		}
+	}
+	if (buffer_manifold && buffer_manifold->is_empty()) {
+		ERR_FAIL_COND(!contact_buffer.erase(reinterpret_cast<uint64_t>(contact)));
 	}
 
 	if (buffer_manifold) {
 		// Only handle the first PreSolve for this contact this step (don't overwrite initial impact_velocity, world_pos)
-		for (int i = 0; i < buffer_manifold->count; ++i) {
+		for (int i = 0; i < b2_maxManifoldPoints; ++i) {
 			Box2DContactPoint *c_ptr = &buffer_manifold->points[i];
+
+			if (c_ptr->id == -1)
+				continue;
 
 			if (c_ptr->solves == 0) {
 				c_ptr->solves += 1;
@@ -510,30 +542,33 @@ void Box2DWorld::PostSolve(b2Contact *contact, const b2ContactImpulse *impulse) 
 		ContactBufferManifold *buffer_manifold = contact_buffer.getptr(reinterpret_cast<uint64_t>(contact));
 
 		if (buffer_manifold) {
-			for (int i = 0; i < buffer_manifold->count; ++i) {
+			for (int i = 0; i < b2_maxManifoldPoints; ++i) {
 				Box2DContactPoint *c_ptr = &buffer_manifold->points[i];
+
+				if (c_ptr->id == -1)
+					continue;
 
 				Vector2 manifold_tan = c_ptr->normal.rotated(Math_PI * 0.5);
 				// TODO test: should impulse be accumulated (relevant to TOI solve), or does Box2D accumulate them itself?
-				c_ptr->normal_impulse += impulse->normalImpulses[i];
-				c_ptr->tangent_impulse += manifold_tan * impulse->tangentImpulses[i];
+				c_ptr->normal_impulse += impulse->normalImpulses[i] * B2_TO_GD;
+				c_ptr->tangent_impulse += manifold_tan * impulse->tangentImpulses[i] * B2_TO_GD;
 
 				// Update contacts buffered in listening nodes
 				if (monitoringA) {
 					//fnode_a->body_node->contact_monitor.locked = true; TODO
-					auto contacts = &fnode_a->owner_node->contact_monitor->contacts;
-					int idx = contacts->find(*c_ptr);
+					VSet<Box2DContactPoint> * const contacts = &fnode_a->owner_node->contact_monitor->contacts;
+					const int idx = contacts->find(*c_ptr);
 					if (idx >= 0)
 						(*contacts)[idx] = (*c_ptr);
 					//fnode_a->body_node->contact_monitor.locked = false;
 				}
 				if (monitoringB) {
 					// Invert contact so A is always owned by the monitor
-					Box2DContactPoint cB = c_ptr->flipped_a_b();
+					const Box2DContactPoint cB = c_ptr->flipped_a_b();
 
 					//fnode_b->body_node->contact_monitor.locked = true; TODO
-					auto contacts = &fnode_b->owner_node->contact_monitor->contacts;
-					int idx = contacts->find(cB);
+					VSet<Box2DContactPoint> * const contacts = &fnode_b->owner_node->contact_monitor->contacts;
+					const int idx = contacts->find(cB);
 					if (idx >= 0)
 						(*contacts)[idx] = (cB);
 					//fnode_b->body_node->contact_monitor.locked = false;
@@ -551,12 +586,12 @@ void Box2DWorld::create_b2World() {
 		world->SetContactFilter(this);
 		world->SetContactListener(this);
 
-		Set<Box2DCollisionObject *>::Element *body = body_owners.front();
+		RBSet<Box2DCollisionObject *>::Element *body = body_owners.front();
 		while (body) {
 			body->get()->on_parent_created(this);
 			body = body->next();
 		}
-		Set<Box2DJoint *>::Element *joint = joint_owners.front();
+		RBSet<Box2DJoint *>::Element *joint = joint_owners.front();
 		while (joint) {
 			joint->get()->on_parent_created(this);
 			joint = joint->next();
@@ -634,8 +669,8 @@ void Box2DWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_auto_step"), &Box2DWorld::get_auto_step);
 
 	// TODO should default collision_mask really be 0x7FFFFFFF? This is copied from Godot physics API
-	ClassDB::bind_method(D_METHOD("intersect_point", "point", "max_results", "exclude", "collision_mask", "collide_with_bodies", "collide_with_sensors", "collision_layer", "group"), &Box2DWorld::intersect_point, DEFVAL(32), DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false), DEFVAL(0x0), DEFVAL(0));
-	ClassDB::bind_method(D_METHOD("intersect_ray", "from", "to", "exclude", "collision_mask", "collide_with_bodies", "collide_with_sensors", "collision_layer", "group"), &Box2DWorld::intersect_ray, DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false), DEFVAL(0x0), DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("intersect_point", "point", "max_results", "exclude", "collision_mask", "collide_with_bodies", "collide_with_sensors", "collision_layer", "group"), &Box2DWorld::intersect_point, DEFVAL(32), DEFVAL(Vector<int64_t>()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false), DEFVAL(0x0), DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("intersect_ray", "from", "to", "exclude", "collision_mask", "collide_with_bodies", "collide_with_sensors", "collision_layer", "group"), &Box2DWorld::intersect_ray, DEFVAL(Vector<int64_t>()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false), DEFVAL(0x0), DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("intersect_shape", "query", "max_results"), &Box2DWorld::intersect_shape, DEFVAL(32));
 	ClassDB::bind_method(D_METHOD("cast_motion", "query"), &Box2DWorld::cast_motion);
 	//ClassDB::bind_method(D_METHOD("collide_shape", "shape", "max_results"), &PhysicsDirectSpaceState2D::_collide_shape, DEFVAL(32));
@@ -645,12 +680,10 @@ void Box2DWorld::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("body_test_motion", "body", "from", "motion", "infinite_inertia", "result"), &Box2DWorld::_body_test_motion_binding, DEFVAL(Variant()));
 
-	ClassDB::bind_method(D_METHOD("step", "delta"), &Box2DWorld::step);
+	ClassDB::bind_method(D_METHOD("step", "delta", "velocity_iterations", "position_iterations"), &Box2DWorld::step, DEFVAL(8), DEFVAL(8));
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "auto_step"), "set_auto_step", "get_auto_step");
-
-	BIND_CONSTANT(NOTIFICATION_WORLD_STEPPED);
 }
 
 inline void _get_aabb_from_shapes(const Vector<const b2Shape *> &p_b2shapes, const b2Transform &p_xform, b2AABB &r_aabb) {
@@ -1011,35 +1044,42 @@ b2Vec2 Box2DWorld::_solve_position(const Vector<const b2Shape *> &p_body_shapes,
 	return correction;
 }
 
-void Box2DWorld::step(float p_step) {
+void Box2DWorld::step(float p_step, int32 velocity_iterations, int32 position_iterations) {
 	// Reset contact "solves" counter to 0
-	const uint64_t *k = NULL;
-	while ((k = contact_buffer.next(k))) {
-		ContactBufferManifold *buffer_manifold = contact_buffer.getptr(*k);
-		for (int i = 0; i < buffer_manifold->count; ++i) {
+	for (KeyValue<uint64_t, ContactBufferManifold> &E : contact_buffer) {
+		ContactBufferManifold *buffer_manifold = &E.value;
+		for (int i = 0; i < b2_maxManifoldPoints; ++i) {
+			if (buffer_manifold->points[i].id == -1)
+				continue;
 			buffer_manifold->points[i].reset_accum();
 		}
 	}
 
 	// Handle pre-step logic
-	for (Set<Box2DCollisionObject *>::Element *obj = body_owners.front(); obj; obj = obj->next()) {
+	for (RBSet<Box2DCollisionObject *>::Element *obj = body_owners.front(); obj; obj = obj->next()) {
 		obj->get()->pre_step(p_step);
 	}
 
-	// Step
-	world->Step(p_step, 8, 8);
+	// Step world
+	world->Step(p_step, velocity_iterations, position_iterations);
 	flag_rescan_contacts_monitored = false;
 
 	last_step_delta = p_step;
 
-	// Body/shape inout callbacks
+	// Step bodies/joints
+	for (RBSet<Box2DCollisionObject *>::Element *obj = body_owners.front(); obj; obj = obj->next()) {
+		obj->get()->step(p_step);
+	}
+	
+	for (RBSet<Box2DJoint *>::Element *joint = joint_owners.front(); joint; joint = joint->next()) {
+		joint->get()->step(p_step);
+	}
+
+	// Body/fixture inout callbacks
 	object_entered_queue.call_and_clear();
 	object_exited_queue.call_and_clear();
 	fixture_entered_queue.call_and_clear();
 	fixture_exited_queue.call_and_clear();
-
-	// Notify our bodies in this world
-	propagate_notification(NOTIFICATION_WORLD_STEPPED);
 }
 
 float Box2DWorld::get_last_step_delta() const {
@@ -1199,7 +1239,7 @@ Array Box2DWorld::intersect_shape(const Ref<Box2DShapeQueryParameters> &p_query,
 
 // Are file-scoped inline functions (for duplicate code) good practice for code cleanliness?
 // no, for purpose of extensibility they should be members
-inline bool _query_should_ignore_fixture(b2Fixture *p_fixture, const bool p_collide_with_sensors, const bool p_collide_with_bodies, const bool p_ignore_dynamic, const b2Filter &p_filter, const Set<const Box2DPhysicsBody *> &p_exclude) {
+inline bool _query_should_ignore_fixture(b2Fixture *p_fixture, const bool p_collide_with_sensors, const bool p_collide_with_bodies, const bool p_ignore_dynamic, const b2Filter &p_filter, const RBSet<const Box2DPhysicsBody *> &p_exclude) {
 	// Check sensor flags
 	if (!(p_collide_with_sensors && p_fixture->IsSensor()) && !(p_collide_with_bodies && !p_fixture->IsSensor())) {
 		return true;
@@ -1272,7 +1312,7 @@ bool Box2DWorld::body_test_motion(const Box2DPhysicsBody *p_body, const Transfor
 	// Unstuck body
 
 	const Vector2 correction = b2_to_gd(_solve_position(query_b2shapes, params, 4));
-	params.transform.translate(correction);
+	params.transform.translate_local(correction);
 
 	// Test motion
 
@@ -1447,7 +1487,7 @@ bool Box2DWorld::UserAABBQueryCallback::ReportFixture(b2Fixture *fixture) {
 	};
 	Variant ret;
 	Callable::CallError ce;
-	callback->call((const Variant **)&args, argcount, ret, ce);
+	callback->callp((const Variant **)&args, argcount, ret, ce);
 
 	if (ce.error != Callable::CallError::CALL_OK) {
 		String err = Variant::get_callable_error_text(*callback, (const Variant **)&args, argcount, ce);
@@ -1486,7 +1526,7 @@ float Box2DWorld::UserRaycastQueryCallback::ReportFixture(b2Fixture *fixture, co
 	};
 	Variant ret;
 	Callable::CallError ce;
-	callback->call((const Variant **)&args, argcount, ret, ce);
+	callback->callp((const Variant **)&args, argcount, ret, ce);
 
 	if (ce.error != Callable::CallError::CALL_OK) {
 		String err = Variant::get_callable_error_text(*callback, (const Variant **)&args, argcount, ce);

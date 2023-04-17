@@ -3,7 +3,7 @@
 
 #include <core/io/resource.h>
 #include <core/object/object.h>
-#include <core/object/reference.h>
+#include <core/object/ref_counted.h>
 #include <scene/2d/node_2d.h>
 
 #include <box2d/b2_distance_joint.h>
@@ -19,7 +19,9 @@
 #include <box2d/b2_weld_joint.h>
 #include <box2d/b2_wheel_joint.h>
 
+#ifdef TOOLS_ENABLED
 #include "../../editor/box2d_joint_editor_plugin.h"
+#endif
 #include "../../util/box2d_types_converter.h"
 #include "box2d_physics_body.h"
 
@@ -28,6 +30,7 @@
 */
 
 class Box2DWorld;
+class Box2DPhysicsBody;
 
 class Box2DJoint : public Node2D {
 	GDCLASS(Box2DJoint, Node2D);
@@ -35,7 +38,9 @@ class Box2DJoint : public Node2D {
 	friend class Box2DWorld;
 	friend class Box2DPhysicsBody;
 
+#ifdef TOOLS_ENABLED
 	friend class Box2DJointEditor; // this is questionable TODO remove probably
+#endif
 
 	b2JointDef *jointDef = NULL;
 	b2Joint *joint = NULL;
@@ -61,7 +66,9 @@ class Box2DJoint : public Node2D {
 
 	void on_parent_created(Node *p_parent);
 	void on_node_predelete(Box2DPhysicsBody *node);
+#ifdef TOOLS_ENABLED
 	virtual void on_editor_transforms_changed();
+#endif
 
 	// Rescans the nodepaths to find b2Bodies and create our b2joint
 	void update_joint_bodies(); // TODO make virtual. Gear joint links joints, not bodies. Rename "update_joint_linkages/connections/nodepaths" or similar
@@ -70,7 +77,9 @@ class Box2DJoint : public Node2D {
 	void _node_b_tree_entered();
 
 protected:
+#ifdef TOOLS_ENABLED
 	Box2DJointEditor::AnchorMode editor_anchor_mode = Box2DJointEditor::AnchorMode::MODE_ANCHORS_LOCAL;
+#endif
 
 	// Destroys and recreates the b2Joint, if valid.
 	// Useful for modifying const b2 parameters, such as anchors. In these cases, set p_soft_reset to true.
@@ -84,6 +93,8 @@ protected:
 
 	void _notification(int p_what);
 	static void _bind_methods();
+
+	GDVIRTUAL1(_world_step, float);
 
 	// Joint node local-space anchor points. These sync with jointDef's body-local anchor points.
 	// Allows configuring anchor points to be in different world positions when added to the scene.
@@ -111,8 +122,10 @@ protected:
 
 	void reset_joint_anchors();
 
+	void step(float p_delta);
+
 public:
-	virtual TypedArray<String> get_configuration_warnings() const override;
+	virtual PackedStringArray get_configuration_warnings() const override;
 
 	void set_nodepath_a(const NodePath &p_node_a);
 	NodePath get_nodepath_a() const;

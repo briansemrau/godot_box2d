@@ -1,5 +1,8 @@
 #include "box2d_joint_editor_plugin.h"
 
+#include <scene/gui/separator.h>
+#include <scene/gui/button.h>
+#include <editor/editor_node.h>
 #include <editor/plugins/canvas_item_editor_plugin.h>
 
 #include "../scene/2d/box2d_joints.h"
@@ -42,11 +45,11 @@ void Box2DJointEditor::disable_anchor_modes(bool p_disable, String p_reason) {
 	button_anchor_global->set_disabled(p_disable);
 
 	if (p_disable) {
-		button_anchor_local->set_tooltip(p_reason);
-		button_anchor_global->set_tooltip(p_reason);
+		button_anchor_local->set_tooltip_text(p_reason);
+		button_anchor_global->set_tooltip_text(p_reason);
 	} else {
-		button_anchor_local->set_tooltip(TTR("Move anchors with joint")); // TODO translation file?
-		button_anchor_global->set_tooltip(TTR("Anchors stick to their body"));
+		button_anchor_local->set_tooltip_text(TTR("Move anchors with joint")); // TODO translation file?
+		button_anchor_global->set_tooltip_text(TTR("Anchors stick to their body"));
 	}
 }
 
@@ -521,7 +524,7 @@ bool Box2DJointEditor::forward_canvas_gui_input(const Ref<InputEvent> &p_event) 
 	if (mb.is_valid()) {
 		Vector2 gpoint = mb->get_position();
 
-		if (mb->get_button_index() == MouseButton::MOUSE_BUTTON_LEFT) {
+		if (mb->get_button_index() == MouseButton::LEFT) {
 			if (mb->is_pressed()) {
 				for (int i = 0; i < handles.size(); i++) {
 					if (xform.xform(handles[i]).distance_to(gpoint - handle_offsets[i]) < 8) {
@@ -952,22 +955,21 @@ void Box2DJointEditor::edit(Node *p_node) {
 void Box2DJointEditor::_bind_methods() {
 }
 
-Box2DJointEditor::Box2DJointEditor(EditorNode *p_editor) :
-		editor(p_editor),
-		undo_redo(EditorNode::get_undo_redo()) {
+Box2DJointEditor::Box2DJointEditor() :
+		undo_redo(EditorUndoRedoManager::get_singleton()) {
 
 	add_child(memnew(VSeparator));
 
 	button_anchor_local = memnew(Button);
 	button_anchor_local->set_flat(true);
 	add_child(button_anchor_local);
-	button_anchor_local->connect("pressed", callable_mp(this, &Box2DJointEditor::_menu_option), varray(static_cast<int>(AnchorMode::MODE_ANCHORS_LOCAL)));
+	button_anchor_local->connect("pressed", callable_mp(this, &Box2DJointEditor::_menu_option).bind(static_cast<int>(AnchorMode::MODE_ANCHORS_LOCAL)));
 	button_anchor_local->set_toggle_mode(true);
 
 	button_anchor_global = memnew(Button);
 	button_anchor_global->set_flat(true);
 	add_child(button_anchor_global);
-	button_anchor_global->connect("pressed", callable_mp(this, &Box2DJointEditor::_menu_option), varray(static_cast<int>(AnchorMode::MODE_ANCHORS_STICKY)));
+	button_anchor_global->connect("pressed", callable_mp(this, &Box2DJointEditor::_menu_option).bind(static_cast<int>(AnchorMode::MODE_ANCHORS_STICKY)));
 	button_anchor_global->set_toggle_mode(true);
 
 	//add_child(memnew(VSeparator));
@@ -992,10 +994,8 @@ void Box2DJointEditorPlugin::make_visible(bool p_visible) {
 	}
 }
 
-Box2DJointEditorPlugin::Box2DJointEditorPlugin(EditorNode *p_editor) {
-	editor = p_editor;
-
-	box2d_joint_editor = memnew(Box2DJointEditor(p_editor));
+Box2DJointEditorPlugin::Box2DJointEditorPlugin() {
+	box2d_joint_editor = memnew(Box2DJointEditor);
 	//p_editor->get_gui_base()->add_child(box2d_joint_editor);
 	CanvasItemEditor::get_singleton()->add_control_to_menu_panel(box2d_joint_editor);
 	box2d_joint_editor->hide();

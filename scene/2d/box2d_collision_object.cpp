@@ -43,6 +43,7 @@ bool Box2DCollisionObject::destroy_b2Body() {
 		ERR_FAIL_COND_V(!world_node->world, false);
 
 		// Destroy body
+		//body->GetUserData().owner = NULL;
 		world_node->world->DestroyBody(body);
 		body = NULL;
 
@@ -137,11 +138,20 @@ bool Box2DCollisionObject::_is_contact_monitor_enabled() const {
 	return contact_monitor != NULL;
 }
 
+void Box2DCollisionObject::step(float p_delta) {
+	GDVIRTUAL_CALL(_world_step, p_delta);
+}
+
 void Box2DCollisionObject::_notification(int p_what) {
 	// TODO finalize implementation to imitate behavior from RigidBody2D and Kinematic (static too?)
 	switch (p_what) {
 		case NOTIFICATION_PREDELETE: {
-			destroy_b2Body();
+			if (world_node) {
+				if (world_node->world) {
+					destroy_b2Body();
+				}
+				world_node->body_owners.erase(this);
+			}
 		} break;
 
 		case NOTIFICATION_ENTER_TREE: {
@@ -157,10 +167,10 @@ void Box2DCollisionObject::_notification(int p_what) {
 			if (new_world != world_node) {
 				// Destroy b2Body
 				if (world_node) {
-					destroy_b2Body();
-					if (world_node) {
-						world_node->body_owners.erase(this);
+					if (world_node->world) {
+						destroy_b2Body();
 					}
+					world_node->body_owners.erase(this);
 				}
 				world_node = new_world;
 				// Create b2Body
@@ -208,7 +218,9 @@ void Box2DCollisionObject::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_group_index"), &Box2DCollisionObject::get_group_index);
 
 	ClassDB::bind_method(D_METHOD("set_filter_data", "collision_layer", "collision_mask", "group_index"), &Box2DCollisionObject::set_filter_data);
-	
+
+	GDVIRTUAL_BIND(_world_step, "delta");
+
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "enabled"), "set_enabled", "is_enabled");
 	ADD_GROUP("Collision", "");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_layer", "get_collision_layer");
@@ -218,8 +230,8 @@ void Box2DCollisionObject::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("enabled_state_changed"));
 }
 
-TypedArray<String> Box2DCollisionObject::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node2D::get_configuration_warnings();
+PackedStringArray Box2DCollisionObject::get_configuration_warnings() const {
+	PackedStringArray warnings = Node2D::get_configuration_warnings();
 
 	Node *_ancestor = get_parent();
 	Box2DWorld *new_world = NULL;
@@ -229,7 +241,7 @@ TypedArray<String> Box2DCollisionObject::get_configuration_warnings() const {
 	}
 
 	if (!new_world) {
-		warnings.push_back(TTR("Box2DCollisionObject only serves to provide bodies to a Box2DWorld node. Please only use it under the hierarchy of Box2DWorld."));
+		warnings.push_back(RTR("Box2DCollisionObject only serves to provide bodies to a Box2DWorld node. Please only use it under the hierarchy of Box2DWorld."));
 	}
 
 	bool has_fixture_child = false;
@@ -240,7 +252,7 @@ TypedArray<String> Box2DCollisionObject::get_configuration_warnings() const {
 		}
 	}
 	if (!has_fixture_child) {
-		warnings.push_back(TTR("This node has no fixture, so it can't collide or interact with other objects.\nConsider adding a Box2DFixture subtype as a child to define its shape."));
+		warnings.push_back(RTR("This node has no fixture, so it can't collide or interact with other objects.\nConsider adding a Box2DFixture subtype as a child to define its shape."));
 	}
 
 	return warnings;
@@ -302,10 +314,8 @@ Array Box2DCollisionObject::get_colliding_bodies() const {
 	ERR_FAIL_COND_V(!contact_monitor, Array());
 	Array ret;
 
-	List<ObjectID> keys;
-	contact_monitor->entered_objects.get_key_list(&keys);
-	for (int i = 0; i < keys.size(); i++) {
-		Object *node = ObjectDB::get_instance(keys[i]);
+	for (const KeyValue<ObjectID, int> &E : contact_monitor->entered_objects) {
+		Object *node = ObjectDB::get_instance(E.key);
 		if (node && Object::cast_to<Box2DCollisionObject>(node)) {
 			ret.append(node);
 		}

@@ -3,7 +3,8 @@
 
 #include <core/io/resource.h>
 #include <core/object/object.h>
-#include <core/object/reference.h>
+#include <core/object/ref_counted.h>
+#include <core/object/gdvirtual.gen.inc>
 #include <core/templates/vset.h>
 #include <scene/2d/node_2d.h>
 
@@ -67,17 +68,20 @@ protected:
 
 	virtual void _on_object_entered(Box2DCollisionObject *p_object) = 0;
 	virtual void _on_object_exited(Box2DCollisionObject *p_object) = 0;
-	virtual void _on_fixture_entered(Box2DFixture *p_fixture) = 0;
-	virtual void _on_fixture_exited(Box2DFixture *p_fixture) = 0;
+	virtual void _on_fixture_entered(Box2DFixture *p_fixture, Box2DFixture *p_self_fixture) = 0;
+	virtual void _on_fixture_exited(Box2DFixture *p_fixture, Box2DFixture *p_self_fixture) = 0;
 
 	virtual void pre_step(float p_delta){};
+	virtual void step(float p_delta);
 
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
 
+	GDVIRTUAL1(_world_step, float);
+
 public:
-	virtual TypedArray<String> get_configuration_warnings() const override;
+	virtual PackedStringArray get_configuration_warnings() const override;
 
 	// Moving to and from world transform
 	void set_box2dworld_transform(const Transform2D &p_transform);

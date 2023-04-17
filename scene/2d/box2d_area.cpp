@@ -47,31 +47,31 @@ void Box2DArea::_on_object_exited(Box2DCollisionObject *p_object) {
 	}
 }
 
-void Box2DArea::_on_fixture_entered(Box2DFixture *p_fixture) {
+void Box2DArea::_on_fixture_entered(Box2DFixture *p_fixture, Box2DFixture *p_self_fixture) {
 	const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(p_fixture->_get_owner_node());
 	const Box2DArea *area = Object::cast_to<const Box2DArea>(p_fixture->_get_owner_node());
 	if (body) {
-		emit_signal("body_fixture_entered", p_fixture);
+		emit_signal("body_fixture_entered", p_fixture, p_self_fixture);
 	} else if (area && area->is_monitorable()) {
-		emit_signal("area_fixture_entered", p_fixture);
+		emit_signal("area_fixture_entered", p_fixture, p_self_fixture);
 	}
 }
 
-void Box2DArea::_on_fixture_exited(Box2DFixture *p_fixture) {
+void Box2DArea::_on_fixture_exited(Box2DFixture *p_fixture, Box2DFixture *p_self_fixture) {
 	const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(p_fixture->_get_owner_node());
 	const Box2DArea *area = Object::cast_to<const Box2DArea>(p_fixture->_get_owner_node());
 	if (body) {
-		emit_signal("body_fixture_exited", p_fixture);
+		emit_signal("body_fixture_exited", p_fixture, p_self_fixture);
 	} else if (area && area->is_monitorable()) {
-		emit_signal("area_fixture_exited", p_fixture);
+		emit_signal("area_fixture_exited", p_fixture, p_self_fixture);
 	}
 }
 
 void Box2DArea::pre_step(float p_delta) {
-	Transform2D motion = last_step_xform.affine_inverse() * get_box2dworld_transform();
+	Transform2D current_xform = get_box2dworld_transform();
 
-	Vector2 lin_vel = motion.get_origin() / p_delta;
-	float ang_vel = motion.get_rotation() / p_delta;
+	Vector2 lin_vel = (current_xform.get_origin() - last_step_xform.get_origin()) / p_delta;
+	float ang_vel = (current_xform.get_rotation() - last_step_xform.get_rotation()) / p_delta;
 
 	b2Body *body = _get_b2Body();
 	if (body) {
@@ -87,11 +87,6 @@ void Box2DArea::_notification(int p_what) {
 		case NOTIFICATION_ENTER_TREE: {
 			last_step_xform = get_box2dworld_transform();
 		}
-
-		case Box2DWorld::NOTIFICATION_WORLD_STEPPED: {
-			// Don't sync physics position
-			// This allows areas to move with the scene transform under other physics objects
-		} break;
 
 		case NOTIFICATION_LOCAL_TRANSFORM_CHANGED: {
 			// Send new transform to physics
@@ -171,7 +166,7 @@ void Box2DArea::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "space_override", PROPERTY_HINT_ENUM, "Disabled,Combine,Combine-Replace,Replace,Replace-Combine"), "set_space_override_mode", "get_space_override_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "gravity_point"), "set_gravity_is_point", "is_gravity_a_point");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_distance_scale", PROPERTY_HINT_EXP_RANGE, "0,1024,0.001,or_greater"), "set_gravity_distance_scale", "get_gravity_distance_scale");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_distance_scale", PROPERTY_HINT_RANGE, "0,1024,0.001,or_greater,exp"), "set_gravity_distance_scale", "get_gravity_distance_scale");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity_vec"), "set_gravity_vector", "get_gravity_vector");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity", PROPERTY_HINT_RANGE, "-1024,1024,0.001"), "set_gravity", "get_gravity");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "linear_damp", PROPERTY_HINT_RANGE, "0,100,0.001,or_greater"), "set_linear_damp", "get_linear_damp");
@@ -337,8 +332,8 @@ TypedArray<Node2D> Box2DArea::get_overlapping_bodies() const {
 	ret.resize(contact_monitor->entered_objects.size());
 
 	int idx = 0;
-	for (const ObjectID *key = contact_monitor->entered_objects.next(NULL); key; key = contact_monitor->entered_objects.next(key)) {
-		const Object *obj = ObjectDB::get_instance(*key);
+	for (const KeyValue<ObjectID, int> &E : contact_monitor->entered_objects) {
+		const Object *obj = ObjectDB::get_instance(E.key);
 		const Box2DPhysicsBody *body = Object::cast_to<const Box2DPhysicsBody>(obj);
 		if (body)
 			ret[idx++] = body;
@@ -355,8 +350,8 @@ TypedArray<Box2DArea> Box2DArea::get_overlapping_areas() const {
 	ret.resize(contact_monitor->entered_objects.size());
 
 	int idx = 0;
-	for (const ObjectID *key = contact_monitor->entered_objects.next(NULL); key; key = contact_monitor->entered_objects.next(key)) {
-		const Object *obj = ObjectDB::get_instance(*key);
+	for (const KeyValue<ObjectID, int> &E : contact_monitor->entered_objects) {
+		const Object *obj = ObjectDB::get_instance(E.key);
 		const Box2DArea *area = Object::cast_to<const Box2DArea>(obj);
 		if (area)
 			ret[idx++] = area;
@@ -393,6 +388,8 @@ StringName Box2DArea::get_audio_bus_name() const {
 Box2DArea::Box2DArea() {
 	bodyDef.type = b2BodyType::b2_dynamicBody;
 	bodyDef.gravityScale = 0.0f;
+
+	set_monitoring(true);
 }
 
 Box2DArea::~Box2DArea() {

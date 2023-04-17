@@ -102,7 +102,7 @@ void Box2DCircleShape::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_radius", "radius"), &Box2DCircleShape::set_radius);
 	ClassDB::bind_method(D_METHOD("get_radius"), &Box2DCircleShape::get_radius);
 
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_radius", "get_radius");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius", PROPERTY_HINT_RANGE, "0.5,16384,0.5,exp,or_greater"), "set_radius", "get_radius");
 }
 
 void Box2DCircleShape::set_radius(real_t p_radius) {
@@ -133,8 +133,8 @@ void Box2DRectShape::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_height"), &Box2DRectShape::get_height);
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "size"), "set_size", "get_size");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "width", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_width", "get_width");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "height", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_height", "get_height");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "width", PROPERTY_HINT_RANGE, "0.5,16384,0.5,exp,or_greater"), "set_width", "get_width");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "height", PROPERTY_HINT_RANGE, "0.5,16384,0.5,exp,or_greater"), "set_height", "get_height");
 }
 
 void Box2DRectShape::set_size(const Vector2 &p_size) {
@@ -688,8 +688,8 @@ void Box2DPolygonShape::draw(const RID &p_to_rid, const Color &p_color) {
 
 Box2DPolygonShape::Box2DPolygonShape() :
 		build_mode(BuildMode::BUILD_SOLIDS),
-		chain_shape(NULL),
-		invert_order(false) {}
+		invert_order(false),
+		chain_shape(NULL) {}
 
 Box2DPolygonShape::~Box2DPolygonShape() {
 	memdelete_notnull(chain_shape);
@@ -705,8 +705,8 @@ void Box2DCapsuleShape::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_radius", "radius"), &Box2DCapsuleShape::set_radius);
 	ClassDB::bind_method(D_METHOD("get_radius"), &Box2DCapsuleShape::get_radius);
 
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "height", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_height", "get_height");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius", PROPERTY_HINT_EXP_RANGE, "0.5,16384,0.5"), "set_radius", "get_radius");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "height", PROPERTY_HINT_RANGE, "0.5,16384,0.5,exp,or_greater"), "set_height", "get_height");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius", PROPERTY_HINT_RANGE, "0.5,16384,0.5,exp,or_greater"), "set_radius", "get_radius");
 }
 
 void Box2DCapsuleShape::set_height(real_t p_height) {

@@ -3,8 +3,8 @@
 
 #include <core/io/resource.h>
 #include <core/object/object.h>
-#include <core/object/reference.h>
-#include <core/templates/set.h>
+#include <core/object/ref_counted.h>
+#include <core/templates/rb_set.h>
 #include <core/templates/vset.h>
 #include <scene/2d/node_2d.h>
 
@@ -58,40 +58,34 @@ struct Box2DContactPoint {
 };
 
 struct ContactBufferManifold {
-	Box2DContactPoint points[b2_maxManifoldPoints];
-	int count = 0;
+	Box2DContactPoint points[b2_maxManifoldPoints]{};
 
-	// TODO Optimize? These functions may be overkill, but everything currently works this way
-
-	inline void insert(Box2DContactPoint &p_point, int p_idx) {
-		ERR_FAIL_COND(count + 1 > b2_maxManifoldPoints);
+	inline void set(Box2DContactPoint &p_point, int p_idx) {
 		ERR_FAIL_COND(p_idx < 0 || p_idx >= b2_maxManifoldPoints);
-		ERR_FAIL_COND(p_idx > count); // Can't insert a point leaving a null at the index below
-
-		// Shift points up
-		if (p_idx < count) {
-			for (int i = count; i > p_idx; --i) {
-				points[i] = points[i - 1];
-			}
-		}
+		ERR_FAIL_COND(points[p_idx].id != -1);
 		points[p_idx] = p_point;
-
-		++count;
 	}
 
-	inline void remove(int p_idx) {
-		ERR_FAIL_COND(p_idx < 0 || p_idx >= count || p_idx >= b2_maxManifoldPoints);
+	inline void swap() {
+		ERR_FAIL_COND(b2_maxManifoldPoints != 2); // affirm in case this ever changes(?) - swap algo would need to become smart
+		const Box2DContactPoint temp = points[0];
+		points[0] = points[1];
+		points[1] = temp;
+	}
 
-		// Shift points down
-		if (p_idx < count - 1) {
-			for (int i = p_idx; i < count - 1; ++i) {
-				// There's a buffer overflow warning for this line but I don't believe it
-				points[i] = points[i + 1];
+	inline void erase(int p_idx) {
+		ERR_FAIL_COND(p_idx < 0 || p_idx >= b2_maxManifoldPoints);
+		ERR_FAIL_COND(points[p_idx].id == -1);
+		points[p_idx].id = -1;
+	}
+
+	inline bool is_empty() {
+		for (int i = 0; i < b2_maxManifoldPoints; ++i) {
+			if (points[i].id != -1) {
+				return false;
 			}
-			points[count - 1].id = -1;
 		}
-
-		--count;
+		return true;
 	}
 };
 
@@ -101,7 +95,7 @@ class Box2DPhysicsBody;
 struct MotionQueryParameters {
 	Transform2D transform = Transform2D();
 
-	Set<const Box2DPhysicsBody *> exclude;
+	RBSet<const Box2DPhysicsBody *> exclude;
 	// potential addition: exclude fixtures
 	b2Filter filter; // TODO If/when we fork Box2D, filters get 32bit data
 	bool collide_with_bodies = true; // TODO might be better named as "collide_with_solids"
@@ -115,8 +109,8 @@ struct MotionQueryParameters {
 	//float motion_timedelta_for_prediction = 1/60;
 };
 
-class Box2DShapeQueryParameters : public Reference {
-	GDCLASS(Box2DShapeQueryParameters, Reference);
+class Box2DShapeQueryParameters : public RefCounted {
+	GDCLASS(Box2DShapeQueryParameters, RefCounted);
 
 	friend class Box2DWorld;
 
@@ -128,10 +122,10 @@ protected:
 
 public:
 	const b2Filter &_get_filter() const;
-	Set<const Box2DPhysicsBody *> _get_exclude() const;
+	RBSet<const Box2DPhysicsBody *> _get_exclude() const;
 
-	void set_shape(const RES &p_shape_ref);
-	RES get_shape() const;
+	void set_shape(const Ref<Resource> &p_shape_ref);
+	Ref<Resource> get_shape() const;
 
 	void set_transform(const Transform2D &p_transform);
 	Transform2D get_transform() const;
@@ -196,11 +190,11 @@ public:
 private:
 	class PointQueryCallback : public b2QueryCallback {
 	public:
-		Set<Box2DFixture *> results; // Use a set so composite fixtures don't double-count towards max_results
+		RBSet<Box2DFixture *> results; // Use a set so composite fixtures don't double-count towards max_results
 
 		b2Vec2 point;
 		int max_results;
-		Set<const Box2DPhysicsBody *> exclude;
+		RBSet<const Box2DPhysicsBody *> exclude;
 		b2Filter filter;
 		bool collide_with_bodies;
 		bool collide_with_sensors;
@@ -210,7 +204,7 @@ private:
 
 	class ShapeQueryCallback : public b2QueryCallback {
 	public:
-		Set<Box2DFixture *> results;
+		RBSet<Box2DFixture *> results;
 
 		Ref<Box2DShapeQueryParameters> params;
 		int max_results;
@@ -229,7 +223,7 @@ private:
 
 		Result result;
 
-		Set<const Box2DPhysicsBody *> exclude;
+		RBSet<const Box2DPhysicsBody *> exclude;
 		b2Filter filter;
 		bool collide_with_bodies;
 		bool collide_with_sensors;
@@ -264,24 +258,56 @@ private:
 		bool QueryCallback(int32 proxyId);
 	};
 	
-	template <class P, void (Box2DCollisionObject::*on_thing_inout)(P *)>
-	class CollisionUpdateQueue {
+	template <void (Box2DCollisionObject::*on_object_inout)(Box2DCollisionObject *)>
+	class ObjectCollisionUpdateQueue {
 	private:
 		struct CollisionUpdatePair {
 			Box2DCollisionObject *function_owner;
-			P *transient;
+			Box2DCollisionObject *transient;
 		};
 		std::deque<CollisionUpdatePair> queue{};
 
 	public:
-		inline void enqueue(Box2DCollisionObject *p_caller, P *p_transient) {
+		inline void enqueue(Box2DCollisionObject *p_caller, Box2DCollisionObject *p_transient) {
 			queue.push_back({ p_caller, p_transient });
+		}
+
+		inline void call_immediate(Box2DCollisionObject *p_caller, Box2DCollisionObject *p_transient) {
+			(p_caller->*on_object_inout)(p_transient);
 		}
 
 		inline void call_and_clear() {
 			while (!queue.empty()) {
 				CollisionUpdatePair *pair = &queue.front();
-				(pair->function_owner->*on_thing_inout)(pair->transient);
+				(pair->function_owner->*on_object_inout)(pair->transient);
+				queue.pop_front();
+			}
+		}
+	};
+
+	template <void (Box2DCollisionObject::*on_fixture_inout)(Box2DFixture *, Box2DFixture *)>
+	class FixtureCollisionUpdateQueue {
+	private:
+		struct CollisionUpdatePair {
+			Box2DCollisionObject *function_owner;
+			Box2DFixture *transient;
+			Box2DFixture *self;
+		};
+		std::deque<CollisionUpdatePair> queue{};
+
+	public:
+		inline void enqueue(Box2DCollisionObject *p_caller, Box2DFixture *p_transient, Box2DFixture *p_self) {
+			queue.push_back({ p_caller, p_transient, p_self });
+		}
+
+		inline void call_immediate(Box2DCollisionObject *p_caller, Box2DFixture *p_transient, Box2DFixture *p_self) {
+			(p_caller->*on_fixture_inout)(p_transient, p_self);
+		}
+
+		inline void call_and_clear() {
+			while (!queue.empty()) {
+				CollisionUpdatePair *pair = &queue.front();
+				(pair->function_owner->*on_fixture_inout)(pair->transient, pair->self);
 				queue.pop_front();
 			}
 		}
@@ -295,14 +321,14 @@ private:
 
 	float last_step_delta = 0.0f;
 
-	CollisionUpdateQueue<Box2DCollisionObject, &Box2DCollisionObject::_on_object_entered> object_entered_queue;
-	CollisionUpdateQueue<Box2DCollisionObject, &Box2DCollisionObject::_on_object_exited> object_exited_queue;
-	CollisionUpdateQueue<Box2DFixture, &Box2DCollisionObject::_on_fixture_entered> fixture_entered_queue;
-	CollisionUpdateQueue<Box2DFixture, &Box2DCollisionObject::_on_fixture_exited> fixture_exited_queue;
+	ObjectCollisionUpdateQueue<&Box2DCollisionObject::_on_object_entered> object_entered_queue;
+	ObjectCollisionUpdateQueue<&Box2DCollisionObject::_on_object_exited> object_exited_queue;
+	FixtureCollisionUpdateQueue<&Box2DCollisionObject::_on_fixture_entered> fixture_entered_queue;
+	FixtureCollisionUpdateQueue<&Box2DCollisionObject::_on_fixture_exited> fixture_exited_queue;
 
 	// TODO make sure these are using the best data structure
-	Set<Box2DCollisionObject *> body_owners;
-	Set<Box2DJoint *> joint_owners;
+	RBSet<Box2DCollisionObject *> body_owners;
+	RBSet<Box2DJoint *> joint_owners;
 
 	// b2World Callbacks
 	// TODO extract into classes
@@ -317,7 +343,7 @@ private:
 	bool flag_rescan_contacts_monitored = false;
 	HashMap<uint64_t, ContactBufferManifold> contact_buffer;
 
-	inline void try_buffer_contact(b2Contact *contact, int i);
+	inline ContactBufferManifold *try_buffer_contact(b2Contact *contact, int i);
 
 	virtual void BeginContact(b2Contact *contact) override;
 	virtual void EndContact(b2Contact *contact) override;
@@ -365,11 +391,7 @@ protected:
 	static void _bind_methods();
 
 public:
-	enum {
-		NOTIFICATION_WORLD_STEPPED = 42300, // special int that shouldn't clobber other notifications.  See node.h
-	};
-
-	void step(float p_step);
+	void step(float p_step, int32 velocity_iterations = 8, int32 position_iterations = 8);
 
 	float get_last_step_delta() const;
 
@@ -402,8 +424,8 @@ public:
 	~Box2DWorld();
 };
 
-class Box2DPhysicsTestMotionResult : public Reference {
-	GDCLASS(Box2DPhysicsTestMotionResult, Reference);
+class Box2DPhysicsTestMotionResult : public RefCounted {
+	GDCLASS(Box2DPhysicsTestMotionResult, RefCounted);
 
 	friend class Box2DWorld;
 

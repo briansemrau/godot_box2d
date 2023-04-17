@@ -1,8 +1,9 @@
 #ifndef BOX2D_JOINT_EDITOR_PLUGIN_H
 #define BOX2D_JOINT_EDITOR_PLUGIN_H
 
-#include <editor/editor_node.h>
+#include <scene/gui/box_container.h>
 #include <editor/editor_plugin.h>
+#include <editor/editor_undo_redo_manager.h>
 
 #include "../scene/resources/box2d_shapes.h"
 
@@ -32,8 +33,7 @@ class Box2DJointEditor : public HBoxContainer {
 		INVALID_JOINT
 	};
 
-	EditorNode *editor;
-	UndoRedo *undo_redo;
+	EditorUndoRedoManager *undo_redo;
 	CanvasItemEditor *canvas_item_editor = NULL;
 	Box2DJoint *node = NULL;
 
@@ -76,26 +76,25 @@ public:
 	void forward_canvas_draw_over_viewport(Control *p_overlay);
 	void edit(Node *p_node);
 
-	Box2DJointEditor(EditorNode *p_editor);
+	Box2DJointEditor();
 };
 
 class Box2DJointEditorPlugin : public EditorPlugin {
 	GDCLASS(Box2DJointEditorPlugin, EditorPlugin);
 
 	Box2DJointEditor *box2d_joint_editor;
-	EditorNode *editor;
 
 public:
-	virtual bool forward_canvas_gui_input(const Ref<InputEvent> &p_event) { return box2d_joint_editor->forward_canvas_gui_input(p_event); }
-	virtual void forward_canvas_draw_over_viewport(Control *p_overlay) { box2d_joint_editor->forward_canvas_draw_over_viewport(p_overlay); }
+	virtual bool forward_canvas_gui_input(const Ref<InputEvent> &p_event) override { return box2d_joint_editor->forward_canvas_gui_input(p_event); }
+	virtual void forward_canvas_draw_over_viewport(Control *p_overlay) override { box2d_joint_editor->forward_canvas_draw_over_viewport(p_overlay); }
 
-	virtual String get_name() const { return "Box2DJoint"; }
-	bool has_main_screen() const { return false; }
-	virtual void edit(Object *p_obj);
-	virtual bool handles(Object *p_obj) const;
-	virtual void make_visible(bool p_visible);
+	virtual String get_name() const override { return "Box2DJoint"; }
+	bool has_main_screen() const override { return false; }
+	virtual void edit(Object *p_obj) override;
+	virtual bool handles(Object *p_obj) const override;
+	virtual void make_visible(bool p_visible) override;
 
-	Box2DJointEditorPlugin(EditorNode *p_editor);
+	Box2DJointEditorPlugin();
 	~Box2DJointEditorPlugin();
 };
 
