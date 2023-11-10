@@ -90,7 +90,12 @@ RES Box2DShapeQueryParameters::get_shape() const {
 }
 
 void Box2DShapeQueryParameters::set_transform(const Transform2D &p_transform) {
-	ERR_FAIL_COND_MSG(p_transform.get_scale() != Size2(1, 1), "Box2DShapeQueryParameters does not support scaled transforms.");
+	#ifdef DEBUG_ENABLED
+	Vector2 s = p_transform.get_scale();
+	if (!s.is_equal_approx(Vector2(1.0,1.0))) {
+		WARN_PRINT("Box2DShapeQueryParameters does not support scaled transforms.");
+	}
+	#endif
 	parameters.transform = p_transform;
 }
 
